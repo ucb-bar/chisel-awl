@@ -38,8 +38,7 @@ module clk_div5 (
   assign d[1] = ~q[2];
   assign d[2] = q[1] || q[0];
 
-  // [jcw]: be sure to only use clock network cells in the clock path
-  // Clock network output flop since this is in the clock path
+  // WARNING: Be sure to only use clock network cells in the clock path
   reg [2:0] q_reg;
   assign q = q_reg;
 
@@ -53,7 +52,7 @@ module clk_div5 (
   // (note that 001 isn't can't happen, so q2 is a don't care)
   assign duty_correction = ~q[1] && q[0];
 
-  // [jcw]: be sure to only use clock network cells in the clock path
+  // WARNING: Be sure to only use clock network cells in the clock path
   reg duty_correction_q_reg;
   assign duty_correction_q = duty_correction_q_reg;
   always @(negedge clk_in) begin
@@ -61,7 +60,5 @@ module clk_div5 (
   end
 
   assign clk_out = q[0] | duty_correction_q;
-
-
 
 endmodule
