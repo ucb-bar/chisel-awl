@@ -51,7 +51,7 @@ class Lane(implicit val p: Parameters) extends Module
   }
 
   if (!(p(TransceiverKey).extraOutputs.isEmpty)) {
-    transceiver.io.extraOutputs.get <> backend.io.transceiverExtraOutputs.get
+    backend.io.transceiverExtraOutputs.get <> transceiver.io.extraOutputs.get
   }
 
   if (transceiverHasIRef) {

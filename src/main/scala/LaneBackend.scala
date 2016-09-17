@@ -37,7 +37,7 @@ class LaneBackend(val c: Clock)(implicit val p: Parameters) extends Module(_cloc
 
 
   if (!(p(TransceiverKey).extraInputs.isEmpty)) {
-    mod.io.transceiverExtraInputs.get <> io.transceiverExtraInputs.get
+    io.transceiverExtraInputs.get <> mod.io.transceiverExtraInputs.get
   }
 
   if (!(p(TransceiverKey).extraOutputs.isEmpty)) {
