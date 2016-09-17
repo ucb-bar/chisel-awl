@@ -4,6 +4,7 @@ import Chisel._
 import cde._
 import junctions._
 import uncore.tilelink._
+import testchipip._
 
 class LaneBackendIO(implicit p: Parameters) extends HbwifBundle()(p) {
 
@@ -29,25 +30,23 @@ class LaneBackend(val c: Clock)(implicit val p: Parameters) extends Module(_cloc
 
   val io = new LaneBackendIO
 
-  val mod = Module(new FakeLaneBackendThing)
-
-  mod.io.transceiverData <> io.transceiverData
-  mod.io.mem <> io.mem
-  mod.io.scr <> io.scr
-
+  val scrBuilder = new SCRBuilder
 
   if (!(p(TransceiverKey).extraInputs.isEmpty)) {
-    io.transceiverExtraInputs.get <> mod.io.transceiverExtraInputs.get
+    // TODO this needs to handle nested Bundles
+    io.transceiverExtraInputs.get.elements.foreach { case (name: String, data: Data) =>
+      data := scrBuilder.control(name, UInt(0))
+    }
   }
 
   if (!(p(TransceiverKey).extraOutputs.isEmpty)) {
-    mod.io.transceiverExtraOutputs.get <> io.transceiverExtraOutputs.get
+    // TODO this needs to handle nested Bundles
+    io.transceiverExtraOutputs.get.elements.foreach { case (name: String, data: Data) =>
+      scrBuilder.status(name) := data
+    }
   }
 
-}
-
-class FakeLaneBackendThing(implicit val p: Parameters) extends BlackBox {
-
-  val io = new LaneBackendIO
+  // generate the SCR File and attach it to our SCR TileLink port
+  scrBuilder.generate(io.scr)(outermostMMIOParams)
 
 }
