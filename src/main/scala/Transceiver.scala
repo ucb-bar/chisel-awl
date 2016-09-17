@@ -7,9 +7,12 @@ import junctions.ParameterizedBundle
 case object TransceiverKey extends Field[TransceiverParameters]
 
 case class TransceiverParameters(
-  name: String = "transceiver",
+  name: String = "generic_transceiver",
   extraInputs: Option[Bundle] = None,
   extraOutputs: Option[Bundle] = None,
+  hasIRef: Boolean = true,
+  refGenHasInput: Boolean = true,
+  refGenConfig: Option[Bundle] = None,
   divideBy: Int = 5,
   isDDR: Boolean = true)
 
@@ -17,12 +20,17 @@ trait HasTransceiverParameters {
   implicit val p: Parameters
   val transceiverDivideBy = p(TransceiverKey).divideBy
   val transceiverIsDDR = p(TransceiverKey).isDDR
-  val transceiverName = p(TransceiverKey).name
+  val transceiverHasIRef = p(TransceiverKey).hasIRef
+  val transceiverRefGenHasInput = p(TransceiverKey).refGenHasInput
   val transceiverDataWidth = if (transceiverIsDDR) 2*transceiverDivideBy else transceiverDivideBy
 }
 
-class TransceiverIO(implicit val p: Parameters) extends ParameterizedBundle()(p)
-  with HasTransceiverParameters {
+class TransceiverData(implicit p: Parameters) extends HbwifBundle()(p) {
+      val rx = UInt(INPUT, width = transceiverDataWidth)
+      val tx = UInt(OUTPUT, width = transceiverDataWidth)
+}
+
+class TransceiverIO(implicit p: Parameters) extends HbwifBundle()(p) {
 
   // high speed clock input
   val fastClk = Clock(INPUT)
@@ -37,16 +45,16 @@ class TransceiverIO(implicit val p: Parameters) extends ParameterizedBundle()(p)
   val tx = (new Differential).flip
 
   // internal data interface
-  val data = new Bundle {
-      val rx = UInt(OUTPUT, width = transceiverDataWidth)
-      val tx = UInt(INPUT, width = transceiverDataWidth)
-  }
+  val data = new TransceiverData
 
-  // parameterizable configuration bundle (punched up to top level of HBWIF)
-  val extraInputs = p(TransceiverKey).extraInputs.getOrElse(new Bundle).cloneType.asInput
+  // reference current (if any)
+  val iref = if (transceiverHasIRef) Some(Bool(INPUT)) else None
 
-  // parameterizable configuration bundle (punched up to top level of HBWIF)
-  val extraOutputs = p(TransceiverKey).extraOutputs.getOrElse(new Bundle).cloneType.asOutput
+  // parameterizable configuration bundle
+  val extraInputs = p(TransceiverKey).extraInputs.map { _.cloneType.asInput }
+
+  // parameterizable configuration bundle
+  val extraOutputs = p(TransceiverKey).extraOutputs.map { _.cloneType.asOutput }
 
 }
 
@@ -54,7 +62,9 @@ class Transceiver(implicit val p: Parameters) extends BlackBox
   with HasTransceiverParameters {
 
   val io = new TransceiverIO()(p)
-  suggestName(transceiverName)
+
+  override def desiredName = p(TransceiverKey).name
+
 }
 
 

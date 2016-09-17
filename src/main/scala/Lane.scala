@@ -19,12 +19,16 @@ class LaneIO(implicit p: Parameters) extends HbwifBundle()(p) {
   // TileLink port for memory
   val mem = (new ClientUncachedTileLinkIO()(outermostParams)).flip
 
-  // Configuration TileLink port
+  // configuration TileLink port
   val scr = (new ClientUncachedTileLinkIO()(outermostMMIOParams)).flip
+
+  // optional reference for the transceiver
+  val iref = if (transceiverHasIRef) Some(Bool(INPUT)) else None
 
 }
 
-class Lane(implicit val p: Parameters) extends Module {
+class Lane(implicit val p: Parameters) extends Module
+  with HasHbwifParameters {
 
   val io = new LaneIO
 
@@ -34,20 +38,24 @@ class Lane(implicit val p: Parameters) extends Module {
   // Lane Backend
   val backend = Module(new LaneBackend(transceiver.io.slowClk))
 
-  transceiver.io.data    <> backend.io.transceiverData
-  transceiver.io.rx      <> io.rx
-  transceiver.io.fastClk <> io.fastClk
-  io.tx                  <> transceiver.io.tx
+  backend.io.transceiverData <> transceiver.io.data
+  io.rx <> transceiver.io.rx
+  transceiver.io.fastClk := io.fastClk
+  transceiver.io.tx <> io.tx
 
   backend.io.mem <> io.mem
   backend.io.scr <> io.scr
 
   if (!(p(TransceiverKey).extraInputs.isEmpty)) {
-    transceiver.io.extraInputs <> backend.io.transceiverExtraInputs
+    transceiver.io.extraInputs.get <> backend.io.transceiverExtraInputs.get
   }
 
   if (!(p(TransceiverKey).extraOutputs.isEmpty)) {
-    transceiver.io.extraOutputs <> backend.io.transceiverExtraOutputs
+    transceiver.io.extraOutputs.get <> backend.io.transceiverExtraOutputs.get
+  }
+
+  if (transceiverHasIRef) {
+    transceiver.io.iref.get <> io.iref.get
   }
 
 }

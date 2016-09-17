@@ -22,7 +22,14 @@ abstract class HbwifBundle(implicit val p: Parameters) extends ParameterizedBund
 
 class HbwifIO(implicit p: Parameters) extends HbwifBundle()(p) {
 
-  val lanes = Vec.fill(hbwifNumLanes) { new LaneIO }
+  val fastClk = Clock(INPUT)
+
+  val rx   = Vec(hbwifNumLanes, new Differential)
+  val tx   = Vec(hbwifNumLanes, (new Differential)).flip
+  val mem  = Vec(hbwifNumLanes, (new ClientUncachedTileLinkIO()(outermostParams))).flip
+  val scr  = Vec(hbwifNumLanes, (new ClientUncachedTileLinkIO()(outermostMMIOParams))).flip
+
+  val iref = if(transceiverRefGenHasInput) Some(Bool(INPUT)) else None
 
 }
 
@@ -33,7 +40,24 @@ class Hbwif(implicit val p: Parameters) extends Module
 
   val lanes = Seq.fill(hbwifNumLanes) { Module(new Lane) }
 
-  lanes.zip(io.lanes).map { i => i._1.io <> i._2 }
+  lanes.foreach { _.io.fastClk := io.fastClk }
+
+  lanes.zip(io.rx).foreach { x => x._2 <> x._1.io.rx }
+  lanes.zip(io.tx).foreach { x => x._1.io.tx <> x._2 }
+  //lanes.zip(io.mem).foreach { x => x._2 <> x._1.io.mem }
+  //lanes.zip(io.scr).foreach { x => x._2 <> x._1.io.scr }
+  lanes.zip(io.mem).foreach { x => x._1.io.mem <> x._2 }
+  lanes.zip(io.scr).foreach { x => x._1.io.scr <> x._2 }
+
+  // Instantiate and connect the reference generator if needed
+  if (transceiverHasIRef) {
+    val refGen = Module(new ReferenceGenerator)
+    lanes.zip(refGen.io.irefOut).foreach { x => x._1.io.iref.get <> x._2 }
+    if (transceiverRefGenHasInput) {
+      refGen.io.irefIn.get := io.iref.get
+    }
+  }
+
 
 }
 
