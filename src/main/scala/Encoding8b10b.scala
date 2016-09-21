@@ -115,7 +115,7 @@ object Encoding8b10b {
   ).map({ x => (Integer.parseInt(x._1.replaceAll(" ","")) -> Integer.parseInt(x._2.replaceAll(" ",""))) }).toMap
 
   // construct the big LUT from the two intermediate LUTs
-  val encodings8b10b = 
+  val encodings8b10b =
     // k, rd, code (10 bit input)
     (0 to (1<<10)).map { i =>
       val k = (i >> 9) & 0x1
@@ -127,10 +127,95 @@ object Encoding8b10b {
         val abcdei = encodings5b6b(lutIn)
         val ua = if (((edcba == 17 || edcba == 18 || edcba == 20) && rd == 0) || ((edcba == 11 || edcba == 13 || edcba == 14) && rd == 1)) 1 else 0
         val fghj = encodings3b4b((k << 5) | (intermediate5b6bRd(rd, abcdei) << 4) | (ua << 3) | hgf)
-        Some( (abcdei << 4) | fghj)
+        // k, rd, input, output
+        Some( ( Decoded8b10bSymbol(1, k, rd, i & 0xff).toBits, Encoded8b10bSymbol(1, rd, (abcdei << 4) | fghj).toBits ) )
       } else {
         None
       }
+    }.filter(!_.isEmpty).map(_.get)
+
+  def encode(s: Decoded8b10bSymbol): Encoded8b10bSymbol = {
+    (new Encoded8b10bSymbol).fromBits(MuxLookup(s.toBits, Encoded8b10bSymbol(0, 0, 0).toBits, encodings8b10b))
+  }
+
+  def decode(s: Encoded8b10bSymbol): Decoded8b10bSymbol = {
+    (new Decoded8b10bSymbol).fromBits(MuxLookup(s.toBits, Decoded8b10bSymbol(0, 0, 0, 0).toBits, encodings8b10b.map { case (enc,dec) => (dec,enc) } ))
+  }
+
+  // input a 10-bit UInt and output an aligned (or invalid) Encoded8b10bSymbol
+  def align(d: UInt): Encoded8b10bSymbol = {
+    val buf = Reg(next = d(8,0))
+    val idx = Reg(init = UInt(0, width=4))
+    val lock = Reg(init = Bool(false))
+    val rd = Reg(init = Bool(false))
+
+    val wires = Vec( (0 to 8).map { i => Cat(buf, d)(9+i, i) } )
+    val commas = wires.map { commaDetect(_) }
+    val found = commas.reduce { _ || _ }
+    val idxs = commas.zipWithIndex.map { case (b, i) => (b, UInt(i)) }
+    val next_idx = MuxCase(UInt(0), idxs)
+
+    when(found) {
+      idx := next_idx
+      lock := Bool(true)
+      // Force RD to a value based on the comma sequence
+      rd := ~wires(next_idx)(5)
+    } .elsewhen(wires(idx).xorR) {
+      // Assume we got a valid symbol, if there are an uneven number of 1s and 0s, rd should flip
+      rd := ~rd
     }
+
+
+    Encoded8b10bSymbol(lock, rd, wires(idx))
+  }
+
+  // check that bits cdeif (7,3) are the same
+  def commaDetect(d: UInt): Bool = d(7,3).andR || ~(d(7,3).orR)
+
+}
+
+class Encoded8b10bSymbol extends Bundle {
+  val data = UInt(width=10)
+  val valid = Bool()
+  val rd = Bool()
+}
+
+object Encoded8b10bSymbol {
+
+  def apply(v: Bool, rd: Bool, d: UInt): Encoded8b10bSymbol = {
+    val s = Wire(new Encoded8b10bSymbol)
+    s.valid := v
+    s.data := d
+    s.rd := rd
+    s
+  }
+
+  def apply(v: Int, rd: Int, d: Int): Encoded8b10bSymbol = {
+    Encoded8b10bSymbol(Bool(v == 1), Bool(rd == 1), UInt(d))
+  }
+
+}
+
+class Decoded8b10bSymbol extends Bundle {
+  val data = UInt(width=8)
+  val control = Bool()
+  val valid = Bool()
+  val rd = Bool()
+}
+
+object Decoded8b10bSymbol {
+
+  def apply(v: Bool, k: Bool, rd: Bool, d: UInt): Decoded8b10bSymbol = {
+    val s = Wire(new Decoded8b10bSymbol)
+    s.valid := v
+    s.control := k
+    s.rd := rd
+    s.data := d
+    s
+  }
+
+  def apply(v: Int, k: Int, rd: Int, d: Int): Decoded8b10bSymbol = {
+    Decoded8b10bSymbol(Bool(v == 1), Bool(k == 1), Bool(rd == 1), UInt(d))
+  }
 
 }
