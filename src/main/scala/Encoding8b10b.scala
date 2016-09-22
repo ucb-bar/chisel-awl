@@ -115,7 +115,7 @@ object Encoding8b10b {
   ).map({ x => (Integer.parseInt(x._1.replaceAll(" ","")) -> Integer.parseInt(x._2.replaceAll(" ",""))) }).toMap
 
   // construct the big LUT from the two intermediate LUTs
-  val encodings8b10b =
+  val encodings =
     // k, rd, code (10 bit input)
     (0 to (1<<10)).map { i =>
       val k = (i >> 9) & 0x1
@@ -128,19 +128,11 @@ object Encoding8b10b {
         val ua = if (((edcba == 17 || edcba == 18 || edcba == 20) && rd == 0) || ((edcba == 11 || edcba == 13 || edcba == 14) && rd == 1)) 1 else 0
         val fghj = encodings3b4b((k << 5) | (intermediate5b6bRd(rd, abcdei) << 4) | (ua << 3) | hgf)
         // k, rd, input, output
-        Some( ( Decoded8b10bSymbol(1, k, rd, i & 0xff).toBits, Encoded8b10bSymbol(1, rd, (abcdei << 4) | fghj).toBits ) )
+        Some( ( Decoded8b10bSymbol(1, k, rd, i & 0xff).asUInt, Encoded8b10bSymbol(1, rd, (abcdei << 4) | fghj).asUInt ) )
       } else {
         None
       }
     }.filter(!_.isEmpty).map(_.get)
-
-  def encode(s: Decoded8b10bSymbol): Encoded8b10bSymbol = {
-    (new Encoded8b10bSymbol).fromBits(MuxLookup(s.toBits, Encoded8b10bSymbol(0, 0, 0).toBits, encodings8b10b))
-  }
-
-  def decode(s: Encoded8b10bSymbol): Decoded8b10bSymbol = {
-    (new Decoded8b10bSymbol).fromBits(MuxLookup(s.toBits, Decoded8b10bSymbol(0, 0, 0, 0).toBits, encodings8b10b.map { case (enc,dec) => (dec,enc) } ))
-  }
 
   // input a 10-bit UInt and output an aligned (or invalid) Encoded8b10bSymbol
   def align(d: UInt): Encoded8b10bSymbol = {
@@ -165,12 +157,14 @@ object Encoding8b10b {
       rd := ~rd
     }
 
-
     Encoded8b10bSymbol(lock, rd, wires(idx))
   }
 
-  // check that bits cdeif (7,3) are the same
+  // Check that bits cdeif (7,3) are the same
   def commaDetect(d: UInt): Bool = d(7,3).andR || ~(d(7,3).orR)
+
+  // Default comma sequence for the encoder (K.28.5)
+  val defaultComma = UInt(Integer.parseInt("10111100",2))
 
 }
 
@@ -178,6 +172,14 @@ class Encoded8b10bSymbol extends Bundle {
   val data = UInt(width=10)
   val valid = Bool()
   val rd = Bool()
+
+  // Abuse the fact that the only valid combinations of 1s and 0s is 6,4 5,5 and 4,6
+  // and that the decoder should handle bit flips
+  def nextRd(): Bool = Mux(data.xorR, rd, ~rd)
+
+  def decode(): Decoded8b10bSymbol = {
+    (new Decoded8b10bSymbol).fromBits(MuxLookup(this.asUInt, Decoded8b10bSymbol(0, 0, 0, 0).asUInt, Encoding8b10b.encodings.map { case (enc,dec) => (dec,enc) } ))
+  }
 }
 
 object Encoded8b10bSymbol {
@@ -201,6 +203,11 @@ class Decoded8b10bSymbol extends Bundle {
   val control = Bool()
   val valid = Bool()
   val rd = Bool()
+
+  def encode(): Encoded8b10bSymbol = {
+    (new Encoded8b10bSymbol).fromBits(MuxLookup(this.asUInt, Encoded8b10bSymbol(0, 0, 0).asUInt, Encoding8b10b.encodings))
+  }
+
 }
 
 object Decoded8b10bSymbol {
@@ -218,4 +225,23 @@ object Decoded8b10bSymbol {
     Decoded8b10bSymbol(Bool(v == 1), Bool(k == 1), Bool(rd == 1), UInt(d))
   }
 
+}
+
+class Channel8b10b extends Bundle {
+  val decoded = UInt(INPUT, width=8)
+  val control = Bool(INPUT)
+  val valid = Bool(INPUT)
+  val encoded = UInt(OUTPUT, width=8)
+}
+
+class Encoder8b10b extends Module {
+
+  val io = new Channel8b10b
+
+  val rd = Reg(init = Bool(false))
+
+  val encoded = Decoded8b10bSymbol(Bool(true), io.control || ~io.valid, rd, Mux(io.valid, Encoding8b10b.defaultComma, io.decoded)).encode
+
+  rd := encoded.nextRd
+  io.encoded := encoded.data
 }
