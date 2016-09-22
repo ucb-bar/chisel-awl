@@ -231,7 +231,7 @@ class Channel8b10b extends Bundle {
   val decoded = UInt(INPUT, width=8)
   val control = Bool(INPUT)
   val valid = Bool(INPUT)
-  val encoded = UInt(OUTPUT, width=8)
+  val encoded = UInt(OUTPUT, width=10)
 }
 
 class Encoder8b10b extends Module {
@@ -244,4 +244,17 @@ class Encoder8b10b extends Module {
 
   rd := encoded.nextRd
   io.encoded := encoded.data
+}
+
+class Decoder8b10b extends Bundle {
+
+  val io = (new Channel8b10b).flip
+
+  val encoded = Encoding8b10b.align(io.encoded)
+  val decoded = encoded.decode
+
+  io.valid := decoded.valid
+  io.control := decoded.control
+  io.decoded := decoded.data
+
 }
