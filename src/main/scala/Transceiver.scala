@@ -26,8 +26,8 @@ trait HasTransceiverParameters {
 }
 
 class TransceiverData(implicit p: Parameters) extends HbwifBundle()(p) {
-      val rx = UInt(INPUT, width = transceiverDataWidth)
-      val tx = UInt(OUTPUT, width = transceiverDataWidth)
+  val rx = UInt(OUTPUT, width = transceiverDataWidth)
+  val tx = UInt(INPUT, width = transceiverDataWidth)
 }
 
 class TransceiverIO(implicit p: Parameters) extends HbwifBundle()(p) {

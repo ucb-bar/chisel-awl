@@ -11,7 +11,7 @@ class LaneBackendIO(implicit p: Parameters) extends HbwifBundle()(p) {
   // data from/to the transceiver
   val transceiverData = (new TransceiverData).flip
 
-  // TileLink port for memory
+  // tilelink port for memory
   val mem = (new ClientUncachedTileLinkIO()(outermostParams)).flip
 
   // Configuration TileLink port
@@ -29,6 +29,18 @@ class LaneBackend(val c: Clock)(implicit val p: Parameters) extends Module(_cloc
   with HasHbwifParameters {
 
   val io = new LaneBackendIO
+
+  require(transceiverDataWidth == 10)
+  val encoder = Module(new Encoder8b10b)
+  val decoder = Module(new Decoder8b10b)
+
+  io.transceiverData.tx := encoder.io.encoded
+  decoder.io.encoded := io.transceiverData.rx
+
+  val memSerDes = Module(new HbwifTileLinkMemSerDes)
+  encoder.io.decoded <> memSerDes.io.down
+  memSerDes.io.up <> decoder.io.decoded
+  memSerDes.io.mem <> io.mem
 
   val scrBuilder = new SCRBuilder
 
