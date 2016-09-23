@@ -44,8 +44,6 @@ class Hbwif(implicit val p: Parameters) extends Module
 
   lanes.zip(io.rx).foreach { x => x._2 <> x._1.io.rx }
   lanes.zip(io.tx).foreach { x => x._1.io.tx <> x._2 }
-  //lanes.zip(io.mem).foreach { x => x._2 <> x._1.io.mem }
-  //lanes.zip(io.scr).foreach { x => x._2 <> x._1.io.scr }
   lanes.zip(io.mem).foreach { x => x._1.io.mem <> x._2 }
   lanes.zip(io.scr).foreach { x => x._1.io.scr <> x._2 }
 
