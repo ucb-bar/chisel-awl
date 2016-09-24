@@ -23,6 +23,9 @@ class LaneBackendIO(implicit p: Parameters) extends HbwifBundle()(p) {
   // parameterizable configuration bundle
   val transceiverExtraOutputs = p(TransceiverKey).extraOutputs.map { _.cloneType.asInput }
 
+  // reset for the transceiver
+  val transceiverReset = Bool(OUTPUT)
+
 }
 
 class LaneBackend(val c: Clock)(implicit val p: Parameters) extends Module(_clock = c)
@@ -43,6 +46,8 @@ class LaneBackend(val c: Clock)(implicit val p: Parameters) extends Module(_cloc
   memSerDes.io.mem <> io.mem
 
   val scrBuilder = new SCRBuilder
+
+  scrBuilder.control("reset", UInt(1))
 
   if (!(p(TransceiverKey).extraInputs.isEmpty)) {
     // TODO this needs to handle nested Bundles

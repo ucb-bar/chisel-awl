@@ -13,6 +13,7 @@ case class TransceiverParameters(
   hasIRef: Boolean = true,
   refGenHasInput: Boolean = true,
   refGenConfig: Option[Bundle] = None,
+  refGenName: String = "generic_reference_generator",
   divideBy: Int = 5,
   isDDR: Boolean = true)
 
@@ -37,6 +38,9 @@ class TransceiverIO(implicit p: Parameters) extends HbwifBundle()(p) {
 
   // low speed clock output
   val slowClk = Clock(OUTPUT)
+
+  // reset
+  val reset = Bool(INPUT)
 
   // RX pad inputs
   val rx = new Differential

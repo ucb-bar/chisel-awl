@@ -43,6 +43,8 @@ class Lane(implicit val p: Parameters) extends Module
   transceiver.io.fastClk := io.fastClk
   transceiver.io.tx <> io.tx
 
+  transceiver.io.reset := backend.io.transceiverReset
+
   backend.io.mem <> io.mem
   backend.io.scr <> io.scr
 

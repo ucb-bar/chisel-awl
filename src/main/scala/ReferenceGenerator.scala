@@ -22,4 +22,6 @@ class ReferenceGenerator(implicit val p: Parameters) extends BlackBox {
 
   val io = new ReferenceGeneratorIO
 
+  override def desiredName = p(TransceiverKey).refGenName
+
 }
