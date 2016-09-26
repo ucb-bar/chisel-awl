@@ -5,7 +5,8 @@ import cde._
 import junctions.ParameterizedBundle
 
 
-class ReferenceGeneratorIO(implicit p: Parameters) extends HbwifBundle()(p) {
+class ReferenceGeneratorIO(implicit p: Parameters) extends ParameterizedBundle()(p)
+  with HasTransceiverParameters {
 
   // parameterizable configuration bundle
   val config = p(TransceiverKey).refGenConfig.map { _.cloneType.asInput }

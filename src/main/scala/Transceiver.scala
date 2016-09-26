@@ -26,12 +26,14 @@ trait HasTransceiverParameters {
   val transceiverDataWidth = if (transceiverIsDDR) 2*transceiverDivideBy else transceiverDivideBy
 }
 
-class TransceiverData(implicit p: Parameters) extends HbwifBundle()(p) {
+class TransceiverData(implicit p: Parameters) extends ParameterizedBundle()(p)
+  with HasTransceiverParameters {
   val rx = UInt(OUTPUT, width = transceiverDataWidth)
   val tx = UInt(INPUT, width = transceiverDataWidth)
 }
 
-class TransceiverIO(implicit p: Parameters) extends HbwifBundle()(p) {
+class TransceiverIO(implicit p: Parameters) extends ParameterizedBundle()(p)
+  with HasTransceiverParameters {
 
   // high speed clock input
   val fastClk = Clock(INPUT)

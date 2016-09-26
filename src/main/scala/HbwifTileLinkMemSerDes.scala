@@ -5,7 +5,8 @@ import cde._
 import junctions._
 import uncore.tilelink._
 
-class HbwifTileLinkMemSerDesIO(implicit p: Parameters) extends HbwifBundle()(p) {
+class HbwifTileLinkMemSerDesIO(implicit p: Parameters) extends ParameterizedBundle()(p)
+  with HasHbwifParameters {
 
   val down = (new Decoded8b10bSymbol).asOutput
   val up = (new Decoded8b10bSymbol).asInput

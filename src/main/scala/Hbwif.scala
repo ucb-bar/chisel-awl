@@ -4,6 +4,7 @@ import Chisel._
 import cde._
 import junctions.ParameterizedBundle
 import uncore.tilelink._
+import uncore.tilelink2.{LazyModule, LazyModuleImp}
 
 case object HbwifKey extends Field[HbwifParameters]
 
@@ -17,46 +18,51 @@ trait HasHbwifParameters extends HasBertParameters with HasTransceiverParameters
   val outermostMMIOParams = p.alterPartial({ case TLId => "MMIO_Outermost" })
 }
 
-abstract class HbwifBundle(implicit val p: Parameters) extends ParameterizedBundle()(p)
-  with HasHbwifParameters
+trait Hbwif extends LazyModule
+  with HasHbwifParameters {
+  val pDevices: ResourceManager[AddrMapEntry]
 
-class HbwifIO(implicit p: Parameters) extends HbwifBundle()(p) {
-
-  val fastClk = Clock(INPUT)
-
-  val rx   = Vec(hbwifNumLanes, new Differential)
-  val tx   = Vec(hbwifNumLanes, (new Differential)).flip
-  val mem  = Vec(hbwifNumLanes, (new ClientUncachedTileLinkIO()(outermostParams))).flip
-  val scr  = Vec(hbwifNumLanes, (new ClientUncachedTileLinkIO()(outermostMMIOParams))).flip
-
-  val iref = if(transceiverRefGenHasInput) Some(Bool(INPUT)) else None
-
+  (0 until hbwifNumLanes).foreach { i =>
+    // TODO: 1024 is arbitrary, calculate this number from the SCR size
+    pDevices.add(AddrMapEntry(s"hbwif_lane$i", MemSize(1024, MemAttr(AddrMapProt.RW))))
+  }
+  pDevices.add(AddrMapEntry("hbwif_", MemSize(1024, MemAttr(AddrMapProt.RW))))
 }
 
-class Hbwif(implicit val p: Parameters) extends Module
-  with HasHbwifParameters {
+trait HbwifBundle extends HasHbwifParameters {
+  val hbwifRx      = Vec(hbwifNumLanes, new Differential)
+  val hbwifTx      = Vec(hbwifNumLanes, (new Differential)).flip
+  val hbwifIref    = if(transceiverRefGenHasInput) Some(Bool(INPUT)) else None
+  val hbwifFastClk = Bool(INPUT)
+}
 
-  val io = new HbwifIO
+trait HbwifModule {
+  implicit val p: Parameters
+  val outer: Periphery
+  val io: HbwifBundle
+  val mmioNetwork: Option[TileLinkRecursiveInterconnect]
+  val coreplex: Coreplex
 
-  val lanes = Seq.fill(hbwifNumLanes) { Module(new Lane) }
+  val hbwifLanes = Seq.fill(hbwifNumLanes) { Module(new Lane) }
 
-  lanes.foreach { _.io.fastClk := io.fastClk }
+  hbwifLanes.foreach { _.io.fastClk := io.hbwifFastClk }
 
-  lanes.zip(io.rx).foreach { x => x._2 <> x._1.io.rx }
-  lanes.zip(io.tx).foreach { x => x._1.io.tx <> x._2 }
-  lanes.zip(io.mem).foreach { x => x._1.io.mem <> x._2 }
-  lanes.zip(io.scr).foreach { x => x._1.io.scr <> x._2 }
+  hbwifLanes.zip(io.rx).foreach { x => x._2 <> x._1.io.hbwifRx }
+  hbwifLanes.zip(io.tx).foreach { x => x._1.io.hbwifTx <> x._2 }
+
+  (0 until hbwifNumLanes).foreach { i =>
+    hbwifLanes(i).io.scr <> mmioNetwork.get.port(s"hbwif_lane$i")
+  }
+  hbwifLanes.zip(coreplex.io.master.mem).foreach { x => x._1.io.mem <> x._2 }
 
   // Instantiate and connect the reference generator if needed
   if (transceiverHasIRef) {
-    val refGen = Module(new ReferenceGenerator)
-    lanes.zip(refGen.io.irefOut).foreach { x => x._1.io.iref.get <> x._2 }
+    val hbwifRefGen = Module(new ReferenceGenerator)
+    hbwifLanes.zip(hbwifRefGen.io.irefOut).foreach { x => x._1.io.iref.get <> x._2 }
     if (transceiverRefGenHasInput) {
-      refGen.io.irefIn.get := io.iref.get
+      refGen.io.irefIn.get := io.hbwifIref.get
     }
   }
-
-
 }
 
 
