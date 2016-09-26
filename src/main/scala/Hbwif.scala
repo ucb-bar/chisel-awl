@@ -42,6 +42,7 @@ trait HbwifModule {
   val io: HbwifBundle
   val mmioNetwork: Option[TileLinkRecursiveInterconnect]
   val coreplex: Coreplex
+  val hbwifIO: Vec[ClientUncachedTileLinkIO]
 
   val hbwifLanes = Seq.fill(hbwifNumLanes) { Module(new Lane) }
 
@@ -53,7 +54,7 @@ trait HbwifModule {
   (0 until hbwifNumLanes).foreach { i =>
     hbwifLanes(i).io.scr <> mmioNetwork.get.port(s"hbwif_lane$i")
   }
-  hbwifLanes.zip(coreplex.io.master.mem).foreach { x => x._1.io.mem <> x._2 }
+  hbwifLanes.zip(hbwifIO).foreach { x => x._1.io.mem <> x._2 }
 
   // Instantiate and connect the reference generator if needed
   if (transceiverHasIRef) {
