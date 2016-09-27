@@ -6,7 +6,7 @@ import junctions._
 import uncore.tilelink._
 import testchipip._
 
-class LaneBackendIO(implicit p: Parameters) extends ParameterizedBundle()(p)
+class LaneBackendIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
   with HasHbwifParameters {
 
   // data from/to the transceiver

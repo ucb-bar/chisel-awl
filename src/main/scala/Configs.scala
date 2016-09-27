@@ -2,7 +2,6 @@ package hbwif
 
 import Chisel._
 import cde._
-//import rocketchip._
 import coreplex._
 
 class DefaultHbwifConfig extends Config(

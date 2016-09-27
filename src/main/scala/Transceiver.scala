@@ -2,7 +2,7 @@ package hbwif
 
 import Chisel._
 import cde._
-import junctions.ParameterizedBundle
+import util.ParameterizedBundle
 
 case object TransceiverKey extends Field[TransceiverParameters]
 
@@ -26,13 +26,13 @@ trait HasTransceiverParameters {
   val transceiverDataWidth = if (transceiverIsDDR) 2*transceiverDivideBy else transceiverDivideBy
 }
 
-class TransceiverData(implicit p: Parameters) extends ParameterizedBundle()(p)
+class TransceiverData(implicit val p: Parameters) extends ParameterizedBundle()(p)
   with HasTransceiverParameters {
   val rx = UInt(OUTPUT, width = transceiverDataWidth)
   val tx = UInt(INPUT, width = transceiverDataWidth)
 }
 
-class TransceiverIO(implicit p: Parameters) extends ParameterizedBundle()(p)
+class TransceiverIO(implicit val p: Parameters) extends ParameterizedBundle()(p)
   with HasTransceiverParameters {
 
   // high speed clock input

@@ -2,11 +2,11 @@ package hbwif
 
 import Chisel._
 import cde._
-import junctions.ParameterizedBundle
+import util.ParameterizedBundle
 
 
-class ReferenceGeneratorIO(implicit p: Parameters) extends ParameterizedBundle()(p)
-  with HasTransceiverParameters {
+class ReferenceGeneratorIO(implicit val p: Parameters) extends ParameterizedBundle()(p)
+  with HasHbwifParameters {
 
   // parameterizable configuration bundle
   val config = p(TransceiverKey).refGenConfig.map { _.cloneType.asInput }

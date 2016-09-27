@@ -5,7 +5,7 @@ import cde._
 import junctions._
 import uncore.tilelink._
 
-class LaneIO(implicit p: Parameters) extends ParameterizedBundle()(p)
+class LaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
   with HasHbwifParameters {
 
   // high speed clock input

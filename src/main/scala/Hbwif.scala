@@ -2,9 +2,12 @@ package hbwif
 
 import Chisel._
 import cde._
-import junctions.ParameterizedBundle
+import util.ParameterizedBundle
+import rocketchip._
+import junctions._
 import uncore.tilelink._
 import uncore.tilelink2.{LazyModule, LazyModuleImp}
+import coreplex._
 
 case object HbwifKey extends Field[HbwifParameters]
 
@@ -36,20 +39,18 @@ trait HbwifBundle extends HasHbwifParameters {
   val hbwifFastClk = Bool(INPUT)
 }
 
-trait HbwifModule {
+trait HbwifModule extends HasHbwifParameters {
   implicit val p: Parameters
-  val outer: Periphery
   val io: HbwifBundle
   val mmioNetwork: Option[TileLinkRecursiveInterconnect]
-  val coreplex: Coreplex
   val hbwifIO: Vec[ClientUncachedTileLinkIO]
 
   val hbwifLanes = Seq.fill(hbwifNumLanes) { Module(new Lane) }
 
   hbwifLanes.foreach { _.io.fastClk := io.hbwifFastClk }
 
-  hbwifLanes.zip(io.rx).foreach { x => x._2 <> x._1.io.hbwifRx }
-  hbwifLanes.zip(io.tx).foreach { x => x._1.io.hbwifTx <> x._2 }
+  hbwifLanes.map(_.io.rx).zip(io.hbwifRx) map { case (lane, top) => lane <> top }
+  hbwifLanes.map(_.io.tx).zip(io.hbwifTx) map { case (lane, top) => lane <> top }
 
   (0 until hbwifNumLanes).foreach { i =>
     hbwifLanes(i).io.scr <> mmioNetwork.get.port(s"hbwif_lane$i")
@@ -61,7 +62,7 @@ trait HbwifModule {
     val hbwifRefGen = Module(new ReferenceGenerator)
     hbwifLanes.zip(hbwifRefGen.io.irefOut).foreach { x => x._1.io.iref.get <> x._2 }
     if (transceiverRefGenHasInput) {
-      refGen.io.irefIn.get := io.hbwifIref.get
+      hbwifRefGen.io.irefIn.get := io.hbwifIref.get
     }
   }
 }

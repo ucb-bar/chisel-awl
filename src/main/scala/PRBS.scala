@@ -2,7 +2,7 @@ package hbwif
 
 import Chisel._
 import cde._
-import junctions.ParameterizedBundle
+import util.ParameterizedBundle
 import scala.collection.mutable.ArrayBuffer
 
 
