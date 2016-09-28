@@ -9,8 +9,8 @@ module example_transceiver (
   input rx_n,
   output tx_p,
   output tx_n,
-  input [9:0] transceiverData_tx,
-  output [9:0] transceiverData_rx,
+  input [9:0] data_tx,
+  output [9:0] data_rx,
   input iref,
   input [3:0] extraInputs_txSwing,
   input extraInputs_cdrMode
