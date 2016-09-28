@@ -25,6 +25,7 @@ class ExampleHbwifConfig extends Config(
       refGenHasInput = true,
       refGenConfig = Some(new ExampleRefGenConfig),
       refGenName = "example_reference_generator",
+      refGenNumOutputs = 8,
       divideBy = 5,
       isDDR = true
     )

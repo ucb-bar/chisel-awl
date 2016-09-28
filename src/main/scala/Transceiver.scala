@@ -14,6 +14,7 @@ case class TransceiverParameters(
   refGenHasInput: Boolean = true,
   refGenConfig: Option[Bundle] = None,
   refGenName: String = "generic_reference_generator",
+  refGenNumOutputs: Int = 8,
   divideBy: Int = 5,
   isDDR: Boolean = true)
 
@@ -23,6 +24,7 @@ trait HasTransceiverParameters {
   val transceiverIsDDR = p(TransceiverKey).isDDR
   val transceiverHasIRef = p(TransceiverKey).hasIRef
   val transceiverRefGenHasInput = p(TransceiverKey).refGenHasInput
+  val transceiverRefGenNumOutputs = p(TransceiverKey).refGenNumOutputs
   val transceiverDataWidth = if (transceiverIsDDR) 2*transceiverDivideBy else transceiverDivideBy
 }
 
