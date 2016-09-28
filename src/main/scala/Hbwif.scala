@@ -42,7 +42,7 @@ trait HbwifModule extends HasHbwifParameters {
   val hbwifIO: Vec[ClientUncachedTileLinkIO]
   val hbwifFastClock: Clock
 
-  val hbwifLanes = Seq.fill(hbwifNumLanes) { Module(new Lane) }
+  val hbwifLanes = Seq.fill(hbwifNumLanes) { Module(new HbwifLane) }
 
   hbwifLanes.foreach { _.io.fastClk := hbwifFastClock }
 

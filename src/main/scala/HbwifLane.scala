@@ -5,7 +5,7 @@ import cde._
 import junctions._
 import uncore.tilelink._
 
-class LaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
+class HbwifLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
   with HasHbwifParameters {
 
   // high speed clock input
@@ -28,16 +28,16 @@ class LaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
 
 }
 
-class Lane(implicit val p: Parameters) extends Module
+class HbwifLane(implicit val p: Parameters) extends Module
   with HasHbwifParameters {
 
-  val io = new LaneIO
+  val io = new HbwifLaneIO
 
   // Transceiver
   val transceiver = Module(new Transceiver)
 
   // Lane Backend
-  val backend = Module(new LaneBackend(transceiver.io.slowClk))
+  val backend = Module(new HbwifLaneBackend(transceiver.io.slowClk))
 
   backend.io.transceiverData <> transceiver.io.data
   io.rx <> transceiver.io.rx

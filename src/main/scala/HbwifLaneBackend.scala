@@ -6,7 +6,7 @@ import junctions._
 import uncore.tilelink._
 import testchipip._
 
-class LaneBackendIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
+class HbwifLaneBackendIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
   with HasHbwifParameters {
 
   // data from/to the transceiver
@@ -29,10 +29,10 @@ class LaneBackendIO(implicit val p: Parameters) extends util.ParameterizedBundle
 
 }
 
-class LaneBackend(val c: Clock)(implicit val p: Parameters) extends Module(_clock = c)
+class HbwifLaneBackend(val c: Clock)(implicit val p: Parameters) extends Module(_clock = c)
   with HasHbwifParameters {
 
-  val io = new LaneBackendIO
+  val io = new HbwifLaneBackendIO
 
   require(transceiverDataWidth == 10)
   val encoder = Module(new Encoder8b10b)
