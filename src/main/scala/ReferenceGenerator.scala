@@ -12,7 +12,7 @@ class ReferenceGeneratorIO(implicit val p: Parameters) extends ParameterizedBund
   val config = p(TransceiverKey).refGenConfig.map { _.cloneType.asInput }
 
   // reference outputs
-  val irefOut = Vec.fill(hbwifNumLanes) { Bool(OUTPUT) }
+  val irefOut = UInt(OUTPUT, width=hbwifNumLanes)
 
   // optional reference input
   val irefIn = if (transceiverRefGenHasInput) Some(Bool(INPUT)) else None
