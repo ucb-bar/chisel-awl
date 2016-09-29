@@ -11,7 +11,7 @@ class HbwifTileLinkMemSerDesIO(implicit val p: Parameters) extends util.Paramete
   val down = (new Decoded8b10bSymbol).asOutput
   val up = (new Decoded8b10bSymbol).asInput
 
-  val mem = (new ClientUncachedTileLinkIO()(outermostParams)).flip
+  val mem = (new ClientUncachedTileLinkIO()(edgeMemParams)).flip
 
 }
 

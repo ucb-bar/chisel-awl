@@ -13,10 +13,10 @@ class HbwifLaneBackendIO(implicit val p: Parameters) extends util.ParameterizedB
   val transceiverData = (new TransceiverData).flip
 
   // tilelink port for memory
-  val mem = (new ClientUncachedTileLinkIO()(outermostParams)).flip
+  val mem = (new ClientUncachedTileLinkIO()(edgeMemParams)).flip
 
   // Configuration TileLink port
-  val scr = (new ClientUncachedTileLinkIO()(outermostMMIOParams)).flip
+  val scr = (new ClientUncachedTileLinkIO()(edgeMMIOParams)).flip
 
   // parameterizable configuration bundle
   val transceiverExtraInputs = p(TransceiverKey).extraInputs.map { _.cloneType.asOutput }
@@ -65,6 +65,6 @@ class HbwifLaneBackend(val c: Clock)(implicit val p: Parameters) extends Module(
   }
 
   // generate the SCR File and attach it to our SCR TileLink port
-  scrBuilder.generate(io.scr)(outermostMMIOParams)
+  scrBuilder.generate(io.scr)(edgeMMIOParams)
 
 }

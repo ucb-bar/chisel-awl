@@ -18,10 +18,10 @@ class HbwifLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()
   val tx = (new Differential).flip
 
   // TileLink port for memory
-  val mem = (new ClientUncachedTileLinkIO()(outermostParams)).flip
+  val mem = (new ClientUncachedTileLinkIO()(edgeMemParams)).flip
 
   // configuration TileLink port
-  val scr = (new ClientUncachedTileLinkIO()(outermostMMIOParams)).flip
+  val scr = (new ClientUncachedTileLinkIO()(edgeMMIOParams)).flip
 
   // optional reference for the transceiver
   val iref = if (transceiverHasIRef) Some(Bool(INPUT)) else None
