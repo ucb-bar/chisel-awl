@@ -51,28 +51,28 @@ class HbwifLaneBackend(val c: Clock)(implicit val p: Parameters) extends Module(
   scrBuilder.addControl("reset", UInt(1))
 
   // TODO this needs to handle nested Bundles
-  io.transceiverExtraInputs.get.elements.keys.foreach {
+  io.transceiverExtraInputs.map(_.elements.keys.foreach {
     name => scrBuilder.addControl(name)
-  }
+  })
 
   // TODO this needs to handle nested Bundles
-  io.transceiverExtraOutputs.get.elements.keys.foreach {
+  io.transceiverExtraOutputs.map(_.elements.keys.foreach {
     name => scrBuilder.addStatus(name)
-  }
+  })
 
   // generate the SCR File and attach it to our SCR TileLink port
   val scr = scrBuilder.generate(edgeMMIOParams)
   scr.io.tl <> io.scr
 
   // TODO this needs to handle nested Bundles
-  io.transceiverExtraInputs.get.elements.foreach {
+  io.transceiverExtraInputs.map(_.elements.foreach {
     case (name: String, data: Data) => scr.control(name) := data
-  }
+  })
 
   // TODO this needs to handle nested Bundles
-  io.transceiverExtraOutputs.get.elements.foreach {
+  io.transceiverExtraOutputs.map(_.elements.foreach {
     case (name: String, data: Data) => data := scr.status(name)
-  }
+  })
 
   io.transceiverReset := scr.control("reset")
 }
