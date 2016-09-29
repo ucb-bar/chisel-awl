@@ -66,12 +66,12 @@ class HbwifLaneBackend(val c: Clock)(implicit val p: Parameters) extends Module(
 
   // TODO this needs to handle nested Bundles
   io.transceiverExtraInputs.map(_.elements.foreach {
-    case (name: String, data: Data) => scr.control(name) := data
+    case (name: String, data: Data) => data := scr.control(name)
   })
 
   // TODO this needs to handle nested Bundles
   io.transceiverExtraOutputs.map(_.elements.foreach {
-    case (name: String, data: Data) => data := scr.status(name)
+    case (name: String, data: Data) => scr.status(name) := data
   })
 
   io.transceiverReset := scr.control("reset")
