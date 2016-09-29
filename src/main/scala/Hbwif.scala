@@ -15,8 +15,10 @@ case class HbwifParameters(
   val numLanes: Int = 8,
   val bufferDepth: Int = 10) // Calculated based on worst-case transmission line delay and codec, serdes, etc. latency
 
-trait HasHbwifParameters extends HasBertParameters with HasTransceiverParameters with HasPeripheryParameters {
+trait HasHbwifParameters extends HasBertParameters with HasTransceiverParameters {
   val hbwifNumLanes = p(HbwifKey).numLanes
+  val memParams = p.alterPartial({ case TLId => "L2toMC" })
+  val mmioParams = p.alterPartial({ case TLId => "L2toMMIO" })
 }
 
 trait Hbwif extends LazyModule
