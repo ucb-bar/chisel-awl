@@ -23,11 +23,11 @@ trait HasHbwifParameters extends HasBertParameters with HasTransceiverParameters
 
 trait Hbwif extends LazyModule
   with HasHbwifParameters {
-  val pDevices: ResourceManager[AddrMapEntry]
+  val scrDevices: ResourceManager[AddrMapEntry]
 
   (0 until hbwifNumLanes).foreach { i =>
     // TODO: 1024 is arbitrary, calculate this number from the SCR size
-    pDevices.add(AddrMapEntry(s"hbwif_lane$i", MemSize(4096, MemAttr(AddrMapProt.RW))))
+    scrDevices.add(AddrMapEntry(s"hbwif_lane$i", MemSize(4096, MemAttr(AddrMapProt.RW))))
   }
 }
 
@@ -40,7 +40,7 @@ trait HbwifBundle extends HasHbwifParameters {
 trait HbwifModule extends HasHbwifParameters {
   implicit val p: Parameters
   val io: HbwifBundle
-  val pBus: TileLinkRecursiveInterconnect
+  val scrBus: TileLinkRecursiveInterconnect
   val hbwifIO: Vec[ClientUncachedTileLinkIO]
   val hbwifFastClock: Clock
 
@@ -52,7 +52,7 @@ trait HbwifModule extends HasHbwifParameters {
   hbwifLanes.map(_.io.tx).zip(io.hbwifTx) map { case (lane, top) => lane <> top }
 
   (0 until hbwifNumLanes).foreach { i =>
-    hbwifLanes(i).io.scr <> pBus.port(s"hbwif_lane$i")
+    hbwifLanes(i).io.scr <> scrBus.port(s"hbwif_lane$i")
   }
   hbwifLanes.zip(hbwifIO).foreach { x => x._1.io.mem <> x._2 }
 
