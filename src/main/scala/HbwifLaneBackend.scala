@@ -46,7 +46,7 @@ class HbwifLaneBackend(val c: Clock)(implicit val p: Parameters) extends Module(
   memSerDes.io.up <> decoder.io.decoded
   memSerDes.io.mem <> io.mem
 
-  val scrBuilder = new SCRBuilder
+  val scrBuilder = new SCRBuilder("hbwif_lane")
 
   scrBuilder.addControl("reset", UInt(1))
 
