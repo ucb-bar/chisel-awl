@@ -17,8 +17,8 @@ case class HbwifParameters(
 
 trait HasHbwifParameters extends HasBertParameters with HasTransceiverParameters {
   val hbwifNumLanes = p(HbwifKey).numLanes
-  val memParams = p.alterPartial({ case TLId => "L2toMC" })
-  val mmioParams = p.alterPartial({ case TLId => "L2toMMIO" })
+  val memParams = p.alterPartial({ case TLId => "Switcher" })
+  val mmioParams = p.alterPartial({ case TLId => "MMIOtoSCR" })
 }
 
 trait Hbwif extends LazyModule
