@@ -4,6 +4,7 @@ import Chisel._
 import cde._
 import util.ParameterizedBundle
 import scala.collection.mutable.ArrayBuffer
+import testchipip.HeaderEnum
 
 
 class PRBS(
@@ -19,10 +20,7 @@ class PRBS(
     val out            = Bits(OUTPUT, width = parallelOutBits)
   }
   // modes
-  val LOAD = 0
-  val SEED = 1
-  val RUN  = 2
-  val STOP = 3
+  val prbsModes = HeaderEnum("prbs_mode", "load", "seed", "run", "stop")
 
   // implement PRBS with an LFSR
   val lfsr = Reg(init = UInt(1, width = prbsWidth))
@@ -42,18 +40,18 @@ class PRBS(
   io.seed_good := lfsr.orR
 
   switch(io.mode) {
-    is(UInt(LOAD)) {
+    is(prbsModes("load")) {
       // parallel load the state
       lfsr := io.load_in
     }
-    is(UInt(SEED)) {
+    is(prbsModes("seed")) {
       if (parallelOutBits > prbsWidth) {
         lfsr := io.seed_in(prbsWidth-1,0)
       } else {
         lfsr := Cat(io.seed_in,lfsr(prbsWidth-1,parallelOutBits))
       }
     }
-    is(UInt(RUN)) {
+    is(prbsModes("run")) {
       lfsr := lfsr_wires(parallelOutBits)
     }
   }

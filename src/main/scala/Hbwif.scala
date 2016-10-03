@@ -43,6 +43,9 @@ trait HbwifModule extends HasHbwifParameters {
   val scrBus: TileLinkRecursiveInterconnect
   val hbwifIO: Vec[ClientUncachedTileLinkIO]
   val hbwifFastClock: Clock
+  val clock: Clock
+  val reset: Bool
+
 
   val hbwifLanes = Seq.fill(hbwifNumLanes) { Module(new HbwifLane) }
 
@@ -53,6 +56,8 @@ trait HbwifModule extends HasHbwifParameters {
 
   (0 until hbwifNumLanes).foreach { i =>
     hbwifLanes(i).io.scr <> scrBus.port(s"hbwif_lane$i")
+    hbwifLanes(i).io.systemClock := clock
+    hbwifLanes(i).io.systemReset := reset
   }
   hbwifLanes.zip(hbwifIO).foreach { x => x._1.io.mem <> x._2 }
 

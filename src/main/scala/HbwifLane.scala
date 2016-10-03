@@ -26,6 +26,13 @@ class HbwifLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()
   // optional reference for the transceiver
   val iref = if (transceiverHasIRef) Some(Bool(INPUT)) else None
 
+  // Async crossing stuff
+  // System clock
+  val systemClock = Clock(INPUT)
+
+  // System reset
+  val systemReset = Bool(INPUT)
+
 }
 
 class HbwifLane(implicit val p: Parameters) extends Module
@@ -46,8 +53,8 @@ class HbwifLane(implicit val p: Parameters) extends Module
 
   transceiver.io.reset := backend.io.transceiverReset
 
-  backend.io.mem <> io.mem
-  backend.io.scr <> io.scr
+  backend.io.mem <> AsyncUTileLinkFrom(io.systemClock, io.systemReset, io.mem)
+  backend.io.scr <> AsyncUTileLinkFrom(io.systemClock, io.systemReset, io.scr)
 
   if (!(p(TransceiverKey).extraInputs.isEmpty)) {
     transceiver.io.extraInputs.get <> backend.io.transceiverExtraInputs.get
