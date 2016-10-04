@@ -6,7 +6,7 @@ import util.ParameterizedBundle
 import rocketchip._
 import junctions._
 import uncore.tilelink._
-import uncore.tilelink2.{LazyModule, LazyModuleImp}
+import diplomacy.{LazyModule, LazyModuleImp}
 import coreplex._
 
 case object HbwifKey extends Field[HbwifParameters]
