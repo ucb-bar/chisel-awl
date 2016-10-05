@@ -26,9 +26,9 @@ library(HBWIF) {
   default_leakage_power_density : 0 ;
   default_output_pin_cap : 0 ;
 
-  operating_conditions(tt28_0.90V_25C) {
+  operating_conditions(ss28_0.90V_125C) {
     process : 1 ;
-    temperature : 25 ;
+    temperature : 125 ;
     voltage : 0.9 ;
   }
 

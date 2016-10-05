@@ -20,4 +20,7 @@ class HbwifTileLinkMemSerDes(implicit val p: Parameters) extends Module
 
   val io = new HbwifTileLinkMemSerDesIO
 
+  // temporary stuff
+  io.down := Reg(next = io.up)
+
 }
