@@ -14,6 +14,11 @@ module example_transceiver (
   input iref,
   input [3:0] extraInputs_txSwing,
   input extraInputs_cdrMode
+  `ifdef HBWIF_USE_PG_PINS
+  , inout avdd
+  , inout dvdd
+  , inout gnd
+  `endif
 );
 
 
