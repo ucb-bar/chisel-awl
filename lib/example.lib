@@ -1,0 +1,251 @@
+library(HBWIF) {
+  delay_model : table_lookup ;
+  library_features(report_delay_calculation);
+  time_unit : 1ns ;
+  voltage_unit : 1V ;
+  current_unit : 1mA ;
+  capacitive_load_unit(1, pf);
+  pulling_resistance_unit : 1ohm ;
+  leakage_power_unit : 1uW ;
+  input_threshold_pct_fall : 60 ;
+  input_threshold_pct_rise : 40 ;
+  output_threshold_pct_fall : 60 ;
+  output_threshold_pct_rise : 40 ;
+  slew_derate_from_library : 1 ;
+  slew_lower_threshold_pct_fall : 20 ;
+  slew_lower_threshold_pct_rise : 20 ;
+  slew_upper_threshold_pct_fall : 80 ;
+  slew_upper_threshold_pct_rise : 80 ;
+  nom_process : 1 ;
+  nom_temperature : 25 ;
+  nom_voltage : 0.9 ;
+  default_cell_leakage_power : 0 ;
+  default_fanout_load : 0 ;
+  default_inout_pin_cap : 0 ;
+  default_input_pin_cap : 0 ;
+  default_leakage_power_density : 0 ;
+  default_output_pin_cap : 0 ;
+
+  operating_conditions(tt28_0.90V_25C) {
+    process : 1 ;
+    temperature : 25 ;
+    voltage : 0.9 ;
+  }
+
+  input_voltage(default) {
+    vil : 0 ;
+    vih : 0.9 ;
+    vimin : 0 ;
+    vimax : 0.9 ;
+  }
+
+  output_voltage(default) {
+    vol : 0 ;
+    voh : 0.9 ;
+    vomin : 0 ;
+    vomax : 0.9 ;
+  }
+
+  type(bus_2) {
+    base_type : "array" ;
+    bit_from : 1 ;
+    bit_to : 0 ;
+    bit_width : 2 ;
+    data_type : "bit" ;
+    downto : true ;
+  }
+
+  type(bus_4) {
+    base_type : "array" ;
+    bit_from : 3 ;
+    bit_to : 0 ;
+    bit_width : 4 ;
+    data_type : "bit" ;
+    downto : true ;
+  }
+
+  type(bus_8) {
+    base_type : "array" ;
+    bit_from : 7 ;
+    bit_to : 0 ;
+    bit_width : 8 ;
+    data_type : "bit" ;
+    downto : true ;
+  }
+
+  type(bus_10) {
+    base_type : "array" ;
+    bit_from : 9 ;
+    bit_to : 0 ;
+    bit_width : 10 ;
+    data_type : "bit" ;
+    downto : true ;
+  }
+
+  voltage_map(gnd, 0);
+  voltage_map(avdd, 0.9);
+  voltage_map(dvdd, 0.9);
+
+  cell(example_transceiver) {
+    dont_use : true ;
+    dont_touch : true;
+    is_macro_cell : true;
+    area : 5000 ;
+
+    pg_pin(dvdd) {
+      pg_type : primary_power ;
+      voltage_name : dvdd ;
+    }
+
+    pg_pin(avdd) {
+      pg_type : primary_power ;
+      voltage_name : avdd ;
+    }
+
+    pg_pin(gnd) {
+      pg_type : primary_ground ;
+      voltage_name : gnd
+    }
+
+    pin(fastClk) {
+      capacitance : 0.001 ;
+      clock : true ;
+      direction : input ;
+
+      input_voltage : default;
+    }
+
+    pin(slowClk) {
+      capacitance : 0.001 ;
+      clock : true ;
+      direction : output ;
+
+      output_voltage : default;
+    }
+
+    pin(reset) {
+      capacitance : 0.001 ;
+      direction : input ;
+
+      input_voltage : default;
+    }
+
+    pin(rx_p) {
+      capacitance : 0.001 ;
+      direction : input ;
+
+      input_voltage : default;
+    }
+
+    pin(rx_n) {
+      capacitance : 0.001 ;
+      direction : input ;
+
+      input_voltage : default;
+    }
+
+    pin(tx_p) {
+      capacitance : 0.001 ;
+      direction : output ;
+
+      related_power_pin : avdd ;
+      related_ground_pin : gnd ;
+      output_voltage : default;
+    }
+
+    pin(tx_n) {
+      capacitance : 0.001 ;
+      direction : output ;
+
+      related_power_pin : avdd ;
+      related_ground_pin : gnd ;
+      output_voltage : default;
+    }
+
+    bus(data_tx) {
+      bus_type : bus_10 ;
+      direction : input ;
+      capacitance : 0.001 ;
+
+      output_voltage : default;
+    }
+
+    bus(data_rx) {
+      bus_type : bus_10 ;
+      direction : output ;
+      capacitance : 0.001 ;
+
+      related_power_pin : dvdd ;
+      related_ground_pin : gnd ;
+      output_voltage : default;
+    }
+
+    pin(iref) {
+      capacitance : 0.001 ;
+      direction : input ;
+
+      input_voltage : default;
+    }
+
+    bus(extraInputs_txSwing) {
+      bus_type : bus_4 ;
+      direction : input ;
+      capacitance : 0.001 ;
+
+      input_voltage : default;
+    }
+
+    pin(extraInputs_cdrMode) {
+      capacitance : 0.001 ;
+      direction : input ;
+
+      input_voltage : default;
+    }
+
+  }
+
+  cell(example_reference_generator) {
+    dont_use : true ;
+    dont_touch : true;
+    is_macro_cell : true;
+
+    area : 100 ;
+
+    pg_pin(avdd) {
+      pg_type : primary_power ;
+      voltage_name : avdd ;
+    }
+
+    pg_pin(gnd) {
+      pg_type : primary_ground ;
+      voltage_name : gnd
+    }
+
+    bus(config_mirrorMultiplier) {
+        bus_type : bus_2 ;
+        direction : input ;
+        capacitance : 0.001 ;
+
+        input_voltage : default;
+    }
+
+    pin(irefIn) {
+        capacitance : 0.001 ;
+        direction : input ;
+
+        input_voltage : default;
+    }
+
+    bus(irefOut) {
+        bus_type : bus_8 ;
+        direction : output ;
+        capacitance : 0.001 ;
+
+        related_power_pin : avdd ;
+        related_ground_pin : gnd ;
+        output_voltage : default;
+    }
+
+  }
+
+}
