@@ -45,7 +45,7 @@ trait HbwifModule extends HasHbwifParameters {
   val hbwifFastClock: Clock
   val clock: Clock
   val reset: Bool
-  val hbwifReset: Bool
+  val hbwifReset = Wire(Bool())
 
   val hbwifLanes = Seq.fill(hbwifNumLanes) { Module(new HbwifLane) }
 
