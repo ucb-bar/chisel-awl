@@ -29,7 +29,7 @@ class HbwifLaneBackendIO(implicit val p: Parameters) extends util.ParameterizedB
 
 }
 
-class HbwifLaneBackend(val c: Clock)(implicit val p: Parameters) extends Module(_clock = c)
+class HbwifLaneBackend(val c: Clock, val r: Bool)(implicit val p: Parameters) extends Module(_clock = c, _reset = r)
   with HasHbwifParameters {
 
   val io = new HbwifLaneBackendIO

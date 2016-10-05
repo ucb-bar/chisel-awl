@@ -4,6 +4,7 @@ import Chisel._
 import cde._
 import junctions._
 import uncore.tilelink._
+import testchipip._
 
 class HbwifLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
   with HasHbwifParameters {
@@ -26,12 +27,8 @@ class HbwifLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()
   // optional reference for the transceiver
   val iref = if (transceiverHasIRef) Some(Bool(INPUT)) else None
 
-  // Async crossing stuff
-  // System clock
-  val systemClock = Clock(INPUT)
-
-  // System reset
-  val systemReset = Bool(INPUT)
+  // un-synchronized HBWIF reset
+  val hbwifReset = Bool(INPUT)
 
 }
 
@@ -43,8 +40,11 @@ class HbwifLane(implicit val p: Parameters) extends Module
   // Transceiver
   val transceiver = Module(new Transceiver)
 
+  // Synchronous reset
+  val syncReset = ResetSync(io.hbwifReset, transceiver.io.slowClk)
+
   // Lane Backend
-  val backend = Module(new HbwifLaneBackend(transceiver.io.slowClk))
+  val backend = Module(new HbwifLaneBackend(transceiver.io.slowClk, syncReset))
 
   backend.io.transceiverData <> transceiver.io.data
   io.rx <> transceiver.io.rx
@@ -53,8 +53,8 @@ class HbwifLane(implicit val p: Parameters) extends Module
 
   transceiver.io.reset := backend.io.transceiverReset
 
-  backend.io.mem <> AsyncUTileLinkFrom(io.systemClock, io.systemReset, io.mem)
-  backend.io.scr <> AsyncUTileLinkFrom(io.systemClock, io.systemReset, io.scr)
+  io.mem <> AsyncUTileLinkTo(transceiver.io.slowClk, syncReset, backend.io.mem)
+  io.scr <> AsyncUTileLinkTo(transceiver.io.slowClk, syncReset, backend.io.scr)
 
   if (!(p(TransceiverKey).extraInputs.isEmpty)) {
     transceiver.io.extraInputs.get <> backend.io.transceiverExtraInputs.get
