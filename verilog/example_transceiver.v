@@ -3,7 +3,7 @@
 
 module example_transceiver (
   input fastClk,
-  input slowClk,
+  output slowClk,
   input reset,
   input rx_p,
   input rx_n,

@@ -1,0 +1,464 @@
+VERSION 5.6 ;
+BUSBITCHARS "[]" ;
+DIVIDERCHAR "/" ;
+
+MACRO example_transceiver
+    CLASS BLOCK ;
+    ORIGIN 0 0 ;
+    FOREIGN example_transceiver 0 0 ;
+    SIZE 50 BY 100 ;
+    SYMMETRY X Y R90 ;
+
+    PIN fastClk
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 10 49.9 10.1 ;
+        END
+    END fastClk
+
+    PIN slowClk
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 11 49.9 11.1 ;
+        END
+    END slowClk
+
+    PIN reset
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 12 49.9 12.1 ;
+        END
+    END reset
+
+    PIN rx_p
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 0 15 0.1 25 ;
+        END
+    END rx_p
+
+    PIN rx_n
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 0 35 0.1 45 ;
+        END
+    END rx_n
+
+    PIN tx_p
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 0 55 0.1 65 ;
+        END
+    END tx_p
+
+    PIN tx_n
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 0 75 0.1 85 ;
+        END
+    END tx_n
+
+    PIN data_tx[0]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            RECT 50 13 49.9 13.1 ;
+        END
+    END data_tx[0]
+
+    PIN data_tx[1]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 14 49.9 14.1 ;
+        END
+    END data_tx[1]
+
+    PIN data_tx[2]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 15 49.9 15.1 ;
+        END
+    END data_tx[2]
+
+    PIN data_tx[3]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 16 49.9 16.1 ;
+        END
+    END data_tx[3]
+
+    PIN data_tx[4]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 17 49.9 17.1 ;
+        END
+    END data_tx[4]
+
+    PIN data_tx[5]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 18 49.9 18.1 ;
+        END
+    END data_tx[5]
+
+    PIN data_tx[6]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 19 49.9 19.1 ;
+        END
+    END data_tx[6]
+
+    PIN data_tx[7]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 20 49.9 20.1 ;
+        END
+    END data_tx[7]
+
+    PIN data_tx[8]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 21 49.9 21.1 ;
+        END
+    END data_tx[8]
+
+    PIN data_tx[9]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 22 49.9 22.1 ;
+        END
+    END data_tx[9]
+
+    PIN data_rx[0]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 23 49.9 23.1 ;
+        END
+    END data_rx[0]
+
+    PIN data_rx[1]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 24 49.9 24.1 ;
+        END
+    END data_rx[1]
+
+    PIN data_rx[2]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 25 49.9 25.1 ;
+        END
+    END data_rx[2]
+
+    PIN data_rx[3]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 26 49.9 26.1 ;
+        END
+    END data_rx[3]
+
+    PIN data_rx[4]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 27 49.9 27.1 ;
+        END
+    END data_rx[4]
+
+    PIN data_rx[5]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 28 49.9 28.1 ;
+        END
+    END data_rx[5]
+
+    PIN data_rx[6]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 29 49.9 29.1 ;
+        END
+    END data_rx[6]
+
+    PIN data_rx[7]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 30 49.9 30.1 ;
+        END
+    END data_rx[7]
+
+    PIN data_rx[8]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 31 49.9 31.1 ;
+        END
+    END data_rx[8]
+
+    PIN data_rx[9]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 32 49.9 32.1 ;
+        END
+    END data_rx[9]
+
+    PIN extraInputs_txSwing[0]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 33 49.9 33.1 ;
+        END
+    END extraInputs_txSwing[0]
+
+    PIN extraInputs_txSwing[1]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 34 49.9 34.1 ;
+        END
+    END extraInputs_txSwing[1]
+
+    PIN extraInputs_txSwing[2]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 35 49.9 35.1 ;
+        END
+    END extraInputs_txSwing[2]
+
+    PIN extraInputs_txSwing[3]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 36 49.9 36.1 ;
+        END
+    END extraInputs_txSwing[3]
+
+    PIN extraInputs_cdrMode
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 37 49.9 37.1 ;
+        END
+    END extraInputs_cdrMode
+
+    PIN iref
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 40 49.9 40.5 ;
+        END
+    END iref
+
+    PIN avdd
+        DIRECTION INOUT ;
+        USE POWER ;
+        PORT
+            LAYER M5 ;
+            RECT 10 0 15 100 ;
+        END
+    END avdd
+
+    PIN dvdd
+        DIRECTION INOUT ;
+        USE POWER ;
+        PORT
+            LAYER M5 ;
+            RECT 35 0 40 100 ;
+        END
+    END dvdd
+
+    PIN gnd
+        DIRECTION INOUT ;
+        USE GROUND ;
+        PORT
+            LAYER M5 ;
+            RECT 20 0 30 100 ;
+        END
+    END gnd
+
+END example_transceiver
+
+MACRO example_reference_generator
+    CLASS BLOCK ;
+    ORIGIN 0 0 ;
+    FOREIGN example_reference_generator 0 0 ;
+    SIZE 10 BY 10 ;
+    SYMMETRY X Y R90 ;
+
+    PIN irefOut[0]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 10 1.0 9.9 1.5 ;
+        END
+    END irefOut[0]
+
+    PIN irefOut[1]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 10 2.0 9.9 2.5 ;
+        END
+    END irefOut[1]
+
+    PIN irefOut[2]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 10 3.0 9.9 3.5 ;
+        END
+    END irefOut[2]
+
+    PIN irefOut[3]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 10 4.0 9.9 4.5 ;
+        END
+    END irefOut[3]
+
+    PIN irefOut[4]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 10 5.0 9.9 5.5 ;
+        END
+    END irefOut[4]
+
+    PIN irefOut[5]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 10 6.0 9.9 6.5 ;
+        END
+    END irefOut[5]
+
+    PIN irefOut[6]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 10 7.0 9.9 7.5 ;
+        END
+    END irefOut[6]
+
+    PIN irefOut[7]
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 10 8.0 9.9 8.5 ;
+        END
+    END irefOut[7]
+
+    PIN irefIn
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 0 1.0 0.1 1.5 ;
+        END
+    END irefIn
+
+    PIN config_mirrorMultiplier[0]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 0 2.0 0.1 2.1 ;
+        END
+    END config_mirrorMultiplier[0]
+
+    PIN config_mirrorMultiplier[1]
+        DIRECTION INPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 0 3.0 0.1 3.1 ;
+        END
+    END config_mirrorMultiplier[1]
+
+    PIN avdd
+        DIRECTION INOUT ;
+        USE POWER ;
+        PORT
+            LAYER M5 ;
+            RECT 1 0 2 10 ;
+        END
+    END avdd
+
+    PIN gnd
+        DIRECTION INOUT ;
+        USE GROUND ;
+        PORT
+            LAYER M5 ;
+            RECT 3 0 4 10 ;
+        END
+    END gnd
+
+END example_reference_generator
+
+
+END LIBRARY
