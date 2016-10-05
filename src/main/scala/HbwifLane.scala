@@ -53,8 +53,8 @@ class HbwifLane(implicit val p: Parameters) extends Module
 
   transceiver.io.reset := backend.io.transceiverReset
 
-  io.mem <> AsyncUTileLinkTo(transceiver.io.slowClk, syncReset, backend.io.mem)
-  io.scr <> AsyncUTileLinkTo(transceiver.io.slowClk, syncReset, backend.io.scr)
+  backend.io.mem <> AsyncUTileLinkTo(backend.clock, backend.reset, io.mem)
+  backend.io.scr <> AsyncUTileLinkTo(backend.clock, backend.reset, io.scr)
 
   if (!(p(TransceiverKey).extraInputs.isEmpty)) {
     transceiver.io.extraInputs.get <> backend.io.transceiverExtraInputs.get
