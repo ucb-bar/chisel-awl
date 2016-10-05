@@ -76,6 +76,7 @@ MACRO example_transceiver
         DIRECTION INPUT ;
         USE SIGNAL ;
         PORT
+            LAYER M4 ;
             RECT 50 13 49.9 13.1 ;
         END
     END data_tx[0]
