@@ -63,6 +63,7 @@ trait HbwifModule extends HasHbwifParameters {
   // Instantiate and connect the reference generator if needed
   if (transceiverHasIRef) {
     val hbwifRefGen = Module(new ReferenceGenerator)
+    hbwifRefGen.suggestName("hbwifRefGenInst")
     hbwifLanes.zipWithIndex.foreach { x => x._1.io.iref.get := hbwifRefGen.io.irefOut(x._2) }
     if (transceiverRefGenHasInput) {
       hbwifRefGen.io.irefIn.get := io.hbwifIref.get

@@ -39,12 +39,14 @@ class HbwifLane(implicit val p: Parameters) extends Module
 
   // Transceiver
   val transceiver = Module(new Transceiver)
+  transceiver.suggestName("transceiverInst")
 
   // Synchronous reset
   val syncReset = ResetSync(io.hbwifReset, transceiver.io.slowClk)
 
   // Lane Backend
   val backend = Module(new HbwifLaneBackend(transceiver.io.slowClk, syncReset))
+  backend.suggestName("backendInst")
 
   backend.io.transceiverData <> transceiver.io.data
   io.rx <> transceiver.io.rx
