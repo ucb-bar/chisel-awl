@@ -5,6 +5,7 @@ import cde._
 import junctions._
 import uncore.tilelink._
 import testchipip._
+import rocketchip._
 
 class HbwifLaneBackendIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
   with HasHbwifParameters {
@@ -29,7 +30,7 @@ class HbwifLaneBackendIO(implicit val p: Parameters) extends util.ParameterizedB
 
 }
 
-class HbwifLaneBackend(val c: Clock, val r: Bool)(implicit val p: Parameters) extends Module(_clock = c, _reset = r)
+class HbwifLaneBackend(val c: Clock, val r: Bool, val id: Int)(implicit val p: Parameters) extends Module(_clock = c, _reset = r)
   with HasHbwifParameters {
 
   val io = new HbwifLaneBackendIO
@@ -49,7 +50,7 @@ class HbwifLaneBackend(val c: Clock, val r: Bool)(implicit val p: Parameters) ex
   memSerDes.io.up <> decoder.io.decoded
   memSerDes.io.mem <> io.mem
 
-  val scrBuilder = new SCRBuilder("hbwif_lane")
+  val scrBuilder = new SCRBuilder(s"hbwif_lane$id")
 
   scrBuilder.addControl("reset", UInt(1))
 
@@ -64,7 +65,7 @@ class HbwifLaneBackend(val c: Clock, val r: Bool)(implicit val p: Parameters) ex
   })
 
   // generate the SCR File and attach it to our SCR TileLink port
-  val scr = scrBuilder.generate(mmioParams)
+  val scr = scrBuilder.generate(p(GlobalAddrMap)(s"io:pbus:scrbus:hbwif_lane$id").start)(mmioParams)
   scr.io.tl <> io.scr
 
   // TODO this needs to handle nested Bundles

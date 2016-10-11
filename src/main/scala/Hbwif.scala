@@ -47,7 +47,7 @@ trait HbwifModule extends HasHbwifParameters {
   val reset: Bool
   val hbwifReset = Wire(Bool())
 
-  val hbwifLanes = Seq.fill(hbwifNumLanes) { Module(new HbwifLane) }
+  val hbwifLanes = (0 until hbwifNumLanes).map(id => Module(new HbwifLane(id)))
 
   hbwifLanes.foreach { _.io.fastClk := hbwifFastClock }
   hbwifLanes.foreach { _.io.hbwifReset := hbwifReset }

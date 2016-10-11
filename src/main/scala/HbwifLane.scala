@@ -32,7 +32,7 @@ class HbwifLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()
 
 }
 
-class HbwifLane(implicit val p: Parameters) extends Module
+class HbwifLane(id: Int)(implicit val p: Parameters) extends Module
   with HasHbwifParameters {
 
   val io = new HbwifLaneIO
@@ -45,7 +45,7 @@ class HbwifLane(implicit val p: Parameters) extends Module
   val syncReset = ResetSync(io.hbwifReset, transceiver.io.slowClk)
 
   // Lane Backend
-  val backend = Module(new HbwifLaneBackend(transceiver.io.slowClk, syncReset))
+  val backend = Module(new HbwifLaneBackend(transceiver.io.slowClk, syncReset, id))
   backend.suggestName("backendInst")
 
   backend.io.transceiverData <> transceiver.io.data
