@@ -21,6 +21,7 @@ module example_transceiver (
   `endif
 );
 
+  assign slowClk = fastClk;
 
 endmodule
 
