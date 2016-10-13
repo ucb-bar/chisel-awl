@@ -190,6 +190,8 @@ class Decoded8b10bSymbol extends Bundle {
       { case (dec,enc) => (Decoded8b10bSymbol(dec).asUInt, Encoded8b10bSymbol(enc).asUInt) }))
   }
 
+  def isData(dummy: Int = 0): Bool = valid && !control
+
 }
 
 object Decoded8b10bSymbol {

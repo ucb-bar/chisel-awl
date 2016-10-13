@@ -10,7 +10,7 @@ class DefaultHbwifConfig extends Config(
     case TransceiverKey => TransceiverParameters()
     case HbwifKey => HbwifParameters(
       numLanes = site(NMemoryChannels),
-      bufferDepth = 10)
+      bufferDepth = 16)
   }
 )
 

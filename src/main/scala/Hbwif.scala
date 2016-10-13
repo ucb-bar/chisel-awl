@@ -13,12 +13,28 @@ case object HbwifKey extends Field[HbwifParameters]
 
 case class HbwifParameters(
   val numLanes: Int = 8,
-  val bufferDepth: Int = 10) // Calculated based on worst-case transmission line delay and codec, serdes, etc. latency
+  val maxRetransmitCycles: Int = 20000,
+  val bufferDepth: Int = 16)
 
 trait HasHbwifParameters extends HasBertParameters with HasTransceiverParameters {
-  val hbwifNumLanes = p(HbwifKey).numLanes
   val memParams = p.alterPartial({ case TLId => "Switcher" })
   val mmioParams = p.alterPartial({ case TLId => "MMIOtoSCR" })
+  val hbwifNumLanes = p(HbwifKey).numLanes
+  val hbwifMaxRetransmitCycles = p(HbwifKey).maxRetransmitCycles
+  val hbwifBufferDepth = p(HbwifKey).bufferDepth
+}
+
+trait HasHbwifTileLinkParameters extends HasHbwifParameters
+  with HasTileLinkParameters {
+  val hbwifRawGrantBits = tlBeatAddrBits + tlClientXactIdBits + tlManagerIdBits + 1 + tlGrantTypeBits + tlDataBits
+  val hbwifRawAcquireBits = tlBeatAddrBits + tlClientXactIdBits + tlManagerIdBits + 1 + tlGrantTypeBits + tlDataBits
+  val hbwifGrantPadBits = (8 - (hbwifRawGrantBits % 8)) % 8
+  val hbwifAcquirePadBits = (8 - (hbwifRawAcquireBits % 8)) % 8
+  val hbwifChecksumBits = 8
+  val hbwifGrantBits = hbwifRawGrantBits + hbwifGrantPadBits + hbwifChecksumBits
+  val hbwifAcquireBits = hbwifRawAcquireBits + hbwifAcquirePadBits + hbwifChecksumBits
+  val hbwifGrantBytes = hbwifGrantBits / 8
+  val hbwifAcquireBytes = hbwifAcquireBits / 8
 }
 
 trait Hbwif extends LazyModule
@@ -26,7 +42,6 @@ trait Hbwif extends LazyModule
   val scrDevices: ResourceManager[AddrMapEntry]
 
   (0 until hbwifNumLanes).foreach { i =>
-    // TODO: 1024 is arbitrary, calculate this number from the SCR size
     scrDevices.add(AddrMapEntry(s"hbwif_lane$i", MemSize(4096, MemAttr(AddrMapProt.RW))))
   }
 }

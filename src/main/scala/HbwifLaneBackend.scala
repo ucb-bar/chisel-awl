@@ -44,10 +44,10 @@ class HbwifLaneBackend(c: Clock, r: Bool, id: Int)(implicit val p: Parameters) e
   io.transceiverData.tx := encoder.io.encoded
   decoder.io.encoded := io.transceiverData.rx
 
-  val memSerDes = Module(new HbwifTileLinkMemSerDes)
+  val memSerDes = Module(new HbwifTileLinkMemSerDes()(memParams))
   memSerDes.suggestName("memSerDesInst")
-  encoder.io.decoded <> memSerDes.io.down
-  memSerDes.io.up <> decoder.io.decoded
+  encoder.io.decoded <> memSerDes.io.tx
+  memSerDes.io.rx <> decoder.io.decoded
   memSerDes.io.mem <> io.mem
 
   val scrBuilder = new SCRBuilder(s"hbwif_lane$id")
