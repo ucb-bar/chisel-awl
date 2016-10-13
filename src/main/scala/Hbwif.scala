@@ -43,11 +43,11 @@ trait HbwifModule extends HasHbwifParameters {
   val scrBus: TileLinkRecursiveInterconnect
   val hbwifIO: Vec[ClientUncachedTileLinkIO]
   val hbwifFastClock: Clock
-  val clock: Clock
-  val reset: Bool
+  val system_clock: Clock
+  val system_reset: Bool
   val hbwifReset = Wire(Bool())
 
-  val hbwifLanes = (0 until hbwifNumLanes).map(id => Module(new HbwifLane(id)))
+  val hbwifLanes = (0 until hbwifNumLanes).map(id => Module(new HbwifLane(id=id,c=system_clock,r=system_reset)))
 
   hbwifLanes.foreach { _.io.fastClk := hbwifFastClock }
   hbwifLanes.foreach { _.io.hbwifReset := hbwifReset }

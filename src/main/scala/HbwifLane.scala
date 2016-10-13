@@ -32,8 +32,8 @@ class HbwifLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()
 
 }
 
-class HbwifLane(id: Int)(implicit val p: Parameters) extends Module
-  with HasHbwifParameters {
+class HbwifLane(c: Clock, r: Bool, id: Int)(implicit val p: Parameters)
+  extends Module(_clock = c, _reset = r) with HasHbwifParameters {
 
   val io = new HbwifLaneIO
 
