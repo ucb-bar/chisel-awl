@@ -30,6 +30,8 @@ class HbwifLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()
   // un-synchronized HBWIF reset
   val hbwifReset = Bool(INPUT)
 
+  // Switch to bypass reset synchronizers and wire reset directly
+  val hbwifResetOverride = Bool(INPUT)
 }
 
 class HbwifLane(c: Clock, r: Bool, id: Int)(implicit val p: Parameters)
@@ -45,7 +47,7 @@ class HbwifLane(c: Clock, r: Bool, id: Int)(implicit val p: Parameters)
   val syncReset = ResetSync(io.hbwifReset, transceiver.io.slowClk)
 
   // Lane Backend
-  val backend = Module(new HbwifLaneBackend(transceiver.io.slowClk, syncReset, id))
+  val backend = Module(new HbwifLaneBackend(transceiver.io.slowClk, Mux(io.hbwifResetOverride, io.hbwifReset, syncReset), id))
   backend.suggestName("backendInst")
 
   backend.io.transceiverData <> transceiver.io.data

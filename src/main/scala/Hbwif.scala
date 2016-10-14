@@ -46,11 +46,13 @@ trait HbwifModule extends HasHbwifParameters {
   val system_clock: Clock
   val system_reset: Bool
   val hbwifReset = Wire(Bool())
+  val hbwifResetOverride = Wire(Bool())
 
   val hbwifLanes = (0 until hbwifNumLanes).map(id => Module(new HbwifLane(id=id,c=system_clock,r=system_reset)))
 
   hbwifLanes.foreach { _.io.fastClk := hbwifFastClock }
   hbwifLanes.foreach { _.io.hbwifReset := hbwifReset }
+  hbwifLanes.foreach { _.io.hbwifResetOverride := hbwifResetOverride }
 
   hbwifLanes.map(_.io.rx).zip(io.hbwifRx) map { case (lane, top) => top <> lane }
   hbwifLanes.map(_.io.tx).zip(io.hbwifTx) map { case (lane, top) => lane <> top }
