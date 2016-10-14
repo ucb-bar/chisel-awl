@@ -70,6 +70,9 @@ class HbwifLaneBackend(c: Clock, r: Bool, id: Int)(implicit val p: Parameters) e
   scrBuilder.addStatus("bert_bit_count")
   scrBuilder.addStatus("bert_snapshot")
 
+  scrBuilder.addControl("retransmit_enable", UInt(1))
+  scrBuilder.addControl("retransmit_cycles", UInt(1))
+
   // TODO this needs to handle nested Bundles
   io.transceiverExtraInputs.map(_.elements.keys.foreach {
     name => scrBuilder.addControl(name)
@@ -109,5 +112,8 @@ class HbwifLaneBackend(c: Clock, r: Bool, id: Int)(implicit val p: Parameters) e
   (0 until bertNumWays).foreach { i => scr.status(s"bert_error_count_$i") := bert.io.errorCounts(i)}
   scr.status("bert_bit_count") := bert.io.bitCount
   scr.status("bert_snapshot") := bert.io.snapshot
+
+  memSerDes.io.retransmitEnable := scr.control("retransmit_enable")(0)
+  memSerDes.io.retransmitEnable := scr.control("retransmit_cycles")(log2Up(hbwifMaxRetransmitCycles)-1,0)
 
 }

@@ -14,6 +14,9 @@ class HbwifTileLinkMemSerDesIO(implicit val p: Parameters) extends util.Paramete
 
   val mem = (new ClientUncachedTileLinkIO).flip
 
+  val retransmitEnable = Bool(INPUT)
+  val retransmitCycles = UInt(INPUT, width = log2Up(hbwifMaxRetransmitCycles))
+
 }
 
 class HbwifTileLinkMemSerDes(implicit val p: Parameters) extends Module
@@ -57,6 +60,11 @@ class HbwifTileLinkMemSerDes(implicit val p: Parameters) extends Module
   io.mem.acquire.ready := !full && acquireTable.io.in.ready
   acquireTable.io.in.valid := !full && io.mem.acquire.valid
   acquireTable.io.in.bits := io.mem.acquire.bits
+  acquireTable.io.retransmitEnable := io.retransmitEnable
+  acquireTable.io.retransmitCycles := io.retransmitCycles
+
+  acquireTable.io.clear.valid := grantFilter.io.out.valid & grantFilter.io.out.bits.first()
+  acquireTable.io.clear.bits := grantFilter.io.out.bits.client_xact_id
 
   acquireSerializer.io.acquire <> acquireTable.io.out
   io.tx <> acquireSerializer.io.serial
@@ -87,10 +95,12 @@ class HbwifGrantFilter(implicit val p: Parameters) extends Module
 
   when(state === sWait) {
     when(io.in.valid) {
-      when((io.in.bits.g_type === Acquire.getBlockType) && (io.in.bits.addr_beat === UInt(0))) {
-        state := sFill
-        count := UInt(1)
-        buffer(UInt(tlDataBeats - 1)) := io.in.bits
+      when(io.in.bits.hasMultibeatData()) {
+        when (io.in.bits.addr_beat === UInt(0)) {
+          state := sFill
+          count := UInt(1)
+          buffer(UInt(tlDataBeats - 1)) := io.in.bits
+        }
       } .otherwise {
         state := sValid
         count := UInt(0)
@@ -197,6 +207,11 @@ class HbwifAcquireTableIO(implicit val p: Parameters) extends util.Parameterized
   val in = Decoupled(new Acquire).flip
   val out = Decoupled(new Acquire)
 
+  val retransmitEnable = Bool(INPUT)
+  val retransmitCycles = UInt(INPUT, width = log2Up(hbwifMaxRetransmitCycles))
+
+  val clear = Valid(UInt(width = tlClientXactIdBits)).flip
+
 }
 
 class HbwifAcquireTable(implicit val p: Parameters) extends Module
@@ -204,23 +219,126 @@ class HbwifAcquireTable(implicit val p: Parameters) extends Module
 
   val io = new HbwifAcquireTableIO
 
+  val sReady :: sFill :: sRetransmit :: Nil = Enum(UInt(), 3)
+  val state = Reg(init = sReady)
+
   val timestamps = Reg(Vec(hbwifBufferDepth, UInt(width = log2Up(hbwifMaxRetransmitCycles))))
-  val valids = Reg(init = Wire(Vec(hbwifBufferDepth, UInt(0, width=1))))
-  val types = Reg(Vec(hbwifBufferDepth, UInt(width = 2)))
-  val xactIds = Reg(Vec(hbwifBufferDepth, UInt(width = tlClientXactIdBits)))
+  val timeouts = Reg(Vec(hbwifBufferDepth, Bool()))
+  val valids = Reg(init = Wire(Vec(hbwifBufferDepth, Bool(false))))
+  val xactIdToAddr = Reg(Vec((1 << tlClientXactIdBits), UInt(width = log2Up(hbwifBufferDepth))))
 
-  /*
-   input  io_mem_acquire_bits_addr_block,      - block address
-   input  io_mem_acquire_bits_client_xact_id,  - client transaction id
-   input  io_mem_acquire_bits_addr_beat,       - beat address
-   input  io_mem_acquire_bits_is_builtin_type, - should be true
-   input  io_mem_acquire_bits_a_type,          - look at definitions (should be one of 4)
-   input  io_mem_acquire_bits_union,           - extra information (write mask, etc)
-   input  io_mem_acquire_bits_data,            - write data for puts and put blocks
-  */
+  val table = SeqMem(new Acquire(), hbwifBufferDepth * tlDataBeats)
 
-  // TODO implement retransmit
-  io.out := io.in
+  val count = Reg(UInt(width = tlBeatAddrBits))
+  val blockAddress = Reg(UInt(width = log2Up(hbwifBufferDepth)))
+
+  val full = valids.reduce(_&_)
+  val nextAddress = PriorityEncoder(valids.map(!_))
+  val timeoutsMasked = timeouts.zip(valids).map { case (t,v) => t & v }
+  val timeout = timeoutsMasked.reduce(_|_)
+  val timeoutAddress = PriorityEncoder(timeoutsMasked)
+
+  val retransmitData = Wire(new Acquire())
+
+  io.in.ready := !full & (state =/= sRetransmit)
+  io.out.valid := state === sFill | state === sRetransmit | (((state === sReady) | !io.retransmitEnable) & io.in.valid)
+  io.out.bits := Mux(state === sRetransmit, retransmitData, io.in.bits)
+
+  // table SRAM stuff
+  val wen = (state === sReady | state === sFill) & io.in.fire()
+  val waddr = Mux(state === sFill, Cat(blockAddress, count), Cat(nextAddress, UInt(0, width = tlBeatAddrBits)))
+  val raddr = Cat(blockAddress, count)
+
+  retransmitData := table.read(raddr, !wen)
+  // TODO the timing here is off
+
+  when (wen) { table.write(waddr, io.in.bits) }
+
+  // TODO need to fix TIMEOUT on the same cycle as a clear XXX
+
+  ///////////////////////////// timeouts and timestamps
+  when (state === sReady) {
+    when (io.in.fire()) {
+      (0 until hbwifBufferDepth).foreach { i =>
+        when (nextAddress === UInt(i)) {
+          timestamps(UInt(i)) := io.retransmitCycles
+          timeouts(UInt(i)) := Bool(false)
+        } .otherwise {
+          timestamps(UInt(i)) := timestamps(UInt(i)) - UInt(1)
+          when (timestamps(UInt(i)) === UInt(0)) {
+            timeouts(UInt(i)) := Bool(true)
+          }
+        }
+      }
+    } .elsewhen (timeout) {
+      (0 until hbwifBufferDepth).foreach { i =>
+        when (blockAddress === UInt(i)) {
+          timestamps(UInt(i)) := io.retransmitCycles
+          timeouts(UInt(i)) := Bool(false)
+        } .otherwise {
+          timestamps(UInt(i)) := timestamps(UInt(i)) - UInt(1)
+          when (timestamps(UInt(i)) === UInt(0)) {
+            timeouts(UInt(i)) := Bool(true)
+          }
+        }
+      }
+    }
+  }
+
+  ///////////////////////////// valids
+  when (io.retransmitEnable) {
+    assert(!io.clear.valid | valids(xactIdToAddr(io.clear.bits)), "Trying to clear a valid bit that isn't set")
+    (0 until hbwifBufferDepth).foreach { i =>
+      when ((state === sReady) & io.in.fire() & (nextAddress === UInt(i))) {
+        valids(UInt(i)) := Bool(true)
+      } .elsewhen (io.clear.valid & (xactIdToAddr(io.clear.bits) === UInt(i))) {
+        valids(UInt(i)) := Bool(false)
+      }
+    }
+  } .otherwise {
+    valids.foreach { _ := Bool(false) }
+  }
+
+  ///////////////////////////// xactIdToAddr
+  when (state === sReady) {
+    when (io.in.fire()) {
+      assert(!valids(xactIdToAddr(io.in.bits.client_xact_id)), "Should not get the same client_xact_id before the valid bit is cleared")
+      xactIdToAddr(io.in.bits.client_xact_id) := nextAddress
+    }
+  }
+
+  ///////////////////////////// state
+  when (io.retransmitEnable) {
+    when (state === sReady) {
+      when (io.in.fire()) {
+        blockAddress := nextAddress
+        count := UInt(1)
+        when (!io.in.bits.last()) {
+          assert(io.in.bits.addr_beat === UInt(0), "Got a non-zero beat address as first beat")
+          state := sFill
+        }
+      } .elsewhen (timeout) {
+        blockAddress := timeoutAddress
+        count := UInt(0)
+        state := sRetransmit
+      }
+    } .elsewhen (state === sFill) {
+      when (io.in.fire()) {
+        assert(io.in.bits.addr_beat === count, "Got a beat out of order")
+        count := count + UInt(1)
+        when (count === UInt(tlDataBeats-1)) {
+          state := sReady
+        }
+      }
+    } .elsewhen (state === sRetransmit) {
+      count := count + UInt(1)
+      when (count === UInt(tlDataBeats-1)) {
+        state := sReady
+      }
+    }
+  } .otherwise {
+    state := sReady
+  }
 
 }
 
