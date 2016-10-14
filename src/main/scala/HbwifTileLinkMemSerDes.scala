@@ -228,6 +228,7 @@ class HbwifAcquireTable(implicit val p: Parameters) extends Module
   val xactIdToAddr = Reg(Vec((1 << tlClientXactIdBits), UInt(width = log2Up(hbwifBufferDepth))))
 
   val table = SeqMem(new Acquire(), hbwifBufferDepth * tlDataBeats)
+  table.suggestName("Hbwif_table")
 
   val count = Reg(UInt(width = tlBeatAddrBits))
   val blockAddress = Reg(UInt(width = log2Up(hbwifBufferDepth)))
