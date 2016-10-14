@@ -219,7 +219,8 @@ class HbwifAcquireTable(implicit val p: Parameters) extends Module
    input  io_mem_acquire_bits_data,            - write data for puts and put blocks
   */
 
-  // TODO
+  // TODO implement retransmit
+  io.out := io.in
 
 }
 
@@ -236,6 +237,52 @@ class HbwifAcquireSerializer(implicit val p: Parameters) extends Module
 
   val io = new HbwifAcquireSerializerIO
 
-  // TODO
+  val buffer = Reg(Vec(hbwifAcquireBytes-1, UInt(width = 8)))
+  val checksum = Reg(init = UInt(0, width = 8))
+  val count = Reg(init = UInt(0, width = log2Up(hbwifAcquireBytes-1)))
 
+  val sIdle :: sFill :: sChecksum :: Nil = Enum(UInt(), 3)
+
+  val state = Reg(init = sIdle)
+
+  io.acquire.ready := (state === sIdle | state === sChecksum)
+
+  io.serial.valid := (state === sFill | state === sChecksum)
+  io.serial.control := Bool(false)
+  io.serial.rd := Bool(false) // don't care here
+
+  when (state === sIdle) {
+    io.serial.data := buffer(count)
+  } .elsewhen (state === sFill) {
+    io.serial.data := buffer(count)
+  } .elsewhen (state === sChecksum) {
+    io.serial.data := ~checksum + UInt(1)
+  } .otherwise {
+    io.serial.data := buffer(count)
+  }
+
+  when (state === sIdle) {
+    when (io.acquire.fire()) {
+      state := sFill
+      count := UInt(0)
+      (0 until hbwifAcquireBytes-2).foreach { i => buffer(i) := Cat(UInt(0, width=hbwifAcquirePadBits),io.acquire.bits.asUInt())(i*8+7,i*8) }
+    }
+  } .elsewhen (state === sFill) {
+    when (count === UInt(hbwifAcquirePadBits-2)) {
+      state := sChecksum
+    } .otherwise {
+      state := sFill
+      count := count + UInt(1)
+    }
+  } .elsewhen (state === sChecksum) {
+    when (io.acquire.fire()) {
+      state := sFill
+      (0 until hbwifAcquireBytes-2).foreach { i => buffer(i) := Cat(UInt(0, width=hbwifAcquirePadBits),io.acquire.bits.asUInt())(i*8+7,i*8) }
+      count := UInt(0)
+    } .otherwise {
+      state := sIdle
+    }
+  } .otherwise {
+    state := sIdle
+  }
 }
