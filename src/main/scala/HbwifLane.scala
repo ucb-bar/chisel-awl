@@ -34,8 +34,8 @@ class HbwifLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()
   val hbwifResetOverride = Bool(INPUT)
 }
 
-class HbwifLane(c: Clock, r: Bool, id: Int)(implicit val p: Parameters)
-  extends Module(_clock = c, _reset = r) with HasHbwifParameters {
+class HbwifLane(id: Int)(implicit val p: Parameters) extends Module
+  with HasHbwifParameters {
 
   val io = new HbwifLaneIO
 
