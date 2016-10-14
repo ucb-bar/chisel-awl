@@ -31,7 +31,7 @@ class ExampleHbwifConfig extends Config(
     )
     case HbwifKey => HbwifParameters(
       numLanes = site(NMemoryChannels),
-      bufferDepth = 10)
+      bufferDepth = 8)
   }
 )
 
