@@ -25,14 +25,12 @@ class HbwifTileLinkMemSerDes(implicit val p: Parameters) extends Module
   require(hbwifBufferDepth <= (1 << tlClientXactIdBits), "HBWIF buffer depth should be <= (1 << tlClientXactIdBits)")
   require(hbwifBufferDepth == (1 << log2Up(hbwifBufferDepth)), "HBWIF buffer depth should be a power of 2")
 
-  val timestamps = Reg(Vec(hbwifBufferDepth, UInt(width = log2Up(hbwifMaxRetransmitCycles))))
-  //val valids = Reg(init = Vec(hbwifBufferDepth, Bool(false)))
-  val types = Reg(Vec(hbwifBufferDepth, UInt(width = 2)))
-  val xactIds = Reg(Vec(hbwifBufferDepth, UInt(width = tlClientXactIdBits)))
-
   val grantBuffer = Module(new HellaFlowQueue(hbwifBufferDepth)(new Grant))
   val grantFilter = Module(new HbwifGrantFilter)
   val grantDeserializer = Module(new HbwifGrantDeserializer)
+
+  val acquireTable = Module(new HbwifAcquireTable)
+  val acquireSerializer = Module(new HbwifAcquireSerializer)
 
   assert(grantBuffer.io.enq.ready, "The grantBuffer must always be ready")
   grantBuffer.io.enq.bits := grantFilter.io.out.bits
@@ -56,19 +54,12 @@ class HbwifTileLinkMemSerDes(implicit val p: Parameters) extends Module
     }
   }
 
-  io.mem.acquire.ready := !full
+  io.mem.acquire.ready := !full && acquireTable.io.in.ready
+  acquireTable.io.in.valid := !full && io.mem.acquire.valid
+  acquireTable.io.in.bits := io.mem.acquire.bits
 
-  /*
-   output io_mem_acquire_ready
-   input  io_mem_acquire_valid
-   input  io_mem_acquire_bits_addr_block,      - block address
-   input  io_mem_acquire_bits_client_xact_id,  - client transaction id
-   input  io_mem_acquire_bits_addr_beat,       - beat address
-   input  io_mem_acquire_bits_is_builtin_type, - should be true
-   input  io_mem_acquire_bits_a_type,          - look at definitions (should be one of 4)
-   input  io_mem_acquire_bits_union,           - extra information (write mask, etc)
-   input  io_mem_acquire_bits_data,            - write data for puts and put blocks
-  */
+  acquireSerializer.io.acquire <> acquireTable.io.out
+  io.tx <> acquireSerializer.io.serial
 
 }
 
@@ -200,3 +191,51 @@ class HbwifGrantDeserializer(implicit val p: Parameters) extends Module
 
 }
 
+class HbwifAcquireTableIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
+  with HasHbwifTileLinkParameters {
+
+  val in = Decoupled(new Acquire).flip
+  val out = Decoupled(new Acquire)
+
+}
+
+class HbwifAcquireTable(implicit val p: Parameters) extends Module
+  with HasHbwifTileLinkParameters {
+
+  val io = new HbwifAcquireTableIO
+
+  val timestamps = Reg(Vec(hbwifBufferDepth, UInt(width = log2Up(hbwifMaxRetransmitCycles))))
+  val valids = Reg(init = Wire(Vec(hbwifBufferDepth, UInt(0, width=1))))
+  val types = Reg(Vec(hbwifBufferDepth, UInt(width = 2)))
+  val xactIds = Reg(Vec(hbwifBufferDepth, UInt(width = tlClientXactIdBits)))
+
+  /*
+   input  io_mem_acquire_bits_addr_block,      - block address
+   input  io_mem_acquire_bits_client_xact_id,  - client transaction id
+   input  io_mem_acquire_bits_addr_beat,       - beat address
+   input  io_mem_acquire_bits_is_builtin_type, - should be true
+   input  io_mem_acquire_bits_a_type,          - look at definitions (should be one of 4)
+   input  io_mem_acquire_bits_union,           - extra information (write mask, etc)
+   input  io_mem_acquire_bits_data,            - write data for puts and put blocks
+  */
+
+  // TODO
+
+}
+
+class HbwifAcquireSerializerIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
+  with HasHbwifTileLinkParameters {
+
+  val acquire = Decoupled(new Acquire).flip
+  val serial = (new Decoded8b10bSymbol).asOutput
+
+}
+
+class HbwifAcquireSerializer(implicit val p: Parameters) extends Module
+  with HasHbwifTileLinkParameters {
+
+  val io = new HbwifAcquireSerializerIO
+
+  // TODO
+
+}

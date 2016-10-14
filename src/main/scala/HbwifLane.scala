@@ -55,7 +55,7 @@ class HbwifLane(c: Clock, r: Bool, id: Int)(implicit val p: Parameters)
   transceiver.io.fastClk := io.fastClk
   transceiver.io.tx <> io.tx
 
-  transceiver.io.reset := backend.io.transceiverReset
+  transceiver.io.reset := io.hbwifReset
 
   backend.io.mem <> AsyncUTileLinkTo(backend.clock, backend.reset, io.mem)
   backend.io.scr <> AsyncUTileLinkTo(backend.clock, backend.reset, io.scr)

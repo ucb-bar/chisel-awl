@@ -25,9 +25,6 @@ class HbwifLaneBackendIO(implicit val p: Parameters) extends util.ParameterizedB
   // parameterizable configuration bundle
   val transceiverExtraOutputs = p(TransceiverKey).extraOutputs.map { _.cloneType.asInput }
 
-  // reset for the transceiver
-  val transceiverReset = Bool(OUTPUT)
-
 }
 
 class HbwifLaneBackend(c: Clock, r: Bool, id: Int)(implicit val p: Parameters) extends Module(_clock = c, _reset = r)
@@ -41,7 +38,6 @@ class HbwifLaneBackend(c: Clock, r: Bool, id: Int)(implicit val p: Parameters) e
   val decoder = Module(new Decoder8b10b)
   decoder.suggestName("decoderInst")
 
-  io.transceiverData.tx := encoder.io.encoded
   decoder.io.encoded := io.transceiverData.rx
 
   val memSerDes = Module(new HbwifTileLinkMemSerDes()(memParams))
@@ -52,7 +48,27 @@ class HbwifLaneBackend(c: Clock, r: Bool, id: Int)(implicit val p: Parameters) e
 
   val scrBuilder = new SCRBuilder(s"hbwif_lane$id")
 
-  scrBuilder.addControl("reset", UInt(1))
+  val bert = Module(new Bert())
+
+  bert.io.dataIn := io.transceiverData.rx
+
+  // MUX between BERT and the tilelink channel when BERT is on
+  io.transceiverData.tx := Mux(bert.io.enable, bert.io.dataOut, encoder.io.encoded)
+
+  scrBuilder.addControl("bert_enable", UInt(0))
+  scrBuilder.addControl("bert_clear", UInt(0))
+  scrBuilder.addControl("bert_snapshot_en", UInt(1))
+  scrBuilder.addControl("bert_rx_prbs_load_data", UInt(1))
+  scrBuilder.addControl("bert_rx_prbs_mode", UInt(0))
+  scrBuilder.addControl("bert_tx_prbs_load_data", UInt(1))
+  scrBuilder.addControl("bert_tx_prbs_mode", UInt(0))
+  scrBuilder.addControl("bert_shutoff_select", UInt(0))
+  scrBuilder.addControl("bert_prbs_select", UInt(0))
+  scrBuilder.addControl("bert_ber_mode", UInt(0))
+  scrBuilder.addStatus("bert_seed_good")
+  (0 until bertNumWays).foreach { i => scrBuilder.addStatus(s"bert_error_count_$i") }
+  scrBuilder.addStatus("bert_bit_count")
+  scrBuilder.addStatus("bert_snapshot")
 
   // TODO this needs to handle nested Bundles
   io.transceiverExtraInputs.map(_.elements.keys.foreach {
@@ -78,5 +94,20 @@ class HbwifLaneBackend(c: Clock, r: Bool, id: Int)(implicit val p: Parameters) e
     case (name: String, data: Data) => scr.status(name) := data
   })
 
-  io.transceiverReset := scr.control("reset")
+  // wire up the SCRs
+  bert.io.enable         := scr.control("bert_enable")(0)
+  bert.io.clear          := scr.control("bert_clear")(0)
+  bert.io.snapshotEn     := scr.control("bert_snapshot_en")(0)
+  bert.io.rxPRBSLoadData := scr.control("bert_rx_prbs_load_data")(30,0)
+  bert.io.rxPRBSMode     := scr.control("bert_rx_prbs_mode")(1,0)
+  bert.io.txPRBSLoadData := scr.control("bert_tx_prbs_load_data")(30,0)
+  bert.io.txPRBSMode     := scr.control("bert_tx_prbs_mode")(1,0)
+  bert.io.shutoffSelect  := scr.control("bert_shutoff_select")(log2Up(bertShutoffPoints)-1,0)
+  bert.io.prbsSelect     := scr.control("bert_prbs_select")(1,0)
+  bert.io.berMode        := scr.control("bert_ber_mode")(0)
+  scr.status("bert_seed_good") := bert.io.seedGood
+  (0 until bertNumWays).foreach { i => scr.status(s"bert_error_count_$i") := bert.io.errorCounts(i)}
+  scr.status("bert_bit_count") := bert.io.bitCount
+  scr.status("bert_snapshot") := bert.io.snapshot
+
 }
