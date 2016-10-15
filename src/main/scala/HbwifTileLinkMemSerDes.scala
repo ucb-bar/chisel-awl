@@ -28,7 +28,7 @@ class HbwifTileLinkMemSerDes(implicit val p: Parameters) extends Module
   require(hbwifBufferDepth <= (1 << tlClientXactIdBits), "HBWIF buffer depth should be <= (1 << tlClientXactIdBits)")
   require(hbwifBufferDepth == (1 << log2Up(hbwifBufferDepth)), "HBWIF buffer depth should be a power of 2")
 
-  val grantBuffer = Module(new HellaFlowQueue(hbwifBufferDepth)(new Grant))
+  val grantBuffer = Module(new HellaFlowQueue(hbwifBufferDepth * tlDataBeats)(new Grant))
   val grantFilter = Module(new HbwifGrantFilter)
   val grantDeserializer = Module(new HbwifGrantDeserializer)
 
@@ -227,7 +227,7 @@ class HbwifAcquireTable(implicit val p: Parameters) extends Module
   val valids = Reg(init = Wire(Vec(hbwifBufferDepth, Bool(false))))
   val xactIdToAddr = Reg(Vec((1 << tlClientXactIdBits), UInt(width = log2Up(hbwifBufferDepth))))
 
-  val table = SeqMem(new Acquire(), hbwifBufferDepth * tlDataBeats)
+  val table = SeqMem(hbwifBufferDepth * tlDataBeats, new Acquire())
   table.suggestName("Hbwif_table")
 
   val count = Reg(UInt(width = tlBeatAddrBits))

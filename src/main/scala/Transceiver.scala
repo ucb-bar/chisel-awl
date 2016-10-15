@@ -8,6 +8,7 @@ case object TransceiverKey extends Field[TransceiverParameters]
 
 case class TransceiverParameters(
   name: String = "generic_transceiver",
+  fpgaName: String = "fpga_transceiver",
   extraInputs: Option[Bundle] = None,
   extraOutputs: Option[Bundle] = None,
   hasIRef: Boolean = true,
