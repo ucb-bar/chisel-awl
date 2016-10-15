@@ -27,7 +27,6 @@ class HbwifTileLinkMemSerDes(implicit val p: Parameters) extends Module
   assert(io.mem.acquire.bits.is_builtin_type, "Only builtin types allowed in HBWIF")
   require(hbwifBufferDepth <= (1 << tlClientXactIdBits), "HBWIF buffer depth should be <= (1 << tlClientXactIdBits)")
   require(hbwifBufferDepth == (1 << log2Up(hbwifBufferDepth)), "HBWIF buffer depth should be a power of 2")
-  require(hbwifAcquirePadBits >= 2, "HBWIF acquire bytes must be at least 2 (as the state machine is written)")
 
   val grantBuffer = Module(new HellaFlowQueue(hbwifBufferDepth)(new Grant))
   val grantFilter = Module(new HbwifGrantFilter)
@@ -388,7 +387,7 @@ class HbwifAcquireSerializer(implicit val p: Parameters) extends Module
       (0 until hbwifAcquireBytes-2).foreach { i => buffer(i) := Cat(UInt(0, width=hbwifAcquirePadBits),io.acquire.bits.asUInt())(i*8+7,i*8) }
     }
   } .elsewhen (state === sFill) {
-    when (count === UInt(hbwifAcquirePadBits-2)) {
+    when (count === UInt(hbwifAcquireBytes-2)) {
       state := sChecksum
     } .otherwise {
       state := sFill
