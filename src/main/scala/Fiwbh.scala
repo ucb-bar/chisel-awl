@@ -12,7 +12,7 @@ import testchipip._
 
 
 class FiwbhIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
-  with HasHbwifTileLinkParameters {
+  with HasHbwifParameters {
 
   // high speed clock input
   val fastClk = Clock(INPUT)
@@ -21,10 +21,10 @@ class FiwbhIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
   val loopback = Bool(INPUT)
 
   // RX Pad inputs
-  val rx = Vec(hbwifNumLanes, new Differential)
+  val rx = Vec(hbwifNumLanes, new Differential).flip
 
   // TX pad outputs
-  val tx = Vec(hbwifNumLanes, (new Differential).flip)
+  val tx = Vec(hbwifNumLanes, new Differential)
 
   // TileLink port for memory
   val mem = Vec(hbwifNumLanes, new ClientUncachedTileLinkIO()(memParams))
@@ -32,7 +32,7 @@ class FiwbhIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
 }
 
 class Fiwbh(implicit val p: Parameters) extends Module
-  with HasHbwifTileLinkParameters {
+  with HasHbwifParameters {
 
   val io = new FiwbhIO
 
@@ -41,14 +41,14 @@ class Fiwbh(implicit val p: Parameters) extends Module
  /// what the fuck is going on here
   lanes.foreach(_.io.fastClk := io.fastClk)
   lanes.foreach(_.io.loopback := io.loopback)
-  lanes.zip(io.rx).foreach { x => x._1.io.rx <> x._2 }
-  lanes.zip(io.tx).foreach { x => x._2 <> x._1.io.rx }
-  lanes.zip(io.mem).foreach { x => x._1.io.mem <> x._2 }
+  lanes.map(_.io.rx).zip(io.rx).foreach { case (lane, top) => lane <> top }
+  lanes.map(_.io.tx).zip(io.tx).foreach { case (lane, top) => top <> lane }
+  lanes.map(_.io.mem).zip(io.mem).foreach { case (lane, top) => top <> lane }
 
 }
 
 class FiwbhLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
-  with HasHbwifTileLinkParameters {
+  with HasHbwifParameters {
 
   // high speed clock input
   val fastClk = Clock(INPUT)
@@ -57,10 +57,10 @@ class FiwbhLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()
   val loopback = Bool(INPUT)
 
   // RX Pad inputs
-  val rx = new Differential
+  val rx = (new Differential).flip
 
   // TX pad outputs
-  val tx = (new Differential).flip
+  val tx = new Differential
 
   // TileLink port for memory
   val mem = new ClientUncachedTileLinkIO()(memParams)
@@ -68,7 +68,7 @@ class FiwbhLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()
 }
 
 class FiwbhLane(implicit val p: Parameters) extends Module
-  with HasHbwifTileLinkParameters {
+  with HasHbwifParameters {
 
   val io = new FiwbhLaneIO
 
@@ -77,17 +77,17 @@ class FiwbhLane(implicit val p: Parameters) extends Module
   val syncReset = ResetSync(reset, transceiver.io.slowClk)
   val syncLoopback = ResetSync(io.loopback, transceiver.io.slowClk)
 
-  val backend = Module(new FiwbhLaneBackend(transceiver.io.slowClk, syncReset))
+  val backend = Module(new FiwbhLaneBackend(transceiver.io.slowClk, syncReset)(memParams))
 
   backend.io.loopback := syncLoopback
   backend.io.transceiverData <> transceiver.io.data
-  io.rx <> transceiver.io.rx
+  transceiver.io.rx <> io.rx
   transceiver.io.fastClk := io.fastClk
-  transceiver.io.tx <> io.tx
+  io.tx <> transceiver.io.tx
 
   transceiver.io.reset := reset
 
-  AsyncUTileLinkFrom(backend.clock, backend.reset, io.mem) <> backend.io.mem
+  io.mem <> AsyncUTileLinkTo(backend.clock, backend.reset, backend.io.mem)
 
 }
 
@@ -101,7 +101,7 @@ class FiwbhLaneBackendIO(implicit val p: Parameters) extends util.ParameterizedB
   val transceiverData = (new TransceiverData).flip
 
   // tilelink port for memory
-  val mem = new ClientUncachedTileLinkIO()(memParams)
+  val mem = new ClientUncachedTileLinkIO
 
 }
 
@@ -116,11 +116,11 @@ class FiwbhLaneBackend(c: Clock, r: Bool)(implicit val p: Parameters) extends Mo
 
   decoder.io.encoded := io.transceiverData.rx
 
-  val memDesSer = Module(new FiwbhTileLinkMemDesSer()(memParams))
+  val memDesSer = Module(new FiwbhTileLinkMemDesSer)
 
   encoder.io.decoded <> memDesSer.io.tx
   memDesSer.io.rx <> decoder.io.decoded
-  memDesSer.io.mem <> io.mem
+  io.mem <> memDesSer.io.mem
 
   io.transceiverData.tx := Mux(io.loopback, io.transceiverData.rx, encoder.io.encoded)
 

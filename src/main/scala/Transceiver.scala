@@ -48,10 +48,10 @@ class TransceiverIO(implicit val p: Parameters) extends ParameterizedBundle()(p)
   val reset = Bool(INPUT)
 
   // RX pad inputs
-  val rx = new Differential
+  val rx = (new Differential).flip
 
   // TX pad outputs
-  val tx = (new Differential).flip
+  val tx = new Differential
 
   // internal data interface
   val data = new TransceiverData

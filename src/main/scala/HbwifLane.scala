@@ -13,10 +13,10 @@ class HbwifLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()
   val fastClk = Clock(INPUT)
 
   // RX pad inputs
-  val rx = new Differential
+  val rx = (new Differential).flip
 
   // TX pad outputs
-  val tx = (new Differential).flip
+  val tx = new Differential
 
   // TileLink port for memory
   val mem = (new ClientUncachedTileLinkIO()(memParams)).flip
@@ -51,9 +51,9 @@ class HbwifLane(id: Int)(implicit val p: Parameters) extends Module
   backend.suggestName("backendInst")
 
   backend.io.transceiverData <> transceiver.io.data
-  io.rx <> transceiver.io.rx
+  transceiver.io.rx <> io.rx
   transceiver.io.fastClk := io.fastClk
-  transceiver.io.tx <> io.tx
+  io.tx <> transceiver.io.tx
 
   transceiver.io.reset := io.hbwifReset
 

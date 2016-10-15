@@ -47,8 +47,8 @@ trait Hbwif extends LazyModule
 }
 
 trait HbwifBundle extends HasHbwifParameters {
-  val hbwifRx      = Vec(hbwifNumLanes, new Differential)
-  val hbwifTx      = Vec(hbwifNumLanes, (new Differential)).flip
+  val hbwifRx      = Vec(hbwifNumLanes, new Differential).flip
+  val hbwifTx      = Vec(hbwifNumLanes, new Differential)
   val hbwifIref    = if(transceiverRefGenHasInput) Some(Bool(INPUT)) else None
 }
 
@@ -69,8 +69,8 @@ trait HbwifModule extends HasHbwifParameters {
   hbwifLanes.foreach { _.io.hbwifReset := hbwifReset }
   hbwifLanes.foreach { _.io.hbwifResetOverride := hbwifResetOverride }
 
-  hbwifLanes.map(_.io.rx).zip(io.hbwifRx) map { case (lane, top) => top <> lane }
-  hbwifLanes.map(_.io.tx).zip(io.hbwifTx) map { case (lane, top) => lane <> top }
+  hbwifLanes.map(_.io.rx).zip(io.hbwifRx) map { case (lane, top) => lane <> top }
+  hbwifLanes.map(_.io.tx).zip(io.hbwifTx) map { case (lane, top) => top <> lane }
 
   (0 until hbwifNumLanes).foreach { i =>
     hbwifLanes(i).io.scr <> scrBus.port(s"hbwif_lane$i")
