@@ -151,7 +151,7 @@ class Encoded8b10bSymbol extends Bundle {
 
   // Abuse the fact that the only valid combinations of 1s and 0s is 6,4 5,5 and 4,6
   // and that the decoder should handle bit flips
-  def nextRd(dummy: Int = 0): Bool = Mux(data.xorR, rd, ~rd)
+  def nextRd(dummy: Int = 0): Bool = Mux(data.toBools.reduce(_^_), rd, ~rd)
 
   def decode(dummy: Int = 0): Decoded8b10bSymbol = {
     (new Decoded8b10bSymbol).fromBits(MuxLookup(this.asUInt, Decoded8b10bSymbol(0, 0, 0, 0).asUInt, Encoding8b10b.encodings.map
@@ -230,8 +230,10 @@ class Encoder8b10b extends Module {
 
   val rd = Reg(init = Bool(false))
 
-  val decoded = Decoded8b10bSymbol(Bool(true), io.decoded.control || ~io.decoded.valid, rd, Mux(io.decoded.valid, UInt(Encoding8b10b.defaultComma), io.decoded.data))
+  val decoded = Decoded8b10bSymbol(Bool(true), io.decoded.control || ~io.decoded.valid, rd, Mux(io.decoded.valid, io.decoded.data, UInt(Encoding8b10b.defaultComma)))
   val encoded = decoded.encode()
+
+  val nextrd = encoded.nextRd()
 
   rd := encoded.nextRd()
   io.encoded := encoded.data
@@ -246,7 +248,8 @@ class Decoder8b10b extends Module {
   val lock = Reg(init = Bool(false))
   val rd = Reg(init = Bool(false))
 
-  val wires = Vec( (0 to 8).map { i => Cat(buf, io.encoded)(9+i, i) } )
+  val cat = Cat(buf, io.encoded)
+  val wires = Vec( (0 to 8).map { i => cat(9+i, i) } )
   // Check that bits cdeif (7,3) are the same (this defines a comma)
   val commas = wires.map { x => x(7,3).andR || ~(x(7,3).orR) }
   val found = commas.reduce(_|_)
@@ -257,8 +260,8 @@ class Decoder8b10b extends Module {
     idx := next_idx
     lock := Bool(true)
     // Force RD to a value based on the comma sequence
-    rd := ~wires(next_idx)(5)
-  } .elsewhen(wires(idx).xorR) {
+    rd := wires(next_idx)(5)
+  } .elsewhen(~wires(idx).toBools.reduce(_^_)) {
     // Assume we got a valid symbol, if there are an uneven number of 1s and 0s, rd should flip
     rd := ~rd
   }

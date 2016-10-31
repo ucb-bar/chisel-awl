@@ -2,6 +2,9 @@ package hbwif
 
 import Chisel._
 import cde._
+import uncore.tilelink._
+import rocketchip.BaseConfig
+import unittest._
 import coreplex._
 
 class DefaultHbwifConfig extends Config(
@@ -44,3 +47,13 @@ class ExampleRefGenConfig extends Bundle {
   val mirrorMultiplier = UInt(width = 2)
 }
 
+class WithHbwifUnitTests extends Config(
+  (pname, site, here) => pname match {
+    case UnitTests => (testParams: Parameters) =>
+      HbwifUnitTests(testParams)
+    case TLId => "Switcher"
+    case _ => throw new CDEMatchError
+  })
+
+class HbwifUnitTestConfig extends Config(
+  new WithHbwifUnitTests ++ new BaseConfig)
