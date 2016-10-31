@@ -33,6 +33,12 @@ class DisparityChecker extends Module {
   assert(disparity === SInt(0) || disparity === SInt(2) || disparity === SInt(-2), "Disparity must be within +/- 2")
 }
 
+object DisparityCheck {
+
+  def apply(d: UInt) = Module(new DisparityChecker).io.data := d
+
+}
+
 class EncodingDataTest extends UnitTest {
 
   val encoder = Module(new Encoder8b10b)
@@ -40,7 +46,7 @@ class EncodingDataTest extends UnitTest {
 
   decoder.io.encoded <> encoder.io.encoded
 
-  Module(new DisparityChecker).io.data := encoder.io.encoded
+  DisparityCheck(encoder.io.encoded)
 
   // randomize every single number and insert an arbitrary number to flip the disparity so we cover everything
   // we pick 3 since it is guaranteed to flip the disparity
@@ -76,7 +82,7 @@ class EncodingDataTest extends UnitTest {
   }
 
   // check the bits that come out
-  when (decoder.io.decoded.valid && ~decoder.io.decoded.control && decoderCount < UInt(vectors.size)) {
+  when (decoder.io.decoded.isData() && decoderCount < UInt(vectors.size)) {
     assert(decoder.io.decoded.data === vectors(decoderCount), "Got the wrong data")
     decoderCount := decoderCount + UInt(1)
   }
@@ -85,7 +91,47 @@ class EncodingDataTest extends UnitTest {
 
 class EncodingAlignmentTest extends UnitTest {
 
-  io.finished := UInt(1)
+  val encoder = Module(new Encoder8b10b)
+
+  val buf = Reg(next = encoder.io.encoded)
+  val cat = Cat(buf, encoder.io.encoded)
+
+  DisparityCheck(encoder.io.encoded)
+
+  // pick some arbitrary data to send
+  val data = 23
+
+  // add 10 decoders which are spaced a bit time apart and ensure we can align to all of them
+  io.finished := (0 until 10).map { x =>
+    val m = Module(new Decoder8b10b)
+    m.io.encoded := cat(x+10,x)
+    val done = Reg(init = Bool(false))
+    when (m.io.decoded.isData()) {
+      assert(m.io.decoded.data === UInt(data), s"Data must be $data")
+      done := Bool(true)
+    }
+    done
+  }.reduce(_&_)
+
+  val syncCount = Reg(init = UInt(0, width=2))
+  val ready = Reg(init = Bool(false))
+
+  when (syncCount < UInt(3)) {
+    syncCount := syncCount + UInt(1)
+  } .otherwise {
+    ready := Bool(true)
+  }
+
+  when (ready) {
+    encoder.io.decoded.valid := Bool(true)
+    encoder.io.decoded.control := Bool(false)
+    encoder.io.decoded.data := UInt(data)
+  } .otherwise {
+    encoder.io.decoded.valid := Bool(false)
+    encoder.io.decoded.control := Bool(true)
+    encoder.io.decoded.data := UInt(0)
+  }
+
 
 }
 

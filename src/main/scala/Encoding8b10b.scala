@@ -249,7 +249,7 @@ class Decoder8b10b extends Module {
   val rd = Reg(init = Bool(false))
 
   val cat = Cat(buf, io.encoded)
-  val wires = Vec( (0 to 8).map { i => cat(9+i, i) } )
+  val wires = Vec( (0 to 9).map { i => cat(9+i, i) } )
   // Check that bits cdeif (7,3) are the same (this defines a comma)
   val commas = wires.map { x => x(7,3).andR || ~(x(7,3).orR) }
   val found = commas.reduce(_|_)
