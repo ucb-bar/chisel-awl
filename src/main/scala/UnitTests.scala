@@ -11,29 +11,42 @@ import scala.util.Random
 object HbwifUnitTests {
   def apply(implicit p: Parameters): Seq[UnitTest] =
     Seq(
-      Module(new Encoding8b10bTest),
+      Module(new EncodingDataTest),
+      Module(new EncodingAlignmentTest),
+      Module(new EncodingErrorTest),
       Module(new HbwifMemTest),
       Module(new HbwifBertTest)
     )
 }
 
-class Encoding8b10bTest extends UnitTest {
+class DisparityChecker extends Module {
+  val io = new Bundle {
+    val data = UInt(INPUT, width = 10)
+  }
+
+  // make this big enough to do the requisite math
+  val disparity = Reg(init = SInt(0, width = 3))
+  val ones  = PopCount(io.data).zext
+  val zeros = SInt(10) - ones
+  disparity := disparity + ones - zeros
+
+  assert(disparity === SInt(0) || disparity === SInt(2) || disparity === SInt(-2), "Disparity must be within +/- 2")
+}
+
+class EncodingDataTest extends UnitTest {
 
   val encoder = Module(new Encoder8b10b)
   val decoder = Module(new Decoder8b10b)
 
   decoder.io.encoded <> encoder.io.encoded
 
-  // make this big enough to do the requisite math
-  val disparity = Reg(init = SInt(0, width = 3))
-  val ones  = PopCount(encoder.io.encoded).zext
-  val zeros = SInt(10) - ones
-  disparity := disparity + ones - zeros
-  // disparity check
-  assert(disparity === SInt(0) || disparity === SInt(2) || disparity === SInt(-2), "Disparity must be within +/- 2")
+  Module(new DisparityChecker).io.data := encoder.io.encoded
 
-  val r = new Random(6)
-  val vectors = Vec(r.shuffle(0 to 255).map(UInt(_)))
+  // randomize every single number and insert an arbitrary number to flip the disparity so we cover everything
+  // we pick 3 since it is guaranteed to flip the disparity
+  // we also pick an arbitrary seed of 6 so that the tests are random but repeatable
+  val v = (new Random(6)).shuffle(0 to 255)
+  val vectors = Vec((v ++ List(3) ++ v).map(UInt(_)))
   val syncCount = Reg(init = UInt(0, width=2))
   val decoderCount = Reg(init = UInt(0, width = log2Up(vectors.size+1)))
   val encoderCount = Reg(init = UInt(0, width = log2Up(vectors.size+1)))
@@ -67,6 +80,18 @@ class Encoding8b10bTest extends UnitTest {
     assert(decoder.io.decoded.data === vectors(decoderCount), "Got the wrong data")
     decoderCount := decoderCount + UInt(1)
   }
+
+}
+
+class EncodingAlignmentTest extends UnitTest {
+
+  io.finished := UInt(1)
+
+}
+
+class EncodingErrorTest extends UnitTest {
+
+  io.finished := UInt(1)
 
 }
 
