@@ -5,8 +5,13 @@ import unittest._
 import testchipip._
 import unittest._
 import uncore.tilelink._
+import uncore.util._
+import uncore.devices._
 import cde._
 import scala.util.Random
+import rocketchip._
+import junctions._
+import util.ParameterizedBundle
 
 object HbwifUnitTests {
   def apply(implicit p: Parameters): Seq[UnitTest] =
@@ -141,15 +146,133 @@ class EncodingErrorTest extends UnitTest {
 
 }
 
-class HbwifMemTest extends UnitTest {
+object HbwifSCRUtil extends HasSCRParameters {
 
-  io.finished := UInt(1)
+  def writeLane(l: Int, s: String, d: Int)(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] = {
+    val addr = SCRAddressMap(s"hbwif_lane$l").get(s)
+    Seq((addr, d))
+  }
+
+  def writeAll(s: String, d: Int)(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] = {
+    (0 until p(HbwifKey).numLanes) map {i => writeLane(i, s, d)} reduce (_ ++ _)
+  }
+
+  def bertMode()(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] = writeAll("bert_enable", 1)
+  def hbwifMode()(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] = writeAll("bert_enable", 0)
 
 }
 
-class HbwifBertTest extends UnitTest {
 
-  io.finished := UInt(1)
+class HbwifInstIO(implicit val p: Parameters) extends ParameterizedBundle()(p)
+  with HbwifBundle {
+  val mem = Vec(hbwifNumLanes, new ClientUncachedTileLinkIO()(p.alterPartial({ case TLId => "Switcher" }))).flip
+  val fastClk = Clock(INPUT)
+  val scr = new ClientUncachedTileLinkIO()(p.alterPartial({ case TLId => "MMIOtoSCR" })).flip
+  val reset = Bool(INPUT)
+}
+
+class HbwifInst(implicit val p: Parameters) extends Module
+  with HasTransceiverParameters with HasHbwifParameters {
+
+  val scrParams = p.alterPartial({
+    case TLId => "MMIOtoSCR"
+  })
+
+  val io = new HbwifInstIO
+  val scrBus = Module(new TileLinkRecursiveInterconnect(1, p(GlobalAddrMap).subMap("io:pbus:scrbus"))(scrParams))
+
+  scrBus.io.in(0) := io.scr
+
+  val hbwifLanes = (0 until hbwifNumLanes).map(id => Module(new HbwifLane(id)))
+
+  hbwifLanes.foreach { _.io.fastClk := io.fastClk }
+  hbwifLanes.foreach { _.io.hbwifReset := io.reset }
+  hbwifLanes.foreach { _.io.hbwifResetOverride := Bool(false) }
+
+  hbwifLanes.map(_.io.rx).zip(io.hbwifRx) map { case (lane, top) => lane <> top }
+  hbwifLanes.map(_.io.tx).zip(io.hbwifTx) map { case (lane, top) => top <> lane }
+
+  (0 until hbwifNumLanes).foreach { i =>
+    hbwifLanes(i).io.scr <> scrBus.port(s"hbwif_lane$i")
+  }
+  hbwifLanes.zip(io.mem).foreach { x => x._1.io.mem <> x._2 }
+
+  // Instantiate and connect the reference generator if needed
+  if (transceiverHasIRef) {
+    val hbwifRefGen = Module(new ReferenceGenerator)
+    hbwifRefGen.suggestName("hbwifRefGenInst")
+    hbwifLanes.zipWithIndex.foreach { x => x._1.io.iref.get := hbwifRefGen.io.irefOut(x._2) }
+    if (transceiverRefGenHasInput) {
+      hbwifRefGen.io.irefIn.get := io.hbwifIref.get
+    }
+  }
+
+}
+
+trait HasHbwifTestModule extends HasTransceiverParameters with HasUnitTestIO {
+  implicit val p: Parameters
+  val clock: Clock
+  val reset: Bool
+  //val scrDriver: PutSeqDriver
+
+  val q = p.alterPartial({
+    case GlobalAddrMap => AddrMap(AddrMapEntry("io",
+      AddrMap(AddrMapEntry("pbus",
+        AddrMap(AddrMapEntry("scrbus",
+          AddrMap(AddrMapEntry("hbwif_lane0", MemSize(4096, MemAttr(AddrMapProt.RW))))
+        ))
+      ))
+    ))
+  })
+
+  val hbwif = Module(new HbwifInst()(q))
+  val fiwbh = Module(new Fiwbh()(q))
+
+  val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.hbwifMode()))
+
+  scrDriver.io.start := io.start
+  hbwif.io.scr <> scrDriver.io.mem
+
+  hbwif.io.reset := reset
+
+  hbwif.io.fastClk := clock
+  fiwbh.io.fastClk := clock
+
+  hbwif.io.hbwifRx <> fiwbh.io.tx
+  fiwbh.io.rx <> hbwif.io.hbwifTx
+
+  val memIn = hbwif.io.mem(0)
+  val memOut = fiwbh.io.mem(0)
+
+  if(transceiverHasIRef && transceiverRefGenHasInput) hbwif.io.hbwifIref.get := Bool(true)
+}
+
+class HbwifMemTest(implicit val p: Parameters) extends UnitTest
+  with HasHbwifTestModule with HasTileLinkParameters {
+
+  fiwbh.io.loopback := Bool(false)
+
+  //val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.hbwifMode()))
+
+  val depth = 2 * tlDataBeats
+  val driver = TileLinkUnitTestUtils.fullDriverSet(depth)
+  driver.io.start := scrDriver.io.finished
+  io.finished := driver.io.finished
+
+  memIn <> driver.io.mem
+  val testram = Module(new TileLinkTestRAM(depth))
+  testram.io <> memOut
+
+}
+
+class HbwifBertTest(implicit val p: Parameters) extends UnitTest
+  with HasHbwifTestModule {
+
+  fiwbh.io.loopback := Bool(true)
+
+  io.finished := Bool(true)
+
+  //val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.bertMode()))
 
 }
 

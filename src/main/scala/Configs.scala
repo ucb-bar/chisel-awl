@@ -3,7 +3,8 @@ package hbwif
 import Chisel._
 import cde._
 import uncore.tilelink._
-import rocketchip.BaseConfig
+import uncore.agents._
+import rocketchip.{BaseConfig,GenerateGlobalAddrMap}
 import unittest._
 import coreplex._
 
@@ -49,6 +50,33 @@ class ExampleRefGenConfig extends Bundle {
 
 class WithHbwifUnitTests extends Config(
   (pname, site, here) => pname match {
+    case HbwifKey => HbwifParameters(
+      numLanes = 1,
+      bufferDepth = 16)
+    case TLKey("Switcher") =>
+      site(TLKey("L2toMC")).copy(
+        maxClientXacts = site(NAcquireTransactors) + 2,
+        maxClientsPerPort = site(NBanksPerMemoryChannel) * site(NMemoryChannels))
+    case TLKey("MMIOtoSCR") => {
+      val scrDataBits = 64
+      val scrDataBeats = (8 * site(CacheBlockBytes)) / scrDataBits
+      site(TLKey("L2toMMIO")).copy(
+        maxClientsPerPort = 3,
+        dataBeats = scrDataBeats)
+    }
+    case TransceiverKey => TransceiverParameters(
+      name = "example_transceiver",
+      extraInputs = Some(new ExampleTransceiverExtraInputs),
+      extraOutputs = None,
+      hasIRef = true,
+      refGenHasInput = true,
+      refGenConfig = Some(new ExampleRefGenConfig),
+      refGenName = "example_reference_generator",
+      refGenNumOutputs = 8,
+      divideBy = 5,
+      isDDR = true
+    )
+    case BertKey => BertParameters()
     case UnitTests => (testParams: Parameters) =>
       HbwifUnitTests(testParams)
     case TLId => "Switcher"
@@ -56,4 +84,4 @@ class WithHbwifUnitTests extends Config(
   })
 
 class HbwifUnitTestConfig extends Config(
-  new WithHbwifUnitTests ++ new BaseConfig)
+  new BaseConfig ++ new WithHbwifUnitTests)

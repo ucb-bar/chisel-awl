@@ -38,7 +38,6 @@ class Fiwbh(implicit val p: Parameters) extends Module
 
   val lanes = (0 until hbwifNumLanes) map { i => Module(new FiwbhLane) }
 
- /// what the fuck is going on here
   lanes.foreach(_.io.fastClk := io.fastClk)
   lanes.foreach(_.io.loopback := io.loopback)
   lanes.map(_.io.rx).zip(io.rx).foreach { case (lane, top) => lane <> top }
