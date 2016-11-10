@@ -30,12 +30,11 @@ class HbwifTileLinkMemSerDes(implicit val p: Parameters) extends Module
   require(hbwifBufferDepth <= (1 << tlClientXactIdBits), "HBWIF buffer depth should be <= (1 << tlClientXactIdBits)")
   require(hbwifBufferDepth == (1 << log2Up(hbwifBufferDepth)), "HBWIF buffer depth should be a power of 2")
 
-  // FIXME
   val grantBuffer = Module(new HellaFlowQueue(hbwifBufferDepth * tlDataBeats)(new Grant))
   val grantFilter = Module(new HbwifFilter(new Grant))
   val grantDeserializer = Module(new HbwifDeserializer(new Grant))
 
-  //val acquireTable = Module(new HbwifAcquireTable)
+  val acquireTable = Module(new HbwifAcquireTable)
   val acquireSerializer = Module(new HbwifSerializer(new Acquire))
 
   assert(grantBuffer.io.enq.ready, "The grantBuffer must always be ready")
@@ -60,18 +59,16 @@ class HbwifTileLinkMemSerDes(implicit val p: Parameters) extends Module
     }
   }
 
-  //io.mem.acquire.ready := !full && acquireTable.io.in.ready
-  //acquireTable.io.in.valid := !full && io.mem.acquire.valid
-  //acquireTable.io.in.bits := io.mem.acquire.bits
-  //acquireTable.io.retransmitEnable := io.retransmitEnable
-  //acquireTable.io.retransmitCycles := io.retransmitCycles
+  io.mem.acquire.ready := !full && acquireTable.io.in.ready
+  acquireTable.io.in.valid := !full && io.mem.acquire.valid
+  acquireTable.io.in.bits := io.mem.acquire.bits
+  acquireTable.io.retransmitEnable := io.retransmitEnable
+  acquireTable.io.retransmitCycles := io.retransmitCycles
 
-  acquireSerializer.io.data <> io.mem.acquire
+  acquireTable.io.clear.valid := grantFilter.io.out.valid & grantFilter.io.out.bits.first()
+  acquireTable.io.clear.bits := grantFilter.io.out.bits.client_xact_id
 
-  //acquireTable.io.clear.valid := grantFilter.io.out.valid & grantFilter.io.out.bits.first()
-  //acquireTable.io.clear.bits := grantFilter.io.out.bits.client_xact_id
-
-  //acquireSerializer.io.data <> acquireTable.io.out
+  acquireSerializer.io.data <> acquireTable.io.out
   io.tx <> acquireSerializer.io.serial
 
 }
@@ -251,7 +248,7 @@ class HbwifAcquireTable(implicit val p: Parameters) extends Module
 
   val retransmitData = Wire(new Acquire())
 
-  io.in.ready := !full & (state =/= sRetransmit)
+  io.in.ready := !full & (state =/= sRetransmit) & io.out.ready
   io.out.valid := state === sFill | state === sRetransmit | (((state === sReady) | !io.retransmitEnable) & io.in.valid)
   io.out.bits := Mux(state === sRetransmit, retransmitData, io.in.bits)
 
