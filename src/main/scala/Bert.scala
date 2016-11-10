@@ -54,7 +54,7 @@ class Bert()(implicit p: Parameters) extends BertModule()(p) {
   val io = new BertIO
 
   // track the bit error count
-  val errorCounts = Reg(init = Wire(Vec(bertNumWays, UInt(0, width = bertCountWidth))))
+  val errorCounts = Reg(init = Vec.fill(bertNumWays) { UInt(0, width = bertCountWidth) } )
   io.errorCounts := errorCounts
 
   // track the bit count

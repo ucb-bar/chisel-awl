@@ -4,7 +4,8 @@
 module example_transceiver (
   input fastClk,
   output slowClk,
-  input reset,
+  input resetIn,
+  output resetOut,
   input rx_p,
   input rx_n,
   output tx_p,
@@ -22,9 +23,10 @@ module example_transceiver (
 );
 
   `ifndef HBWIF_USE_PG_PINS
-  supply1 avdd;
-  supply1 dvdd;
-  supply0 gnd;
+  wire avdd, dvdd, gnd;
+  assign avdd = 1'b1;
+  assign dvdd = 1'b1;
+  assign gnd = 1'b0;
   `endif
 
   wire corrupt;
@@ -41,7 +43,8 @@ module example_transceiver (
   fpga_transceiver U0 (
     .fastClk(fastClk),
     .slowClk(slowClk_pre),
-    .reset(reset),
+    .resetIn(resetIn),
+    .resetOut(resetOut),
     .rx_p(rx_p),
     .rx_n(rx_n),
     .tx_p(tx_p_pre),
@@ -82,8 +85,9 @@ endmodule
 
 module fpga_transceiver (
   input fastClk,
-  output slowClk,
-  input reset,
+  output reg slowClk,
+  input resetIn,
+  output resetOut,
   input rx_p,
   input rx_n,
   output tx_p,
@@ -92,54 +96,70 @@ module fpga_transceiver (
   output [9:0] data_rx
 );
 
-reg slowClk;
+  // Internal signals
+  wire rx, clk_d;
+  reg [9:0] ser;
+  reg [9:0] des;
+  reg [9:0] des_buffer;
 
-// Internal signals
-wire rx;
-reg [9:0] ser;
-reg [9:0] des;
-reg [9:0] des_buffer;
+  // Differential checks
+  assign tx_n = ~tx_p;
+  assign tx_p = ser[9];
+  assign rx = (rx_p == ~rx_n) ? rx_p : 1'bx;
 
-// Differential checks
-assign tx_n = ~tx_p;
-assign tx_p = ser[9];
-assign rx = (rx_p == ~rx_n) ? rx_p : 1'bx;
+  assign data_rx = des_buffer;
 
-// TX Serializer and RX Deserializer
-reg [3:0] serdes_count;
-always @(posedge fastClk) begin
-  if (reset) begin
-    serdes_count <= 4'd0;
-    ser <= 10'd0;
-    des_buffer <= 10'd0;
-    des <= 10'd0;
-  end else begin
-    if (serdes_count == 4'd9) begin
+  // Need to add a slight delay here to simulate correctly
+  assign #0.1 clk_d = fastClk;
+
+  reg [1:0] resetSync;
+
+  // Async reset out
+  always @(posedge slowClk or posedge resetIn) begin
+    if (resetIn) begin
+      resetSync[1] <= 1'b1;
+      resetSync[0] <= 1'b1;
+    end else begin
+      resetSync[1:0] <= {resetSync[0],1'b0};
+    end
+  end
+  assign resetOut = resetSync[1];
+
+  // TX Serializer and RX Deserializer
+  reg [3:0] serdes_count;
+  always @(posedge clk_d or negedge clk_d) begin
+    if (resetIn) begin
       serdes_count <= 4'd0;
-      ser <= data_tx;
-      des <= des_buffer;
+      ser <= 10'd0;
+      des_buffer <= 10'd0;
+      des <= 10'd0;
     end else begin
-      serdes_count <= serdes_count + 4'd1;
-      ser <= {ser[8:0], 1'b0};
-      des_buffer <= {des[8:0], rx};
+      if (serdes_count == 4'd9) begin
+        serdes_count <= 4'd0;
+        ser <= data_tx;
+        des_buffer <= des;
+      end else begin
+        serdes_count <= serdes_count + 4'd1;
+        ser <= {ser[8:0], 1'b0};
+      end
+      des <= {des[8:0], rx};
     end
   end
-end
 
-// Divide-by-5 using asynchronous reset
-reg [2:0] div5_count;
-always @(posedge fastClk or negedge fastClk or posedge reset) begin
-  if (reset) begin
-    div5_count <= 3'd0;
-    slowClk <= 1'b1;
-  end else begin
-    if (div5_count == 3'd4) begin
+  // Divide-by-5 using asynchronous reset
+  reg [2:0] div5_count;
+  always @(posedge fastClk or negedge fastClk or posedge resetIn) begin
+    if (resetIn) begin
       div5_count <= 3'd0;
-      slowClk <= ~slowClk;
+      slowClk <= 1'b1;
     end else begin
-      div5_count <= div5_count + 3'd1;
+      if (div5_count == 3'd4) begin
+        div5_count <= 3'd0;
+        slowClk <= ~slowClk;
+      end else begin
+        div5_count <= div5_count + 3'd1;
+      end
     end
   end
-end
 
 endmodule

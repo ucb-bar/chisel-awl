@@ -28,13 +28,6 @@ trait HasHbwifTileLinkParameters extends HasHbwifParameters
   with HasTileLinkParameters {
   val hbwifRawGrantBits = tlBeatAddrBits + tlClientXactIdBits + tlManagerIdBits + 1 + tlGrantTypeBits + tlDataBits
   val hbwifRawAcquireBits = tlBeatAddrBits + tlClientXactIdBits + tlManagerIdBits + 1 + tlGrantTypeBits + tlDataBits
-  val hbwifGrantPadBits = (8 - (hbwifRawGrantBits % 8)) % 8
-  val hbwifAcquirePadBits = (8 - (hbwifRawAcquireBits % 8)) % 8
-  val hbwifChecksumBits = 8
-  val hbwifGrantBits = hbwifRawGrantBits + hbwifGrantPadBits + hbwifChecksumBits
-  val hbwifAcquireBits = hbwifRawAcquireBits + hbwifAcquirePadBits + hbwifChecksumBits
-  val hbwifGrantBytes = hbwifGrantBits / 8
-  val hbwifAcquireBytes = hbwifAcquireBits / 8
 }
 
 trait Hbwif extends LazyModule

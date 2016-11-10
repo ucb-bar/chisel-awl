@@ -247,7 +247,7 @@ trait HasHbwifTestModule extends HasTransceiverParameters with HasUnitTestIO {
   if(transceiverHasIRef && transceiverRefGenHasInput) hbwif.io.hbwifIref.get := Bool(true)
 }
 
-class HbwifMemTest(implicit val p: Parameters) extends UnitTest
+class HbwifMemTest(implicit val p: Parameters) extends UnitTest(100000)
   with HasHbwifTestModule with HasTileLinkParameters {
 
   fiwbh.io.loopback := Bool(false)
@@ -265,10 +265,7 @@ class HbwifMemTest(implicit val p: Parameters) extends UnitTest
 
 }
 
-class HbwifBertTest(implicit val p: Parameters) extends UnitTest
-  with HasHbwifTestModule {
-
-  fiwbh.io.loopback := Bool(true)
+class HbwifBertTest(implicit val p: Parameters) extends UnitTest {
 
   io.finished := Bool(true)
 

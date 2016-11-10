@@ -24,23 +24,28 @@ class HbwifTileLinkMemSerDes(implicit val p: Parameters) extends Module
 
   val io = new HbwifTileLinkMemSerDesIO
 
-  assert(io.mem.acquire.bits.is_builtin_type, "Only builtin types allowed in HBWIF")
+  when (io.mem.acquire.valid) {
+    assert(io.mem.acquire.bits.is_builtin_type, "Only builtin types allowed in HBWIF")
+  }
   require(hbwifBufferDepth <= (1 << tlClientXactIdBits), "HBWIF buffer depth should be <= (1 << tlClientXactIdBits)")
   require(hbwifBufferDepth == (1 << log2Up(hbwifBufferDepth)), "HBWIF buffer depth should be a power of 2")
 
+  // FIXME
   val grantBuffer = Module(new HellaFlowQueue(hbwifBufferDepth * tlDataBeats)(new Grant))
-  val grantFilter = Module(new HbwifGrantFilter)
-  val grantDeserializer = Module(new HbwifGrantDeserializer)
+  //val grantFilter = Module(new HbwifFilter(new Grant))
+  val grantDeserializer = Module(new HbwifDeserializer(new Grant))
 
-  val acquireTable = Module(new HbwifAcquireTable)
-  val acquireSerializer = Module(new HbwifAcquireSerializer)
+  //val acquireTable = Module(new HbwifAcquireTable)
+  val acquireSerializer = Module(new HbwifSerializer(new Acquire))
 
   assert(grantBuffer.io.enq.ready, "The grantBuffer must always be ready")
-  grantBuffer.io.enq.bits := grantFilter.io.out.bits
-  grantBuffer.io.enq.valid := grantFilter.io.out.valid
+  //grantBuffer.io.enq.bits := grantFilter.io.out.bits
+  //grantBuffer.io.enq.valid := grantFilter.io.out.valid
+  grantBuffer.io.enq.bits := grantDeserializer.io.data.bits
+  grantBuffer.io.enq.valid := grantDeserializer.io.data.valid
   io.mem.grant <> grantBuffer.io.deq
 
-  grantFilter.io.in <> grantDeserializer.io.grant
+  //grantFilter.io.in <> grantDeserializer.io.data
   grantDeserializer.io.serial <> io.rx
 
   val dec = (io.mem.grant.fire() && io.mem.grant.bits.last())
@@ -57,37 +62,39 @@ class HbwifTileLinkMemSerDes(implicit val p: Parameters) extends Module
     }
   }
 
-  io.mem.acquire.ready := !full && acquireTable.io.in.ready
-  acquireTable.io.in.valid := !full && io.mem.acquire.valid
-  acquireTable.io.in.bits := io.mem.acquire.bits
-  acquireTable.io.retransmitEnable := io.retransmitEnable
-  acquireTable.io.retransmitCycles := io.retransmitCycles
+  //io.mem.acquire.ready := !full && acquireTable.io.in.ready
+  //acquireTable.io.in.valid := !full && io.mem.acquire.valid
+  //acquireTable.io.in.bits := io.mem.acquire.bits
+  //acquireTable.io.retransmitEnable := io.retransmitEnable
+  //acquireTable.io.retransmitCycles := io.retransmitCycles
 
-  acquireTable.io.clear.valid := grantFilter.io.out.valid & grantFilter.io.out.bits.first()
-  acquireTable.io.clear.bits := grantFilter.io.out.bits.client_xact_id
+  acquireSerializer.io.data <> io.mem.acquire
 
-  acquireSerializer.io.acquire <> acquireTable.io.out
+  //acquireTable.io.clear.valid := grantFilter.io.out.valid & grantFilter.io.out.bits.first()
+  //acquireTable.io.clear.bits := grantFilter.io.out.bits.client_xact_id
+
+  //acquireSerializer.io.data <> acquireTable.io.out
   io.tx <> acquireSerializer.io.serial
 
 }
 
-class HbwifGrantFilterIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
-  with HasHbwifParameters {
+class HbwifFilterIO[T <: Bundle](gen: T)(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
+  with HasHbwifTileLinkParameters {
 
-  val in  = Valid(new Grant).flip
-  val out = Valid(new Grant)
+  val in = Valid(gen.cloneType).flip
+  val out = Valid(gen.cloneType)
 
 }
 
-class HbwifGrantFilter(implicit val p: Parameters) extends Module
+class HbwifFilter[T <: TileLinkChannel with HasClientTransactionId with HasTileLinkBeatId](gen: T)(implicit val p: Parameters) extends Module
   with HasHbwifTileLinkParameters {
 
-  val io = new HbwifGrantFilterIO
+  val io = new HbwifFilterIO(gen)
 
   val sWait :: sValid :: sFill :: Nil = Enum(UInt(), 3)
   val state = Reg(init = sWait)
 
-  val buffer = Reg(Vec(tlDataBeats, new Grant()))
+  val buffer = Reg(Vec(tlDataBeats, gen.cloneType))
   val count = Reg(UInt(width = tlBeatAddrBits))
 
   io.out.bits  := buffer(UInt(tlDataBeats) - count)
@@ -104,11 +111,11 @@ class HbwifGrantFilter(implicit val p: Parameters) extends Module
       } .otherwise {
         state := sValid
         count := UInt(0)
-        buffer(UInt(tlDataBeats - 1)) := io.in.bits
+        buffer(UInt(0)) := io.in.bits
       }
     }
   } .elsewhen (state === sValid) {
-    assert(!io.in.valid, "I got a valid Grant before I could handle it")
+    assert(!io.in.valid, "I got a valid Acquire before I could handle it")
     when(count === UInt(0)) {
       state := sWait
     } .otherwise {
@@ -134,28 +141,29 @@ class HbwifGrantFilter(implicit val p: Parameters) extends Module
 
 }
 
-class HbwifGrantDeserializerIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
-  with HasHbwifParameters {
+class HbwifDeserializerIO[T <: Bundle](gen: T)(implicit val p: Parameters) extends util.ParameterizedBundle()(p) {
 
   val serial = (new Decoded8b10bSymbol).asInput
-  val grant = Valid(new Grant())
+  val data = Valid(gen.cloneType)
 
 }
 
-class HbwifGrantDeserializer(implicit val p: Parameters) extends Module
-  with HasHbwifTileLinkParameters {
+class HbwifDeserializer[T <: Bundle](gen: T)(implicit val p: Parameters) extends Module {
 
-  val io = new HbwifGrantDeserializerIO
+  val size = gen.cloneType.fromBits(UInt(0)).asUInt().getWidth
+  val bytes = (size + (size % 8)) / 8
 
-  val buffer = Reg(Vec(hbwifGrantBytes-1, UInt(width = 8)))
+  val io = new HbwifDeserializerIO(gen)
+
+  val buffer = Reg(Vec(bytes, UInt(width = 8)))
   val checksum = Reg(init = UInt(0, width = 8))
   val valid = Reg(init = Bool(false))
-  val count = Reg(UInt(width = log2Up(hbwifGrantBytes)))
+  val count = Reg(UInt(width = log2Up(bytes+1)))
 
   val cat = buffer.asUInt()
 
-  io.grant.bits := (new Grant).fromBits(buffer.asUInt()(hbwifRawGrantBits-1,0))
-  io.grant.valid := valid
+  io.data.bits := gen.cloneType.fromBits(buffer.asUInt()(size-1,0))
+  io.data.valid := valid
 
   val sIdle :: sFill :: Nil = Enum(UInt(), 2)
 
@@ -171,15 +179,16 @@ class HbwifGrantDeserializer(implicit val p: Parameters) extends Module
     valid := Bool(false)
   } .elsewhen (state === sFill) {
     when (io.serial.isData()) {
-      when (count === UInt(hbwifGrantBytes-1)) {
+      when (count === UInt(bytes)) {
         count := UInt(0)
-        when ((checksum + ~io.serial.data + UInt(1)) === UInt(0)) {
+        when ((checksum + io.serial.data) === UInt(0)) {
           // checksum pass
           valid := Bool(true)
         } .otherwise {
           valid := Bool(false)
         }
         checksum := UInt(0)
+        state := sIdle
       } .otherwise {
         count := count + UInt(1)
         buffer(count) := io.serial.data
@@ -224,7 +233,7 @@ class HbwifAcquireTable(implicit val p: Parameters) extends Module
 
   val timestamps = Reg(Vec(hbwifBufferDepth, UInt(width = log2Up(hbwifMaxRetransmitCycles))))
   val timeouts = Reg(Vec(hbwifBufferDepth, Bool()))
-  val valids = Reg(init = Wire(Vec(hbwifBufferDepth, Bool(false))))
+  val valids = Reg(init = Vec.fill(hbwifBufferDepth) { Bool(false) } )
   val xactIdToAddr = Reg(Vec((1 << tlClientXactIdBits), UInt(width = log2Up(hbwifBufferDepth))))
 
   val table = SeqMem(hbwifBufferDepth * tlDataBeats, new Acquire())
@@ -343,28 +352,35 @@ class HbwifAcquireTable(implicit val p: Parameters) extends Module
 
 }
 
-class HbwifAcquireSerializerIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
+class HbwifSerializerIO[T <: Bundle](gen: T)(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
   with HasHbwifTileLinkParameters {
 
-  val acquire = Decoupled(new Acquire).flip
+  val data = Decoupled(gen.cloneType).flip
   val serial = (new Decoded8b10bSymbol).asOutput
 
 }
 
-class HbwifAcquireSerializer(implicit val p: Parameters) extends Module
+class HbwifSerializer[T <: Bundle](gen: T)(implicit val p: Parameters) extends Module
   with HasHbwifTileLinkParameters {
 
-  val io = new HbwifAcquireSerializerIO
+  val io = new HbwifSerializerIO(gen)
 
-  val buffer = Reg(Vec(hbwifAcquireBytes-1, UInt(width = 8)))
+  val tobits = io.data.bits.asUInt()
+  val size = tobits.getWidth
+  val bytes = (size + (size % 8)) / 8
+  val padBits = size % 8
+
+  val buffer = Reg(Vec(bytes, UInt(width = 8)))
   val checksum = Reg(init = UInt(0, width = 8))
-  val count = Reg(init = UInt(0, width = log2Up(hbwifAcquireBytes-1)))
+  val count = Reg(init = UInt(0, width = log2Up(bytes)))
 
   val sIdle :: sFill :: sChecksum :: Nil = Enum(UInt(), 3)
 
   val state = Reg(init = sIdle)
 
-  io.acquire.ready := (state === sIdle | state === sChecksum)
+  val raw = if(padBits == 0) tobits else Cat(UInt(0, width=padBits), tobits)
+
+  io.data.ready := (state === sIdle | state === sChecksum)
 
   io.serial.valid := (state === sFill | state === sChecksum)
   io.serial.control := Bool(false)
@@ -381,23 +397,26 @@ class HbwifAcquireSerializer(implicit val p: Parameters) extends Module
   }
 
   when (state === sIdle) {
-    when (io.acquire.fire()) {
+    when (io.data.fire()) {
       state := sFill
       count := UInt(0)
-      (0 until hbwifAcquireBytes-2).foreach { i => buffer(i) := Cat(UInt(0, width=hbwifAcquirePadBits),io.acquire.bits.asUInt())(i*8+7,i*8) }
+      checksum := UInt(0)
+      (0 until bytes).foreach { i => buffer(i) := raw(i*8+7,i*8) }
     }
   } .elsewhen (state === sFill) {
-    when (count === UInt(hbwifAcquireBytes-2)) {
+    checksum := checksum + buffer(count)
+    when (count === UInt(bytes-1)) {
       state := sChecksum
     } .otherwise {
       state := sFill
       count := count + UInt(1)
     }
   } .elsewhen (state === sChecksum) {
-    when (io.acquire.fire()) {
+    when (io.data.fire()) {
       state := sFill
-      (0 until hbwifAcquireBytes-2).foreach { i => buffer(i) := Cat(UInt(0, width=hbwifAcquirePadBits),io.acquire.bits.asUInt())(i*8+7,i*8) }
+      (0 until bytes).foreach { i => buffer(i) := raw(i*8+7,i*8) }
       count := UInt(0)
+      checksum := UInt(0)
     } .otherwise {
       state := sIdle
     }

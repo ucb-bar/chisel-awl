@@ -27,14 +27,23 @@ MACRO example_transceiver
         END
     END slowClk
 
-    PIN reset
+    PIN resetIn
         DIRECTION INPUT ;
         USE SIGNAL ;
         PORT
             LAYER M4 ;
             RECT 50 12 49.9 12.1 ;
         END
-    END reset
+    END resetIn
+
+    PIN resetOut
+        DIRECTION OUTPUT ;
+        USE SIGNAL ;
+        PORT
+            LAYER M4 ;
+            RECT 50 13 49.9 13.1 ;
+        END
+    END resetOut
 
     PIN rx_p
         DIRECTION INPUT ;

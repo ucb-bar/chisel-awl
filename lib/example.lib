@@ -123,11 +123,20 @@ library(HBWIF) {
       output_voltage : default;
     }
 
-    pin(reset) {
+    pin(resetIn) {
       capacitance : 0.001 ;
       direction : input ;
 
       input_voltage : default;
+    }
+
+    pin(resetOut) {
+      capacitance : 0.001 ;
+      direction : output ;
+
+      related_power_pin : dvdd ;
+      related_ground_pin : gnd ;
+      output_voltage : default;
     }
 
     pin(rx_p) {

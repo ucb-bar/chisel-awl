@@ -45,7 +45,8 @@ class TransceiverIO(implicit val p: Parameters) extends ParameterizedBundle()(p)
   val slowClk = Clock(OUTPUT)
 
   // reset
-  val reset = Bool(INPUT)
+  val resetIn = Bool(INPUT)
+  val resetOut = Bool(OUTPUT)
 
   // RX pad inputs
   val rx = (new Differential).flip

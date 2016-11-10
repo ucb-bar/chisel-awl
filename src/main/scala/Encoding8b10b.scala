@@ -248,10 +248,10 @@ class Decoder8b10b extends Module {
   val lock = Reg(init = Bool(false))
   val rd = Reg(init = Bool(false))
 
-  val cat = Cat(buf, io.encoded)
+  val cat = Cat(buf,io.encoded)
   val wires = Vec( (0 to 9).map { i => cat(9+i, i) } )
   // Check that bits cdeif (7,3) are the same (this defines a comma)
-  val commas = wires.map { x => x(7,3).andR || ~(x(7,3).orR) }
+  val commas = wires.map { x => (x(9,3) === UInt("b0011111")) || (x(9,3) === UInt("b1100000")) }
   val found = commas.reduce(_|_)
   val idxs = commas.zipWithIndex.map { case (b, i) => (b, UInt(i)) }
   val next_idx = MuxCase(UInt(0), idxs)
