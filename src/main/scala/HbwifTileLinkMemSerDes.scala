@@ -32,20 +32,18 @@ class HbwifTileLinkMemSerDes(implicit val p: Parameters) extends Module
 
   // FIXME
   val grantBuffer = Module(new HellaFlowQueue(hbwifBufferDepth * tlDataBeats)(new Grant))
-  //val grantFilter = Module(new HbwifFilter(new Grant))
+  val grantFilter = Module(new HbwifFilter(new Grant))
   val grantDeserializer = Module(new HbwifDeserializer(new Grant))
 
   //val acquireTable = Module(new HbwifAcquireTable)
   val acquireSerializer = Module(new HbwifSerializer(new Acquire))
 
   assert(grantBuffer.io.enq.ready, "The grantBuffer must always be ready")
-  //grantBuffer.io.enq.bits := grantFilter.io.out.bits
-  //grantBuffer.io.enq.valid := grantFilter.io.out.valid
-  grantBuffer.io.enq.bits := grantDeserializer.io.data.bits
-  grantBuffer.io.enq.valid := grantDeserializer.io.data.valid
+  grantBuffer.io.enq.bits := grantFilter.io.out.bits
+  grantBuffer.io.enq.valid := grantFilter.io.out.valid
   io.mem.grant <> grantBuffer.io.deq
 
-  //grantFilter.io.in <> grantDeserializer.io.data
+  grantFilter.io.in <> grantDeserializer.io.data
   grantDeserializer.io.serial <> io.rx
 
   val dec = (io.mem.grant.fire() && io.mem.grant.bits.last())
@@ -91,14 +89,14 @@ class HbwifFilter[T <: TileLinkChannel with HasClientTransactionId with HasTileL
 
   val io = new HbwifFilterIO(gen)
 
-  val sWait :: sValid :: sFill :: Nil = Enum(UInt(), 3)
+  val sWait :: sBeatValid :: sBlockValid :: sFill :: Nil = Enum(UInt(), 4)
   val state = Reg(init = sWait)
 
   val buffer = Reg(Vec(tlDataBeats, gen.cloneType))
   val count = Reg(UInt(width = tlBeatAddrBits))
 
-  io.out.bits  := buffer(UInt(tlDataBeats) - count)
-  io.out.valid := (state === sValid)
+  io.out.bits  := buffer(count)
+  io.out.valid := (state === sBlockValid) || (state === sBeatValid)
 
   when(state === sWait) {
     when(io.in.valid) {
@@ -106,30 +104,33 @@ class HbwifFilter[T <: TileLinkChannel with HasClientTransactionId with HasTileL
         when (io.in.bits.addr_beat === UInt(0)) {
           state := sFill
           count := UInt(1)
-          buffer(UInt(tlDataBeats - 1)) := io.in.bits
         }
       } .otherwise {
-        state := sValid
+        state := sBeatValid
         count := UInt(0)
-        buffer(UInt(0)) := io.in.bits
       }
+      buffer(UInt(0)) := io.in.bits
     }
-  } .elsewhen (state === sValid) {
+  } .elsewhen (state === sBeatValid) {
     assert(!io.in.valid, "I got a valid Acquire before I could handle it")
-    when(count === UInt(0)) {
+    state := sWait
+  } .elsewhen (state === sBlockValid) {
+    assert(!io.in.valid, "I got a valid Acquire before I could handle it")
+    when(count === UInt(tlDataBeats - 1)) {
       state := sWait
     } .otherwise {
-      count := count - UInt(1)
+      count := count + UInt(1)
     }
   } .elsewhen (state === sFill) {
     when (io.in.valid) {
-      when ((io.in.bits.client_xact_id === buffer(UInt(tlDataBeats - 1)).client_xact_id) && (io.in.bits.addr_beat === count)) {
+      when ((io.in.bits.client_xact_id === buffer(UInt(0)).client_xact_id) && (io.in.bits.addr_beat === count)) {
         when (count === UInt(tlDataBeats - 1)) {
-          state := sValid
+          state := sBlockValid
+          count := UInt(0)
         } .otherwise {
           count := count + UInt(1)
         }
-        buffer(UInt(tlDataBeats - 1) - count) := io.in.bits
+        buffer(count) := io.in.bits
       } .otherwise {
         // we lost a packet somewhere, abort this transaction
         state := sWait

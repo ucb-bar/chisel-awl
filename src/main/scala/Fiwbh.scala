@@ -141,18 +141,16 @@ class FiwbhTileLinkMemDesSer(implicit val p: Parameters) extends Module
   val io = new FiwbhTileLinkMemDesSerIO
 
   val acquireBuffer = Module(new HellaFlowQueue(hbwifBufferDepth * tlDataBeats)(new Acquire))
-  //val acquireFilter = Module(new HbwifFilter(new Acquire))
+  val acquireFilter = Module(new HbwifFilter(new Acquire))
   val acquireDeserializer = Module(new HbwifDeserializer(new Acquire))
 
   val grantSerializer = Module(new HbwifSerializer(new Grant))
 
-  //acquireBuffer.io.enq.bits := acquireFilter.io.out.bits
-  //acquireBuffer.io.enq.valid := acquireFilter.io.out.valid
-  acquireBuffer.io.enq.bits := acquireDeserializer.io.data.bits
-  acquireBuffer.io.enq.valid := acquireDeserializer.io.data.valid
+  acquireBuffer.io.enq.bits := acquireFilter.io.out.bits
+  acquireBuffer.io.enq.valid := acquireFilter.io.out.valid
   io.mem.acquire <> acquireBuffer.io.deq
 
-  //acquireFilter.io.in <> acquireDeserializer.io.data
+  acquireFilter.io.in <> acquireDeserializer.io.data
   acquireDeserializer.io.serial <> io.rx
 
   grantSerializer.io.data <> io.mem.grant
