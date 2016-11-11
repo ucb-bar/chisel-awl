@@ -41,7 +41,7 @@ MACRO example_transceiver
         USE SIGNAL ;
         PORT
             LAYER M4 ;
-            RECT 50 13 49.9 13.1 ;
+            RECT 50 41 49.9 41.1 ;
         END
     END resetOut
 
