@@ -149,7 +149,7 @@ class HbwifDeserializerIO[T <: Bundle](gen: T)(implicit val p: Parameters) exten
 class HbwifDeserializer[T <: Bundle](gen: T)(implicit val p: Parameters) extends Module {
 
   val size = gen.cloneType.fromBits(UInt(0)).asUInt().getWidth
-  val bytes = (size + (size % 8)) / 8
+  val bytes = if (size % 8 == 0) size/8 else size/8 + 1
 
   val io = new HbwifDeserializerIO(gen)
 
