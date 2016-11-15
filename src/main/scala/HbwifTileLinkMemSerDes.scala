@@ -364,9 +364,9 @@ class HbwifSerializer[T <: Bundle](gen: T)(implicit val p: Parameters) extends M
   val io = new HbwifSerializerIO(gen)
 
   val tobits = io.data.bits.asUInt()
-  val size = tobits.getWidth
-  val bytes = (size + (size % 8)) / 8
-  val padBits = size % 8
+  val size = gen.cloneType.fromBits(UInt(0)).asUInt().getWidth
+  val bytes = if (size % 8 == 0) size/8 else size/8 + 1
+  val padBits = if (size % 8 == 0) 0 else 8 - (size % 8)
 
   val buffer = Reg(Vec(bytes, UInt(width = 8)))
   val checksum = Reg(init = UInt(0, width = 8))
