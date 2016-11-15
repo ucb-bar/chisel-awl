@@ -70,7 +70,7 @@ class HbwifLaneBackend(val c: Clock, val r: Bool, val id: Int)(implicit val p: P
   scrBuilder.addStatus("bert_bit_count")
   scrBuilder.addStatus("bert_snapshot")
 
-  scrBuilder.addControl("retransmit_enable", UInt(1))
+  scrBuilder.addControl("retransmit_enable", UInt(0))
   scrBuilder.addControl("retransmit_cycles", UInt(1))
 
   // TODO this needs to handle nested Bundles
@@ -114,6 +114,6 @@ class HbwifLaneBackend(val c: Clock, val r: Bool, val id: Int)(implicit val p: P
   scr.status("bert_snapshot") := bert.io.snapshot
 
   memSerDes.io.retransmitEnable := scr.control("retransmit_enable")(0)
-  memSerDes.io.retransmitEnable := scr.control("retransmit_cycles")(log2Up(hbwifMaxRetransmitCycles)-1,0)
+  memSerDes.io.retransmitCycles := scr.control("retransmit_cycles")(log2Up(hbwifMaxRetransmitCycles)-1,0)
 
 }
