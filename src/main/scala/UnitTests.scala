@@ -20,6 +20,7 @@ object HbwifUnitTests {
       Module(new EncodingAlignmentTest),
       Module(new EncodingErrorTest),
       Module(new HbwifMemTest),
+      Module(new HbwifMemBERTest),
       Module(new HbwifBertTest)
     )
 }
@@ -159,6 +160,7 @@ object HbwifSCRUtil extends HasSCRParameters {
 
   def bertMode()(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] = writeAll("bert_enable", 1)
   def hbwifMode()(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] = writeAll("bert_enable", 0)
+  def retransmitMode()(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] = writeAll("retransmit_cycles", 250) ++ writeAll("retransmit_enable", 1)
 
 }
 
@@ -213,7 +215,8 @@ trait HasHbwifTestModule extends HasTransceiverParameters with HasUnitTestIO {
   implicit val p: Parameters
   val clock: Clock
   val reset: Bool
-  //val scrDriver: PutSeqDriver
+  val txError = Wire(Bool())
+  val rxError = Wire(Bool())
 
   val q = p.alterPartial({
     case GlobalAddrMap => AddrMap(AddrMapEntry("io",
@@ -228,18 +231,19 @@ trait HasHbwifTestModule extends HasTransceiverParameters with HasUnitTestIO {
   val hbwif = Module(new HbwifInst()(q))
   val fiwbh = Module(new Fiwbh()(q))
 
-  val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.hbwifMode()))
-
-  scrDriver.io.start := io.start
-  hbwif.io.scr <> scrDriver.io.mem
-
   hbwif.io.reset := reset
 
   hbwif.io.fastClk := clock
   fiwbh.io.fastClk := clock
 
-  hbwif.io.hbwifRx <> fiwbh.io.tx
-  fiwbh.io.rx <> hbwif.io.hbwifTx
+  hbwif.io.hbwifRx.zip(fiwbh.io.tx).foreach { case (h,f) =>
+    h.p := f.p ^ rxError
+    h.n := f.n ^ rxError
+  }
+  hbwif.io.hbwifTx.zip(fiwbh.io.rx).foreach { case (h,f) =>
+    f.p := h.p ^ txError
+    f.n := h.n ^ txError
+  }
 
   val memIn = hbwif.io.mem(0)
   val memOut = fiwbh.io.mem(0)
@@ -252,7 +256,45 @@ class HbwifMemTest(implicit val p: Parameters) extends UnitTest(100000)
 
   fiwbh.io.loopback := Bool(false)
 
-  //val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.hbwifMode()))
+  val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.hbwifMode()))
+
+  scrDriver.io.start := io.start
+  hbwif.io.scr <> scrDriver.io.mem
+
+  rxError := Bool(false)
+  txError := Bool(false)
+
+  val depth = 2 * tlDataBeats
+  val driver = TileLinkUnitTestUtils.fullDriverSet(depth)
+  driver.io.start := scrDriver.io.finished
+  io.finished := driver.io.finished
+
+  memIn <> driver.io.mem
+  val testram = Module(new TileLinkTestRAM(depth))
+  testram.io <> memOut
+
+}
+
+class HbwifMemBERTest(implicit val p: Parameters) extends UnitTest(300000)
+  with HasHbwifTestModule with HasTileLinkParameters {
+
+  fiwbh.io.loopback := Bool(false)
+
+  val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.hbwifMode() ++ HbwifSCRUtil.retransmitMode()))
+
+  scrDriver.io.start := io.start
+  hbwif.io.scr <> scrDriver.io.mem
+
+  val txErrorGen = Reg(init = UInt(0x101, width = 15))
+  val rxErrorGen = Reg(init = UInt(0x214, width = 15))
+
+  txErrorGen := Cat((txErrorGen & UInt(0x03)).toBools.reduce(_^_), txErrorGen(14,1)).asUInt
+  rxErrorGen := Cat((rxErrorGen & UInt(0x03)).toBools.reduce(_^_), rxErrorGen(14,1)).asUInt
+
+  val ber = 1e-2
+  val thres = (ber * (1 << 15)).toInt
+  txError := (txErrorGen < UInt(thres))
+  rxError := (rxErrorGen < UInt(thres))
 
   val depth = 2 * tlDataBeats
   val driver = TileLinkUnitTestUtils.fullDriverSet(depth)

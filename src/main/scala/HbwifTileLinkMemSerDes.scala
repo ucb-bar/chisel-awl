@@ -226,7 +226,7 @@ class HbwifAcquireTable(implicit val p: Parameters) extends Module
 
   val io = new HbwifAcquireTableIO
 
-  val sReady :: sFill :: sRetransmit :: Nil = Enum(UInt(), 3)
+  val sReady :: sFill :: sRetransmit :: sRetransmitFill :: Nil = Enum(UInt(), 4)
   val state = Reg(init = sReady)
 
   val timestamps = Reg(Vec(hbwifBufferDepth, UInt(width = log2Up(hbwifMaxRetransmitCycles))))
@@ -249,13 +249,13 @@ class HbwifAcquireTable(implicit val p: Parameters) extends Module
   val retransmitData = Wire(new Acquire())
 
   io.in.ready := !full & (state =/= sRetransmit) & io.out.ready
-  io.out.valid := state === sFill | state === sRetransmit | (((state === sReady) | !io.retransmitEnable) & io.in.valid)
-  io.out.bits := Mux(state === sRetransmit, retransmitData, io.in.bits)
+  io.out.valid := state === sFill | state === sRetransmit | state === sRetransmitFill | (((state === sReady) | !io.retransmitEnable) & io.in.valid)
+  io.out.bits := Mux(state === sRetransmit | state === sRetransmitFill, retransmitData, io.in.bits)
 
   // table SRAM stuff
   val wen = (state === sReady | state === sFill) & io.in.fire()
   val waddr = Mux(state === sFill, Cat(blockAddress, count), Cat(nextAddress, UInt(0, width = tlBeatAddrBits)))
-  val raddr = Cat(blockAddress, count)
+  val raddr = Mux(state === sReady, Cat(timeoutAddress, UInt(0, width = tlBeatAddrBits)), Cat(blockAddress, count))
 
   retransmitData := table.read(raddr, !wen)
   // TODO the timing here is off
@@ -265,30 +265,18 @@ class HbwifAcquireTable(implicit val p: Parameters) extends Module
   // TODO need to fix TIMEOUT on the same cycle as a clear XXX
 
   ///////////////////////////// timeouts and timestamps
-  when (state === sReady) {
-    when (io.in.fire()) {
-      (0 until hbwifBufferDepth).foreach { i =>
-        when (nextAddress === UInt(i)) {
-          timestamps(UInt(i)) := io.retransmitCycles
-          timeouts(UInt(i)) := Bool(false)
-        } .otherwise {
-          timestamps(UInt(i)) := timestamps(UInt(i)) - UInt(1)
-          when (timestamps(UInt(i)) === UInt(0)) {
-            timeouts(UInt(i)) := Bool(true)
-          }
-        }
-      }
-    } .elsewhen (timeout) {
-      (0 until hbwifBufferDepth).foreach { i =>
-        when (blockAddress === UInt(i)) {
-          timestamps(UInt(i)) := io.retransmitCycles
-          timeouts(UInt(i)) := Bool(false)
-        } .otherwise {
-          timestamps(UInt(i)) := timestamps(UInt(i)) - UInt(1)
-          when (timestamps(UInt(i)) === UInt(0)) {
-            timeouts(UInt(i)) := Bool(true)
-          }
-        }
+  (0 until hbwifBufferDepth).foreach { i =>
+    when ((nextAddress === UInt(i)) & (state === sReady) & io.in.fire()) {
+      timestamps(UInt(i)) := io.retransmitCycles
+      timeouts(UInt(i)) := Bool(false)
+    } .elsewhen(!io.in.fire() & timeout & (timeoutAddress === UInt(i))) {
+      timestamps(UInt(i)) := io.retransmitCycles
+      timeouts(UInt(i)) := UInt(0)
+    } .otherwise {
+      when (timestamps(UInt(i)) === UInt(0)) {
+        timeouts(UInt(i)) := Bool(true)
+      } .otherwise {
+        timestamps(UInt(i)) := timestamps(UInt(i)) - UInt(1)
       }
     }
   }
@@ -327,7 +315,7 @@ class HbwifAcquireTable(implicit val p: Parameters) extends Module
         }
       } .elsewhen (timeout) {
         blockAddress := timeoutAddress
-        count := UInt(0)
+        count := UInt(1)
         state := sRetransmit
       }
     } .elsewhen (state === sFill) {
@@ -339,15 +327,23 @@ class HbwifAcquireTable(implicit val p: Parameters) extends Module
         }
       }
     } .elsewhen (state === sRetransmit) {
-      count := count + UInt(1)
-      when (count === UInt(tlDataBeats-1)) {
+      when (io.out.bits.last()) {
         state := sReady
+      } .otherwise {
+        count := UInt(1)
+        state := sRetransmitFill
+      }
+    } .elsewhen (state === sRetransmitFill) {
+      when (io.out.fire()) {
+        count := count + UInt(1)
+        when (count === UInt(tlDataBeats-1)) {
+          state := sReady
+        }
       }
     }
   } .otherwise {
     state := sReady
   }
-
 }
 
 class HbwifSerializerIO[T <: Bundle](gen: T)(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
