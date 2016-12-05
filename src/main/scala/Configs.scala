@@ -8,6 +8,13 @@ import rocketchip.{BaseConfig,GenerateGlobalAddrMap}
 import unittest._
 import coreplex._
 
+class WithBufferDepth(bufferDepth: Int) extends Config(
+  (pname,site,here) => pname match {
+    case HbwifKey => HbwifParameters(
+      numLanes = site(NMemoryChannels),
+      bufferDepth = bufferDepth)
+  })
+
 class DefaultHbwifConfig extends Config(
   (pname,site,here) => pname match {
     case BertKey => BertParameters()
