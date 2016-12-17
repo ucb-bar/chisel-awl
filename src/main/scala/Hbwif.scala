@@ -55,6 +55,7 @@ trait HbwifModule extends HasHbwifParameters {
   val reset: Bool
   val hbwifReset = Wire(Bool())
   val hbwifResetOverride = Wire(Bool())
+  val hbwifSlowClockCounter = Seq.fill(hbwifNumLanes){Wire(UInt(width=64))}
 
   val hbwifLanes = (0 until hbwifNumLanes).map(id => Module(new HbwifLane(id)))
 
@@ -64,6 +65,7 @@ trait HbwifModule extends HasHbwifParameters {
 
   hbwifLanes.map(_.io.rx).zip(io.hbwifRx) map { case (lane, top) => lane <> top }
   hbwifLanes.map(_.io.tx).zip(io.hbwifTx) map { case (lane, top) => top <> lane }
+  hbwifLanes.map(_.io.slowClockCounter).zip(hbwifSlowClockCounter) map { case (here, there) => there := here }
 
   (0 until hbwifNumLanes).foreach { i =>
     hbwifLanes(i).io.scr <> scrBus.port(s"hbwif_lane$i")

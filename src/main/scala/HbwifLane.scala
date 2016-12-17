@@ -32,6 +32,9 @@ class HbwifLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()
 
   // Switch to bypass reset synchronizers and wire reset directly
   val hbwifResetOverride = Bool(INPUT)
+
+  // Counter for the slow clock, read by outside
+  val slowClockCounter = UInt(OUTPUT,64)
 }
 
 class HbwifLane(id: Int)(implicit val p: Parameters) extends Module
@@ -71,5 +74,7 @@ class HbwifLane(id: Int)(implicit val p: Parameters) extends Module
   if (transceiverHasIRef) {
     transceiver.io.iref.get <> io.iref.get
   }
+
+  io.slowClockCounter := WordSync(WideCounterModule(64, transceiver.io.slowClk, syncReset),transceiver.io.slowClk)
 
 }
