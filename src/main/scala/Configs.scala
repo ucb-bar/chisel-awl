@@ -7,21 +7,30 @@ import uncore.agents._
 import rocketchip.{BaseConfig,GenerateGlobalAddrMap}
 import unittest._
 import coreplex._
+import scala.math.min
+
+object HbwifKeyHelper {
+  def apply(site: View, bufferDepth: Int): HbwifParameters = {
+    val tlConfig = site(TLKey("Switcher"))
+    val maxBufferDepth = tlConfig.maxClientsPerPort * tlConfig.maxClientXacts
+    HbwifParameters(
+      numLanes = site(NMemoryChannels),
+      bufferDepth = min(bufferDepth, maxBufferDepth))
+  }
+}
 
 class WithBufferDepth(bufferDepth: Int) extends Config(
   (pname,site,here) => pname match {
-    case HbwifKey => HbwifParameters(
-      numLanes = site(NMemoryChannels),
-      bufferDepth = bufferDepth)
+    case HbwifKey => HbwifKeyHelper(site, bufferDepth)
+    case _ => throw new CDEMatchError
   })
 
 class DefaultHbwifConfig extends Config(
   (pname,site,here) => pname match {
     case BertKey => BertParameters()
     case TransceiverKey => TransceiverParameters()
-    case HbwifKey => HbwifParameters(
-      numLanes = site(NMemoryChannels),
-      bufferDepth = 16)
+    case HbwifKey => HbwifKeyHelper(site, 16)
+    case _ => throw new CDEMatchError
   }
 )
 
@@ -40,9 +49,8 @@ class ExampleHbwifConfig extends Config(
       divideBy = 5,
       isDDR = true
     )
-    case HbwifKey => HbwifParameters(
-      numLanes = site(NMemoryChannels),
-      bufferDepth = 16)
+    case HbwifKey => HbwifKeyHelper(site, 16)
+    case _ => throw new CDEMatchError
   }
 )
 
