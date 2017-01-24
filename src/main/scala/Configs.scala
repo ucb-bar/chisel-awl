@@ -15,7 +15,7 @@ object HbwifKeyHelper {
     val maxBufferDepth = tlConfig.maxClientsPerPort * tlConfig.maxClientXacts
     HbwifParameters(
       numLanes = site(NMemoryChannels),
-      bufferDepth = min(bufferDepth, maxBufferDepth))
+      bufferDepth = min(bufferDepth, 1 << log2Ceil(maxBufferDepth)))
   }
 }
 
