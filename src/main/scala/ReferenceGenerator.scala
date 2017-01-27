@@ -13,7 +13,6 @@ class ReferenceGeneratorIO(implicit val p: Parameters) extends ParameterizedBund
 
   // reference outputs
   val irefOut = UInt(OUTPUT, width=transceiverRefGenNumOutputs)
-  require(!transceiverHasIRef || (transceiverRefGenNumOutputs >= hbwifNumLanes), "Cannot have more lanes than reference generator outputs")
 
   // optional reference input
   val irefIn = if (transceiverRefGenHasInput) Some(Bool(INPUT)) else None

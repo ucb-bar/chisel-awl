@@ -19,7 +19,7 @@ class HbwifLaneBackendIO(implicit val p: Parameters) extends util.ParameterizedB
   // Configuration TileLink port
   val scr = (new ClientUncachedTileLinkIO()(mmioParams)).flip
 
-  // parameterizable configuration bundle
+  // parameterizable configuration bundleiii
   val transceiverExtraInputs = p(TransceiverKey).extraInputs.map { _.cloneType.asOutput }
 
   // parameterizable configuration bundle

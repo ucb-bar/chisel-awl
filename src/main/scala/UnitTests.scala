@@ -200,12 +200,18 @@ class HbwifInst(implicit val p: Parameters) extends Module
   hbwifLanes.zip(io.mem).foreach { x => x._1.io.mem <> x._2 }
 
   // Instantiate and connect the reference generator if needed
-  if (transceiverHasIRef) {
-    val hbwifRefGen = Module(new ReferenceGenerator)
-    hbwifRefGen.suggestName("hbwifRefGenInst")
-    hbwifLanes.zipWithIndex.foreach { x => x._1.io.iref.get := hbwifRefGen.io.irefOut(x._2) }
-    if (transceiverRefGenHasInput) {
-      hbwifRefGen.io.irefIn.get := io.hbwifIref.get
+  // TODO clean this up, give names
+  (0 until hbwifNumBanks).foreach { j =>
+    (0 until transceiverNumIrefs).foreach { i =>
+      val idx = i + j*transceiverNumIrefs
+      val hbwifRefGen = Module(new ReferenceGenerator)
+      hbwifRefGen.suggestName(s"hbwifRefGenInst$idx")
+      hbwifLanes.zipWithIndex.foreach { x => x._1.io.iref.get(i) := hbwifRefGen.io.irefOut(x._2) }
+      // XXX this is broken but we are testing the power grid right now, TODO FIXME
+      hbwifRefGen.io.irefIn.foreach { _ := io.hbwifIref.get }
+      //if (transceiverRefGenHasInput) {
+        //hbwifRefGen.io.irefIn.get := io.hbwifIref.get
+      //}
     }
   }
 
@@ -248,7 +254,7 @@ trait HasHbwifTestModule extends HasTransceiverParameters with HasUnitTestIO {
   val memIn = hbwif.io.mem(0)
   val memOut = fiwbh.io.mem(0)
 
-  if(transceiverHasIRef && transceiverRefGenHasInput) hbwif.io.hbwifIref.get := Bool(true)
+  if(transceiverHasIref && transceiverRefGenHasInput) hbwif.io.hbwifIref.get := Bool(true)
 }
 
 class HbwifMemTest(implicit val p: Parameters) extends UnitTest(100000)

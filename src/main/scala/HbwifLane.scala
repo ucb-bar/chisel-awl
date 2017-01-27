@@ -25,7 +25,7 @@ class HbwifLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()
   val scr = (new ClientUncachedTileLinkIO()(mmioParams)).flip
 
   // optional reference for the transceiver
-  val iref = if (transceiverHasIRef) Some(Bool(INPUT)) else None
+  val iref = if (transceiverHasIref) Some(Seq.fill(transceiverNumIrefs) { Bool(INPUT) } ) else None
 
   // un-synchronized HBWIF reset
   val hbwifReset = Bool(INPUT)
@@ -64,17 +64,16 @@ class HbwifLane(id: Int)(implicit val p: Parameters) extends Module
   backend.io.scr <> AsyncUTileLinkTo(backend.clock, backend.reset, io.scr)
 
   if (!(p(TransceiverKey).extraInputs.isEmpty)) {
-    transceiver.io.extraInputs.get <> backend.io.transceiverExtraInputs.get
+    transceiver.io.extraInputs.get := backend.io.transceiverExtraInputs.get
   }
 
   if (!(p(TransceiverKey).extraOutputs.isEmpty)) {
     backend.io.transceiverExtraOutputs.get <> transceiver.io.extraOutputs.get
   }
 
-  if (transceiverHasIRef) {
-    transceiver.io.iref.get <> io.iref.get
-  }
+  //transceiver.io.iref.get.zip(io.iref.get).foreach { x => x._1 := x._2 }
 
   io.slowClockCounter := WordSync(WideCounterModule(64, transceiver.io.slowClk, syncReset),transceiver.io.slowClk)
 
 }
+

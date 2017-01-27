@@ -11,7 +11,7 @@ case class TransceiverParameters(
   fpgaName: String = "fpga_transceiver",
   extraInputs: Option[Bundle] = None,
   extraOutputs: Option[Bundle] = None,
-  hasIRef: Boolean = true,
+  numIrefs: Int = 1,
   refGenHasInput: Boolean = true,
   refGenConfig: Option[Bundle] = None,
   refGenName: String = "generic_reference_generator",
@@ -23,7 +23,8 @@ trait HasTransceiverParameters {
   implicit val p: Parameters
   val transceiverDivideBy = p(TransceiverKey).divideBy
   val transceiverIsDDR = p(TransceiverKey).isDDR
-  val transceiverHasIRef = p(TransceiverKey).hasIRef
+  val transceiverHasIref = p(TransceiverKey).numIrefs > 0
+  val transceiverNumIrefs = p(TransceiverKey).numIrefs
   val transceiverRefGenHasInput = p(TransceiverKey).refGenHasInput
   val transceiverRefGenNumOutputs = p(TransceiverKey).refGenNumOutputs
   val transceiverDataWidth = if (transceiverIsDDR) 2*transceiverDivideBy else transceiverDivideBy
@@ -58,7 +59,7 @@ class TransceiverIO(implicit val p: Parameters) extends ParameterizedBundle()(p)
   val data = new TransceiverData
 
   // reference current (if any)
-  val iref = if (transceiverHasIRef) Some(Bool(INPUT)) else None
+  val iref = if (transceiverHasIref) Some(Seq.fill(transceiverNumIrefs) { Bool(INPUT) } ) else None
 
   // parameterizable configuration bundle
   val extraInputs = p(TransceiverKey).extraInputs.map { _.cloneType.asInput }

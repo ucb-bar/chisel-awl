@@ -14,7 +14,8 @@ case object HbwifKey extends Field[HbwifParameters]
 case class HbwifParameters(
   val numLanes: Int = 8,
   val maxRetransmitCycles: Int = 20000,
-  val bufferDepth: Int = 16)
+  val bufferDepth: Int = 16,
+  val numBanks: Int = 1)
 
 trait HasHbwifParameters extends HasBertParameters with HasTransceiverParameters {
   val memParams = p.alterPartial({ case TLId => "Switcher" })
@@ -22,6 +23,8 @@ trait HasHbwifParameters extends HasBertParameters with HasTransceiverParameters
   val hbwifNumLanes = p(HbwifKey).numLanes
   val hbwifMaxRetransmitCycles = p(HbwifKey).maxRetransmitCycles
   val hbwifBufferDepth = p(HbwifKey).bufferDepth
+  val hbwifNumBanks = p(HbwifKey).numBanks
+  require(hbwifNumLanes % hbwifNumBanks == 0, "The number of lanes must be a multiple of the number of banks")
 }
 
 trait HasHbwifTileLinkParameters extends HasHbwifParameters
@@ -42,7 +45,9 @@ trait Hbwif extends LazyModule
 trait HbwifBundle extends HasHbwifParameters {
   val hbwifRx      = Vec(hbwifNumLanes, new Differential).flip
   val hbwifTx      = Vec(hbwifNumLanes, new Differential)
-  val hbwifIref    = if(transceiverRefGenHasInput) Some(Bool(INPUT)) else None
+  // XXX this is broken but we are testing the power grid right now, TODO FIXME
+  //val hbwifIref    = if(transceiverHasIref && transceiverRefGenHasInput) Some(Vec(transceiverNumIrefs*hbwifNumBanks,Bool(INPUT))) else None
+  val hbwifIref    = if(transceiverHasIref && transceiverRefGenHasInput) Some(Bool(INPUT)) else None
 }
 
 trait HbwifModule extends HasHbwifParameters {
@@ -73,12 +78,20 @@ trait HbwifModule extends HasHbwifParameters {
   hbwifLanes.zip(hbwifIO).foreach { x => x._1.io.mem <> x._2 }
 
   // Instantiate and connect the reference generator if needed
-  if (transceiverHasIRef) {
-    val hbwifRefGen = Module(new ReferenceGenerator)
-    hbwifRefGen.suggestName("hbwifRefGenInst")
-    hbwifLanes.zipWithIndex.foreach { x => x._1.io.iref.get := hbwifRefGen.io.irefOut(x._2) }
-    if (transceiverRefGenHasInput) {
-      hbwifRefGen.io.irefIn.get := io.hbwifIref.get
+  // TODO clean this up, give names
+  (0 until hbwifNumBanks).foreach { j =>
+    (0 until transceiverNumIrefs).foreach { i =>
+      val idx = i + j*transceiverNumIrefs
+      val hbwifRefGen = Module(new ReferenceGenerator)
+      hbwifRefGen.suggestName(s"hbwifRefGenInst$idx")
+
+      //hbwifLanes.zipWithIndex.foreach { x => x._1.io.iref.get(i) := hbwifRefGen.io.irefOut(x._2) }
+
+      // XXX this is broken but we are testing the power grid right now, TODO FIXME
+      hbwifRefGen.io.irefIn.foreach { _ := io.hbwifIref.get }
+      //if (transceiverRefGenHasInput) {
+        //hbwifRefGen.io.irefIn.get := io.hbwifIref.get
+      //}
     }
   }
 }
