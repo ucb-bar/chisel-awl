@@ -59,7 +59,7 @@ class TransceiverIO(implicit val p: Parameters) extends ParameterizedBundle()(p)
   val data = new TransceiverData
 
   // reference current (if any)
-  val iref = if (transceiverHasIref) Some(Seq.fill(transceiverNumIrefs) { Bool(INPUT) } ) else None
+  val iref = if (transceiverHasIref) Some(Vec(transceiverNumIrefs, Bool(OUTPUT)).flip ) else None
 
   // parameterizable configuration bundle
   val extraInputs = p(TransceiverKey).extraInputs.map { _.cloneType.asInput }

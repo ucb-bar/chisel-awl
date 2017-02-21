@@ -86,7 +86,7 @@ class FiwbhLane(implicit val p: Parameters) extends Module
 
   transceiver.io.resetIn := reset
 
-  io.mem <> AsyncUTileLinkFrom(backend.clock, backend.reset, backend.io.mem)
+  io.mem <> AsyncUTileLinkFrom(backend.clock, backend.reset, backend.io.mem, depth = 4)
 
 }
 

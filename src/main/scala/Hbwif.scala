@@ -8,14 +8,14 @@ import junctions._
 import uncore.tilelink._
 import diplomacy.{LazyModule, LazyModuleImp}
 import coreplex._
+import math.max
 
 case object HbwifKey extends Field[HbwifParameters]
 
 case class HbwifParameters(
   val numLanes: Int = 8,
   val maxRetransmitCycles: Int = 20000,
-  val bufferDepth: Int = 16,
-  val numBanks: Int = 1)
+  val bufferDepth: Int = 16)
 
 trait HasHbwifParameters extends HasBertParameters with HasTransceiverParameters {
   val memParams = p.alterPartial({ case TLId => "Switcher" })
@@ -23,7 +23,8 @@ trait HasHbwifParameters extends HasBertParameters with HasTransceiverParameters
   val hbwifNumLanes = p(HbwifKey).numLanes
   val hbwifMaxRetransmitCycles = p(HbwifKey).maxRetransmitCycles
   val hbwifBufferDepth = p(HbwifKey).bufferDepth
-  val hbwifNumBanks = p(HbwifKey).numBanks
+  val hbwifNumBanks = if(transceiverHasIref) max(1,hbwifNumLanes / transceiverRefGenNumOutputs) else 1
+  val hbwifLanesPerBank = hbwifNumLanes / hbwifNumBanks
   require(hbwifNumLanes % hbwifNumBanks == 0, "The number of lanes must be a multiple of the number of banks")
 }
 
@@ -45,9 +46,7 @@ trait Hbwif extends LazyModule
 trait HbwifBundle extends HasHbwifParameters {
   val hbwifRx      = Vec(hbwifNumLanes, new Differential).flip
   val hbwifTx      = Vec(hbwifNumLanes, new Differential)
-  // XXX this is broken but we are testing the power grid right now, TODO FIXME
-  //val hbwifIref    = if(transceiverHasIref && transceiverRefGenHasInput) Some(Vec(transceiverNumIrefs*hbwifNumBanks,Bool(INPUT))) else None
-  val hbwifIref    = if(transceiverHasIref && transceiverRefGenHasInput) Some(Bool(INPUT)) else None
+  val hbwifIref    = if(transceiverHasIref && transceiverRefGenHasInput) Some(UInt(INPUT, width=hbwifNumBanks*transceiverNumIrefs)) else None
 }
 
 trait HbwifModule extends HasHbwifParameters {
@@ -55,7 +54,7 @@ trait HbwifModule extends HasHbwifParameters {
   val io: HbwifBundle
   val scrBus: TileLinkRecursiveInterconnect
   val hbwifIO: Vec[ClientUncachedTileLinkIO]
-  val hbwifFastClock: Clock
+  val hbwifFastClock = Wire(Clock())
   val clock: Clock
   val reset: Bool
   val hbwifReset = Wire(Bool())
@@ -78,20 +77,19 @@ trait HbwifModule extends HasHbwifParameters {
   hbwifLanes.zip(hbwifIO).foreach { x => x._1.io.mem <> x._2 }
 
   // Instantiate and connect the reference generator if needed
-  // TODO clean this up, give names
   (0 until hbwifNumBanks).foreach { j =>
     (0 until transceiverNumIrefs).foreach { i =>
       val idx = i + j*transceiverNumIrefs
       val hbwifRefGen = Module(new ReferenceGenerator)
       hbwifRefGen.suggestName(s"hbwifRefGenInst$idx")
 
-      //hbwifLanes.zipWithIndex.foreach { x => x._1.io.iref.get(i) := hbwifRefGen.io.irefOut(x._2) }
+      (0 until hbwifLanesPerBank).foreach { k =>
+        hbwifLanes(hbwifLanesPerBank*j + k).io.iref.get(i) := hbwifRefGen.io.irefOut(k)
+      }
 
-      // XXX this is broken but we are testing the power grid right now, TODO FIXME
-      hbwifRefGen.io.irefIn.foreach { _ := io.hbwifIref.get }
-      //if (transceiverRefGenHasInput) {
-        //hbwifRefGen.io.irefIn.get := io.hbwifIref.get
-      //}
+      if (transceiverRefGenHasInput) {
+        hbwifRefGen.io.irefIn.get := io.hbwifIref.get(idx)
+      }
     }
   }
 }
