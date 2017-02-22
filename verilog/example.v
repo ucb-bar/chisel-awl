@@ -12,7 +12,7 @@ module example_transceiver (
   output tx_n,
   input [9:0] data_tx,
   output [9:0] data_rx,
-  input iref,
+  input iref_0,
   input [3:0] extraInputs_txSwing,
   input extraInputs_cdrMode
   `ifdef HBWIF_USE_PG_PINS
@@ -33,7 +33,7 @@ module example_transceiver (
   wire slowClk_pre, tx_p_pre, tx_n_pre;
   wire [9:0] data_rx_pre;
 
-  assign corrupt = (iref !== 1'b1) || (avdd !== 1'b1) || (dvdd !== 1'b1) || (gnd !== 1'b0);
+  assign corrupt = (iref_0 !== 1'b1) || (avdd !== 1'b1) || (dvdd !== 1'b1) || (gnd !== 1'b0);
 
   assign slowClk = corrupt ? 1'bx : slowClk_pre;
   assign tx_p = corrupt ? 1'bx : tx_p_pre;
