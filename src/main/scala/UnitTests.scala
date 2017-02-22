@@ -7,6 +7,7 @@ import unittest._
 import uncore.tilelink._
 import uncore.util._
 import uncore.devices._
+import diplomacy.{LazyModule,LazyModuleImp}
 import cde._
 import scala.util.Random
 import rocketchip._
@@ -164,8 +165,7 @@ object HbwifSCRUtil extends HasSCRParameters {
 
 }
 
-
-class HbwifInstIO(implicit val p: Parameters) extends ParameterizedBundle()(p)
+class HbwifUnitTestBundle(implicit val p: Parameters) extends ParameterizedBundle()(p)
   with HbwifBundle {
   val mem = Vec(hbwifNumLanes, new ClientUncachedTileLinkIO()(p.alterPartial({ case TLId => "Switcher" }))).flip
   val fastClk = Clock(INPUT)
@@ -173,49 +173,45 @@ class HbwifInstIO(implicit val p: Parameters) extends ParameterizedBundle()(p)
   val reset = Bool(INPUT)
 }
 
-class HbwifInst(implicit val p: Parameters) extends Module
-  with HasTransceiverParameters with HasHbwifParameters {
+class HbwifUnitTest(p: Parameters) extends LazyModule {
+
+  override lazy val module = Module(new HbwifUnitTestModule(p, this))
+
+}
+
+trait HbwifUnitTestSCRModule extends HasHbwifParameters {
 
   val scrParams = p.alterPartial({
     case TLId => "MMIOtoSCR"
   })
 
-  val io = new HbwifInstIO
-  val scrBus = Module(new TileLinkRecursiveInterconnect(1, p(GlobalAddrMap).subMap("io:pbus:scrbus"))(scrParams))
+  val scrBus: TileLinkRecursiveInterconnect = Module(new TileLinkRecursiveInterconnect(1, p(GlobalAddrMap).subMap("io:pbus:scrbus"))(scrParams))
+  val io = new HbwifUnitTestBundle()(p)
+  val hbwifIO: Vec[ClientUncachedTileLinkIO] = io.mem
 
   scrBus.io.in(0) := io.scr
+}
 
-  val hbwifLanes = (0 until hbwifNumLanes).map(id => Module(new HbwifLane(id)))
 
-  hbwifLanes.foreach { _.io.fastClk := io.fastClk }
-  hbwifLanes.foreach { _.io.hbwifReset := io.reset }
-  hbwifLanes.foreach { _.io.hbwifResetOverride := Bool(false) }
+trait HbwifUnitTestWireModule extends HasHbwifParameters {
 
-  hbwifLanes.map(_.io.rx).zip(io.hbwifRx) map { case (lane, top) => lane <> top }
-  hbwifLanes.map(_.io.tx).zip(io.hbwifTx) map { case (lane, top) => top <> lane }
+  val io: HbwifUnitTestBundle
 
-  (0 until hbwifNumLanes).foreach { i =>
-    hbwifLanes(i).io.scr <> scrBus.port(s"hbwif_lane$i")
-  }
-  hbwifLanes.zip(io.mem).foreach { x => x._1.io.mem <> x._2 }
+  val hbwifReset: Bool
+  val hbwifResetOverride: Bool
+  val hbwifFastClock: Clock
 
-  // Instantiate and connect the reference generator if needed
-  // TODO clean this up, give names
-  (0 until hbwifNumBanks).foreach { j =>
-    (0 until transceiverNumIrefs).foreach { i =>
-      val idx = i + j*transceiverNumIrefs
-      val hbwifRefGen = Module(new ReferenceGenerator)
-      hbwifRefGen.suggestName(s"hbwifRefGenInst$idx")
-      hbwifLanes.zipWithIndex.foreach { x => x._1.io.iref.get(i) := hbwifRefGen.io.irefOut(x._2) }
-      // XXX this is broken but we are testing the power grid right now, TODO FIXME
-      hbwifRefGen.io.irefIn.foreach { _ := io.hbwifIref.get }
-      //if (transceiverRefGenHasInput) {
-        //hbwifRefGen.io.irefIn.get := io.hbwifIref.get
-      //}
-    }
-  }
+  hbwifResetOverride := Bool(false)
+  hbwifReset := io.reset
+  hbwifFastClock := io.fastClk
 
 }
+
+class HbwifUnitTestModule[+L <: HbwifUnitTest]
+  (val p: Parameters, l: L) extends LazyModuleImp(l)
+  with HbwifUnitTestSCRModule
+  with HbwifModule
+  with HbwifUnitTestWireModule
 
 trait HasHbwifTestModule extends HasTransceiverParameters with HasUnitTestIO {
   implicit val p: Parameters
@@ -234,7 +230,7 @@ trait HasHbwifTestModule extends HasTransceiverParameters with HasUnitTestIO {
     ))
   })
 
-  val hbwif = Module(new HbwifInst()(q))
+  val hbwif = LazyModule(new HbwifUnitTest(q)).module
   val fiwbh = Module(new Fiwbh()(q))
 
   hbwif.io.reset := reset
@@ -317,7 +313,7 @@ class HbwifBertTest(implicit val p: Parameters) extends UnitTest {
 
   io.finished := Bool(true)
 
-  //val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.bertMode()))
+  val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.bertMode()))
 
 }
 
