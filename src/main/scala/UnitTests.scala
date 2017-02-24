@@ -174,6 +174,10 @@ object HbwifSCRUtil extends HasSCRParameters {
     writeAll("bert_ber_mode", 1) ++
     writeAll("bert_clear", 0)
 
+  // This is actually for gets, not puts, but writeAll also works
+  def bertErrorCheck(numErrors: Int)(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] =
+    (0 until p(BertKey).numWays).map { i => writeAll(s"bert_error_count_$i", numErrors) } reduce {_ ++ _}
+
 }
 
 class HbwifUnitTestBundle(implicit val p: Parameters) extends ParameterizedBundle()(p)
@@ -325,10 +329,19 @@ class HbwifBertTest(implicit val p: Parameters) extends UnitTest(300000)
 
   fiwbh.io.loopback := Bool(true)
 
-  val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.bertInit()))
+  // Somewhat arbitrary, but errorPeriod should not be a multiple of the number of lanes, so pick a reasonable prime number
+  val numErrors = 76
+  val errorPeriod = 13
 
-  scrDriver.io.start := io.start
-  hbwif.io.scr <> scrDriver.io.mem
+  val scrPutDriver = Module(new PutSeqDriver(HbwifSCRUtil.bertInit()))
+  val scrGetChecker = Module(new GetSeqChecker(HbwifSCRUtil.bertErrorCheck(numErrors)))
+  val scrArbiter = Module(new ClientUncachedTileLinkIOArbiter(2))
+
+  scrPutDriver.io.start := io.start
+  hbwif.io.scr <> scrArbiter.io.out
+
+  scrArbiter.io.in(0) <> scrPutDriver.io.mem
+  scrArbiter.io.in(1) <> scrGetChecker.io.mem
 
   memIn.acquire.valid := Bool(false)
   memIn.grant.ready := Bool(false)
@@ -337,20 +350,19 @@ class HbwifBertTest(implicit val p: Parameters) extends UnitTest(300000)
 
   val errCount = Reg(init = UInt(0, width = 10))
   val clkCount = Reg(init = UInt(0, width = 10))
-  val count = Reg(init = UInt(0, width = 10))
 
   rxError := Bool(false)
 
-  // TODO check that the number of bit errors is 76... hierarchical require?
-  io.finished := errCount === UInt(76)
+  scrGetChecker.io.start := errCount === UInt(numErrors)
 
-  when(scrDriver.io.finished) {
-    count := count + UInt(1)
-    when (errCount < UInt(76)) {
-      when (clkCount < UInt(12)) {
+  io.finished := scrGetChecker.io.finished
+
+  when(scrPutDriver.io.finished) {
+    when (errCount < UInt(numErrors)) {
+      when (clkCount < UInt(errorPeriod-1)) {
         txError := Bool(false)
         clkCount := clkCount + UInt(1)
-      } .elsewhen (clkCount === UInt(12)) {
+      } .elsewhen (clkCount === UInt(errorPeriod-1)) {
         txError := Bool(true)
         clkCount := UInt(0)
         errCount := errCount + UInt(1)
