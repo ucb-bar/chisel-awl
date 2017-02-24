@@ -163,6 +163,17 @@ object HbwifSCRUtil extends HasSCRParameters {
   def hbwifMode()(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] = writeAll("bert_enable", 0)
   def retransmitMode()(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] = writeAll("retransmit_cycles", 250) ++ writeAll("retransmit_enable", 1)
 
+  def bertInit()(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] =
+    writeAll("bert_enable", 1) ++
+    writeAll("bert_tx_prbs_load_data", 1) ++
+    writeAll("bert_tx_prbs_mode", 0) ++
+    writeAll("bert_tx_prbs_mode", 2) ++
+    writeAll("bert_rx_prbs_mode", 1) ++
+    writeAll("bert_rx_prbs_mode", 2) ++
+    writeAll("bert_clear", 1) ++
+    writeAll("bert_ber_mode", 1) ++
+    writeAll("bert_clear", 0)
+
 }
 
 class HbwifUnitTestBundle(implicit val p: Parameters) extends ParameterizedBundle()(p)
@@ -309,11 +320,48 @@ class HbwifMemBERTest(implicit val p: Parameters) extends UnitTest(300000)
 
 }
 
-class HbwifBertTest(implicit val p: Parameters) extends UnitTest {
+class HbwifBertTest(implicit val p: Parameters) extends UnitTest(300000)
+  with HasHbwifTestModule with HasTileLinkParameters {
 
-  io.finished := Bool(true)
+  fiwbh.io.loopback := Bool(true)
 
-  val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.bertMode()))
+  val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.bertInit()))
+
+  scrDriver.io.start := io.start
+  hbwif.io.scr <> scrDriver.io.mem
+
+  memIn.acquire.valid := Bool(false)
+  memIn.grant.ready := Bool(false)
+  memOut.acquire.ready := Bool(false)
+  memOut.grant.valid := Bool(false)
+
+  val errCount = Reg(init = UInt(0, width = 10))
+  val clkCount = Reg(init = UInt(0, width = 10))
+  val count = Reg(init = UInt(0, width = 10))
+
+  rxError := Bool(false)
+
+  // TODO check that the number of bit errors is 76... hierarchical require?
+  io.finished := errCount === UInt(76)
+
+  when(scrDriver.io.finished) {
+    count := count + UInt(1)
+    when (errCount < UInt(76)) {
+      when (clkCount < UInt(12)) {
+        txError := Bool(false)
+        clkCount := clkCount + UInt(1)
+      } .elsewhen (clkCount === UInt(12)) {
+        txError := Bool(true)
+        clkCount := UInt(0)
+        errCount := errCount + UInt(1)
+      } .otherwise {
+        txError := Bool(false)
+        clkCount := UInt(0)
+      }
+    }
+  } .otherwise {
+    txError := Bool(false)
+  }
 
 }
 

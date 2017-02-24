@@ -11,16 +11,15 @@ case class BertParameters(
   countWidth: Int = 45,
   snapshotWidth: Int = 32,
   shutoffPoints: Int = 3,
-  dataWidth: Int = 16,
   shutoffSpacing: Int = 15,
   numWays: Int = 2)
 
-trait HasBertParameters {
+trait HasBertParameters extends HasTransceiverParameters{
   implicit val p: Parameters
   val bertCountWidth = p(BertKey).countWidth
   val bertSnapshotWidth = p(BertKey).snapshotWidth
-  val bertDataWidth = p(BertKey).dataWidth
   val bertShutoffPoints = p(BertKey).shutoffPoints
+  val bertDataWidth = transceiverDataWidth
   val bertShutoffSpacing = p(BertKey).shutoffSpacing
   val bertNumWays  = p(BertKey).numWays
 }
@@ -66,7 +65,7 @@ class Bert()(implicit p: Parameters) extends BertModule()(p) {
   val correctBits = Wire(Vec(bertNumWays, UInt(width = bertDataWidth/bertNumWays)))
 
   // test data
-  val testBits = Reg(Vec(bertNumWays, UInt(width = bertDataWidth/bertNumWays)))
+  val testBits = Wire(Vec(bertNumWays, UInt(width = bertDataWidth/bertNumWays)))
 
   val dataInVec = Wire(Vec(bertNumWays, UInt(width = bertDataWidth/bertNumWays)))
   for (i <- 0 until bertNumWays) {
@@ -101,37 +100,37 @@ class Bert()(implicit p: Parameters) extends BertModule()(p) {
   io.snapshot := snapshot
 
   // instantiate the PRBS31s
-  val prbs31s = List.fill(bertNumWays) { Module(new PRBS(prbsWidth = 31, parallelOutBits = bertDataWidth/bertNumWays, generatorPolynomial = 0x09)) }
+  val prbs31s = List.fill(bertNumWays) { PRBS31(bertDataWidth/bertNumWays) }
   prbs31s.zipWithIndex.foreach { x =>
     x._1.io.mode := io.rxPRBSMode
     x._1.io.loadIn := io.rxPRBSLoadData
     x._1.io.seedIn := dataInVec(x._2)
   }
-  val txPRBS31 = Module(new PRBS(prbsWidth = 31, parallelOutBits = bertDataWidth, generatorPolynomial = 0x09))
+  val txPRBS31 = PRBS31(bertDataWidth)
   txPRBS31.io.mode   := io.txPRBSMode
   txPRBS31.io.loadIn := io.txPRBSLoadData
   txPRBS31.io.seedIn := UInt(1)
 
   // instantiate the PRBS15s
-  val prbs15s = List.fill(bertNumWays) { Module(new PRBS(prbsWidth = 15, parallelOutBits = bertDataWidth/bertNumWays, generatorPolynomial = 0x03)) }
+  val prbs15s = List.fill(bertNumWays) { PRBS15(bertDataWidth/bertNumWays) }
   prbs15s.zipWithIndex.foreach { x =>
     x._1.io.mode := io.rxPRBSMode
     x._1.io.loadIn := io.rxPRBSLoadData(14,0)
     x._1.io.seedIn := dataInVec(x._2)
   }
-  val txPRBS15 = Module(new PRBS(prbsWidth = 15, parallelOutBits = bertDataWidth, generatorPolynomial = 0x03))
+  val txPRBS15 = PRBS15(bertDataWidth)
   txPRBS15.io.mode   := io.txPRBSMode
   txPRBS15.io.loadIn := io.txPRBSLoadData(14,0)
   txPRBS15.io.seedIn := UInt(1)
 
   // instantiate the PRBS7s
-  val prbs7s = List.fill(bertNumWays) { Module(new PRBS(prbsWidth = 7, parallelOutBits = bertDataWidth/bertNumWays, generatorPolynomial = 0x03)) }
+  val prbs7s = List.fill(bertNumWays) { PRBS7(bertDataWidth/bertNumWays) }
   prbs7s.zipWithIndex.foreach { x =>
     x._1.io.mode := io.rxPRBSMode
     x._1.io.loadIn := io.rxPRBSLoadData(7,0)
     x._1.io.seedIn := dataInVec(x._2)
   }
-  val txPRBS7 = Module(new PRBS(prbsWidth = 7, parallelOutBits = bertDataWidth, generatorPolynomial = 0x03))
+  val txPRBS7 = PRBS7(bertDataWidth)
   txPRBS7.io.mode   := io.txPRBSMode
   txPRBS7.io.loadIn := io.txPRBSLoadData(7,0)
   txPRBS7.io.seedIn := UInt(1)
