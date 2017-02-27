@@ -12,6 +12,7 @@ case class TransceiverParameters(
   extraInputs: Option[Bundle] = None,
   extraOutputs: Option[Bundle] = None,
   numIrefs: Int = 1,
+  hasVcm: Boolean = false,
   refGenHasInput: Boolean = true,
   refGenConfig: Option[Bundle] = None,
   refGenName: String = "generic_reference_generator",
@@ -24,6 +25,7 @@ trait HasTransceiverParameters {
   val transceiverDivideBy = p(TransceiverKey).divideBy
   val transceiverIsDDR = p(TransceiverKey).isDDR
   val transceiverHasIref = p(TransceiverKey).numIrefs > 0
+  val transceiverHasVcm = p(TransceiverKey).hasVcm
   val transceiverNumIrefs = p(TransceiverKey).numIrefs
   val transceiverRefGenHasInput = p(TransceiverKey).refGenHasInput
   val transceiverRefGenNumOutputs = p(TransceiverKey).refGenNumOutputs
@@ -60,6 +62,9 @@ class TransceiverIO(implicit val p: Parameters) extends ParameterizedBundle()(p)
 
   // reference current (if any)
   val iref = if (transceiverHasIref) Some(Vec(transceiverNumIrefs, Bool(OUTPUT)).flip ) else None
+
+  // RX common mode voltage, if applicable
+  val vcm = if (transceiverHasVcm) Some(Bool(INPUT)) else None
 
   // parameterizable configuration bundle
   val extraInputs = p(TransceiverKey).extraInputs.map { _.cloneType.asInput }

@@ -47,6 +47,7 @@ trait HbwifBundle extends HasHbwifParameters {
   val hbwifRx      = Vec(hbwifNumLanes, new Differential).flip
   val hbwifTx      = Vec(hbwifNumLanes, new Differential)
   val hbwifIref    = if(transceiverHasIref && transceiverRefGenHasInput) Some(UInt(INPUT, width=hbwifNumBanks*transceiverNumIrefs)) else None
+  val hbwifVcm     = if(transceiverHasVcm) Some(UInt(INPUT, width=hbwifNumBanks)) else None
 }
 
 trait HbwifModule extends HasHbwifParameters {
@@ -76,20 +77,24 @@ trait HbwifModule extends HasHbwifParameters {
   }
   hbwifLanes.zip(hbwifIO).foreach { x => x._1.io.mem <> x._2 }
 
-  // Instantiate and connect the reference generator if needed
-  (0 until hbwifNumBanks).foreach { j =>
-    (0 until transceiverNumIrefs).foreach { i =>
-      val idx = i + j*transceiverNumIrefs
+  (0 until hbwifNumBanks).foreach { i =>
+    // Instantiate and connect the reference generator if needed
+    (0 until transceiverNumIrefs).foreach { j =>
+      val idx = j + i*transceiverNumIrefs
       val hbwifRefGen = Module(new ReferenceGenerator)
       hbwifRefGen.suggestName(s"hbwifRefGenInst$idx")
 
       (0 until hbwifLanesPerBank).foreach { k =>
-        hbwifLanes(hbwifLanesPerBank*j + k).io.iref.get(i) := hbwifRefGen.io.irefOut(k)
+        hbwifLanes(hbwifLanesPerBank*i + k).io.iref.get(j) := hbwifRefGen.io.irefOut(k)
       }
 
       if (transceiverRefGenHasInput) {
         hbwifRefGen.io.irefIn.get := io.hbwifIref.get(idx)
       }
+    }
+    // Connect the VCM pins to each bank
+    (0 until hbwifLanesPerBank).foreach { j =>
+      hbwifLanes(hbwifLanesPerBank*i + j).io.vcm.foreach { _ := io.hbwifVcm.get(i) }
     }
   }
 }

@@ -25,8 +25,10 @@ class HbwifLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()
   val scr = (new ClientUncachedTileLinkIO()(mmioParams)).flip
 
   // optional reference for the transceiver
-  //val iref = if (transceiverHasIref) Some(Seq.fill(transceiverNumIrefs) { Bool(INPUT) }) else None
   val iref = if (transceiverHasIref) Some(Vec(transceiverNumIrefs, Bool(OUTPUT)).flip ) else None
+
+  // RX common mode voltage
+  val vcm = if (transceiverHasVcm) Some(Bool(INPUT)) else None
 
   // un-synchronized HBWIF reset
   val hbwifReset = Bool(INPUT)
@@ -75,6 +77,8 @@ class HbwifLane(id: Int)(implicit val p: Parameters) extends Module
   (0 until transceiverNumIrefs).foreach { i =>
     transceiver.io.iref.get(i) := io.iref.get(i)
   }
+
+  transceiver.io.vcm.foreach { _ := io.vcm.get }
 
   io.slowClockCounter := WordSync(WideCounterModule(64, transceiver.io.slowClk, syncReset),transceiver.io.slowClk)
 
