@@ -265,15 +265,18 @@ trait HasHbwifTestModule extends HasTransceiverParameters with HasUnitTestIO {
   val memIn = hbwif.io.mem(0)
   val memOut = fiwbh.io.mem(0)
 
-  if(transceiverHasIref && transceiverRefGenHasInput) hbwif.io.hbwifIref.get := Bool(true)
+  val analogTestHarness = Module(new AnalogTestHarness()(p))
+  if(transceiverHasIref && transceiverRefGenHasInput) hbwif.io.hbwifIref.get := analogTestHarness.io.hbwifIref.get
+  if(transceiverHasVcm) hbwif.io.hbwifVcm.get := analogTestHarness.io.hbwifVcm.get
+
 }
 
-class HbwifMemTest(implicit val p: Parameters) extends UnitTest(100000)
+class HbwifMemTest(scrConfigs: Seq[Tuple2[BigInt,Int]] = Seq())(implicit val p: Parameters) extends UnitTest(100000)
   with HasHbwifTestModule with HasTileLinkParameters {
 
   fiwbh.io.loopback := Bool(false)
 
-  val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.hbwifMode()))
+  val scrDriver = Module(new PutSeqDriver(scrConfigs ++ HbwifSCRUtil.hbwifMode()))
 
   scrDriver.io.start := io.start
   hbwif.io.scr <> scrDriver.io.mem
@@ -292,12 +295,12 @@ class HbwifMemTest(implicit val p: Parameters) extends UnitTest(100000)
 
 }
 
-class HbwifMemBERTest(implicit val p: Parameters) extends UnitTest(300000)
+class HbwifMemBERTest(scrConfigs: Seq[Tuple2[BigInt,Int]] = Seq())(implicit val p: Parameters) extends UnitTest(300000)
   with HasHbwifTestModule with HasTileLinkParameters {
 
   fiwbh.io.loopback := Bool(false)
 
-  val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.hbwifMode() ++ HbwifSCRUtil.retransmitMode()))
+  val scrDriver = Module(new PutSeqDriver(scrConfigs ++ HbwifSCRUtil.hbwifMode() ++ HbwifSCRUtil.retransmitMode()))
 
   scrDriver.io.start := io.start
   hbwif.io.scr <> scrDriver.io.mem
@@ -324,7 +327,7 @@ class HbwifMemBERTest(implicit val p: Parameters) extends UnitTest(300000)
 
 }
 
-class HbwifBertTest(implicit val p: Parameters) extends UnitTest(300000)
+class HbwifBertTest(scrConfigs: Seq[Tuple2[BigInt,Int]] = Seq())(implicit val p: Parameters) extends UnitTest(300000)
   with HasHbwifTestModule with HasTileLinkParameters {
 
   fiwbh.io.loopback := Bool(true)
@@ -333,7 +336,7 @@ class HbwifBertTest(implicit val p: Parameters) extends UnitTest(300000)
   val numErrors = 76
   val errorPeriod = 13
 
-  val scrPutDriver = Module(new PutSeqDriver(HbwifSCRUtil.bertInit()))
+  val scrPutDriver = Module(new PutSeqDriver(scrConfigs ++ HbwifSCRUtil.bertInit()))
   val scrGetChecker = Module(new GetSeqChecker(HbwifSCRUtil.bertErrorCheck(numErrors)))
   val scrArbiter = Module(new ClientUncachedTileLinkIOArbiter(2))
 

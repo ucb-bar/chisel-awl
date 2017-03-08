@@ -105,7 +105,11 @@ module fpga_transceiver (
   // Differential checks
   assign tx_n = ~tx_p;
   assign tx_p = ser[9];
+  `ifdef HBWIF_CHECK_DIFFERENTIALS
   assign rx = (rx_p == ~rx_n) ? rx_p : 1'bx;
+  `else
+  assign rx = rx_p;
+  `endif
 
   assign data_rx = des_buffer;
 
@@ -161,5 +165,13 @@ module fpga_transceiver (
       end
     end
   end
+
+endmodule
+
+module generic_analog_test_harness (
+  output hbwifIref
+);
+
+  assign hbwifIref = 1'b1;
 
 endmodule

@@ -17,6 +17,7 @@ case class TransceiverParameters(
   refGenConfig: Option[Bundle] = None,
   refGenName: String = "generic_reference_generator",
   refGenNumOutputs: Int = 8,
+  analogTestHarnessName: String = "generic_analog_test_harness",
   divideBy: Int = 5,
   isDDR: Boolean = true)
 
