@@ -159,6 +159,10 @@ object HbwifSCRUtil extends HasSCRParameters {
     (0 until p(HbwifKey).numLanes) map {i => writeLane(i, s, d)} reduce (_ ++ _)
   }
 
+  def writeAll(s: Seq[Tuple2[String,Int]])(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] = {
+    s map { case x => writeAll(x._1,x._2) } reduce {_ ++ _}
+  }
+
   def bertMode()(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] = writeAll("bert_enable", 1)
   def hbwifMode()(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] = writeAll("bert_enable", 0)
   def retransmitMode()(implicit p: Parameters): Seq[Tuple2[BigInt,Int]] = writeAll("retransmit_cycles", 250) ++ writeAll("retransmit_enable", 1)
@@ -271,12 +275,12 @@ trait HasHbwifTestModule extends HasTransceiverParameters with HasUnitTestIO {
 
 }
 
-class HbwifMemTest(scrConfigs: Seq[Tuple2[BigInt,Int]] = Seq())(implicit val p: Parameters) extends UnitTest(100000)
+class HbwifMemTest(scrConfigs: Seq[Tuple2[String,Int]] = Seq())(implicit val p: Parameters) extends UnitTest(100000)
   with HasHbwifTestModule with HasTileLinkParameters {
 
   fiwbh.io.loopback := Bool(false)
 
-  val scrDriver = Module(new PutSeqDriver(scrConfigs ++ HbwifSCRUtil.hbwifMode()))
+  val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.writeAll(scrConfigs) ++ HbwifSCRUtil.hbwifMode()))
 
   scrDriver.io.start := io.start
   hbwif.io.scr <> scrDriver.io.mem
@@ -295,12 +299,12 @@ class HbwifMemTest(scrConfigs: Seq[Tuple2[BigInt,Int]] = Seq())(implicit val p: 
 
 }
 
-class HbwifMemBERTest(scrConfigs: Seq[Tuple2[BigInt,Int]] = Seq())(implicit val p: Parameters) extends UnitTest(300000)
+class HbwifMemBERTest(scrConfigs: Seq[Tuple2[String,Int]] = Seq())(implicit val p: Parameters) extends UnitTest(300000)
   with HasHbwifTestModule with HasTileLinkParameters {
 
   fiwbh.io.loopback := Bool(false)
 
-  val scrDriver = Module(new PutSeqDriver(scrConfigs ++ HbwifSCRUtil.hbwifMode() ++ HbwifSCRUtil.retransmitMode()))
+  val scrDriver = Module(new PutSeqDriver(HbwifSCRUtil.writeAll(scrConfigs) ++ HbwifSCRUtil.hbwifMode() ++ HbwifSCRUtil.retransmitMode()))
 
   scrDriver.io.start := io.start
   hbwif.io.scr <> scrDriver.io.mem
@@ -327,7 +331,7 @@ class HbwifMemBERTest(scrConfigs: Seq[Tuple2[BigInt,Int]] = Seq())(implicit val 
 
 }
 
-class HbwifBertTest(scrConfigs: Seq[Tuple2[BigInt,Int]] = Seq())(implicit val p: Parameters) extends UnitTest(300000)
+class HbwifBertTest(scrConfigs: Seq[Tuple2[String,Int]] = Seq())(implicit val p: Parameters) extends UnitTest(300000)
   with HasHbwifTestModule with HasTileLinkParameters {
 
   fiwbh.io.loopback := Bool(true)
@@ -336,7 +340,7 @@ class HbwifBertTest(scrConfigs: Seq[Tuple2[BigInt,Int]] = Seq())(implicit val p:
   val numErrors = 76
   val errorPeriod = 13
 
-  val scrPutDriver = Module(new PutSeqDriver(scrConfigs ++ HbwifSCRUtil.bertInit()))
+  val scrPutDriver = Module(new PutSeqDriver(HbwifSCRUtil.writeAll(scrConfigs) ++ HbwifSCRUtil.bertInit()))
   val scrGetChecker = Module(new GetSeqChecker(HbwifSCRUtil.bertErrorCheck(numErrors)))
   val scrArbiter = Module(new ClientUncachedTileLinkIOArbiter(2))
 
