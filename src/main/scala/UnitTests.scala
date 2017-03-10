@@ -384,5 +384,42 @@ class HbwifBertTest(scrConfigs: Seq[Tuple2[String,Int]] = Seq())(implicit val p:
 
 }
 
+class HbwifBertNoErrorTest(scrConfigs: Seq[Tuple2[String,Int]] = Seq())(implicit val p: Parameters) extends UnitTest(5000)
+  with HasHbwifTestModule with HasTileLinkParameters {
+
+  fiwbh.io.loopback := Bool(true)
+
+  val cycles = 300
+
+  val scrPutDriver = Module(new PutSeqDriver(HbwifSCRUtil.writeAll(scrConfigs) ++ HbwifSCRUtil.bertInit()))
+  val scrGetChecker = Module(new GetSeqChecker(HbwifSCRUtil.bertErrorCheck(0)))
+  val scrArbiter = Module(new ClientUncachedTileLinkIOArbiter(2))
+
+  scrPutDriver.io.start := io.start
+  hbwif.io.scr <> scrArbiter.io.out
+
+  scrArbiter.io.in(0) <> scrPutDriver.io.mem
+  scrArbiter.io.in(1) <> scrGetChecker.io.mem
+
+  memIn.acquire.valid := Bool(false)
+  memIn.grant.ready := Bool(false)
+  memOut.acquire.ready := Bool(false)
+  memOut.grant.valid := Bool(false)
+
+  val cnt = Reg(init = UInt(0, width = 10))
+
+  rxError := Bool(false)
+  txError := Bool(false)
+
+  scrGetChecker.io.start := cnt === UInt(cycles)
+
+  io.finished := scrGetChecker.io.finished
+
+  when(scrPutDriver.io.finished && cnt < UInt(cycles)) {
+    cnt := cnt + UInt(1)
+  }
+
+}
+
 
 class TestHarness(implicit p: Parameters) extends unittest.TestHarness()(p)
