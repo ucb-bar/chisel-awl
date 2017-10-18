@@ -47,8 +47,10 @@ class TransceiverSubsystemIO(
   val dfeTapsOverride = Input(Vec(if (dfeHasOverride) dfeNumTaps else 0, UInt(dfeTapWidth.W)))
   val dfeOverride = Input(UInt((if (dfeHasOverride) 1 else 0).W))
 
+  // DLEV override
   val dLevDACOverride = Input(UInt((if (dLevHasOverride) dLevDACWidth else 0).W))
   val dLevOverride = Input(UInt((if (dLevHasOverride) 1 else 0).W))
+
   //val config = TODO
 
   //val debug = TODO
