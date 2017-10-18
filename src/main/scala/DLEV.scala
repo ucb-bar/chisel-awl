@@ -24,6 +24,7 @@ class DLEV(
     dLevDACWidth
   ))
 
-  //TODO
+  // TODO Placeholder
+  io.dLevDAC := 0.U(dLevDACWidth.W)
 
 }

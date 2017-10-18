@@ -9,7 +9,7 @@ class Differential extends Bundle {
 }
 
 class TransceiverIO(
-  transceiverDataWidth: Int,
+  dataWidth: Int,
   transceiverNumIrefs: Int,
   cdrIWidth: Int,
   cdrPWidth: Int,
@@ -22,7 +22,7 @@ class TransceiverIO(
   val fastClock = Input(Clock())
 
   // low speed clock output
-  val slowClock = Output(Clock())
+  val dataClock = Output(Clock())
 
   // reset
   val resetIn = Input(Bool())
@@ -35,12 +35,9 @@ class TransceiverIO(
   val tx = new Differential
 
   // internal data interface
-  val dataDLev = Output(UInt(transceiverDataWidth.W))
-  val dataRx = Output(UInt(transceiverDataWidth.W))
-  val dataTx = Input(UInt(transceiverDataWidth.W))
-
-  // reference current (if any)
-  val iref = Analog(transceiverNumIrefs.W)
+  val dataDLev = Output(UInt(dataWidth.W))
+  val dataRx = Output(UInt(dataWidth.W))
+  val dataTx = Input(UInt(dataWidth.W))
 
   // CDR stuff
   val cdrI = Input(UInt(cdrIWidth.W))
@@ -57,10 +54,13 @@ class TransceiverIO(
 
   //val debug = TODO
 
+  // reference current (if any)
+  val bias = Analog(transceiverNumIrefs.W)
+
 }
 
 class Transceiver(
-  transceiverDataWidth: Int,
+  dataWidth: Int,
   transceiverNumIrefs: Int,
   cdrIWidth: Int,
   cdrPWidth: Int,
@@ -70,7 +70,7 @@ class Transceiver(
 ) extends BlackBox {
 
   val io = IO(new TransceiverIO(
-    transceiverDataWidth: Int,
+    dataWidth: Int,
     transceiverNumIrefs: Int,
     cdrIWidth: Int,
     cdrPWidth: Int,

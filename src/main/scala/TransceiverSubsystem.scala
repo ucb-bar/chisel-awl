@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.experimental._
 
 class TransceiverSubsystemIO(
-  transceiverDataWidth: Int,
+  dataWidth: Int,
   transceiverNumIrefs: Int,
   cdrHasOverride: Boolean,
   cdrIWidth: Int,
@@ -15,10 +15,10 @@ class TransceiverSubsystemIO(
 ) extends Bundle {
 
   // high speed clock input
-  val fastClk = Input(Clock())
+  val fastClock = Input(Clock())
 
   // low speed clock output
-  val slowClk = Output(Clock())
+  val dataClock = Output(Clock())
 
   // reset
   val resetIn = Input(Bool())
@@ -31,12 +31,12 @@ class TransceiverSubsystemIO(
   val tx = new Differential
 
   // internal data interface
-  val dataDLev = Output(UInt(transceiverDataWidth.W))
-  val dataRx = Output(UInt(transceiverDataWidth.W))
-  val dataTx = Input(UInt(transceiverDataWidth.W))
+  val dataDLev = Output(UInt(dataWidth.W))
+  val dataRx = Output(UInt(dataWidth.W))
+  val dataTx = Input(UInt(dataWidth.W))
 
   // reference current (if any)
-  val iref = Analog(transceiverNumIrefs.W)
+  val bias = Analog(transceiverNumIrefs.W)
 
   // CDR override
   val cdrIOverride = Input(UInt((if (cdrHasOverride) cdrIWidth else 0).W))
@@ -59,7 +59,7 @@ class TransceiverSubsystemIO(
 
 
 class TransceiverSubsystem(
-  transceiverDataWidth: Int,
+  dataWidth: Int,
   transceiverNumIrefs: Int,
   cdrHasOverride: Boolean,
   cdrIWidth: Int,
@@ -72,7 +72,7 @@ class TransceiverSubsystem(
 ) extends Module {
 
   val io = IO(new TransceiverSubsystemIO(
-    transceiverDataWidth,
+    dataWidth,
     transceiverNumIrefs,
     cdrHasOverride,
     cdrIWidth,
@@ -86,7 +86,7 @@ class TransceiverSubsystem(
 
   // Transceiver <> top level connections
   val txrx = Module(new Transceiver(
-    transceiverDataWidth,
+    dataWidth,
     transceiverNumIrefs,
     cdrIWidth,
     cdrPWidth,
@@ -105,13 +105,13 @@ class TransceiverSubsystem(
   io.dataRx := txrx.io.dataRx
   txrx.io.dataTx := io.dataTx
 
-  io.iref <> txrx.io.iref
+  io.bias <> txrx.io.bias
 
-  withClockAndReset(txrx.io.slowClock, txrx.io.resetOut) {
+  withClockAndReset(txrx.io.dataClock, txrx.io.resetOut) {
 
     // Transceiver <> CDR Loop
     val cdr = Module(new CDR(
-      transceiverDataWidth,
+      dataWidth,
       cdrIWidth,
       cdrPwidth
     ))
@@ -125,7 +125,7 @@ class TransceiverSubsystem(
     // Transceiver <> DFE Loop
     if (dfeNumTaps > 0) {
       val dfe = Module(new DFE(
-        transceiverDataWidth,
+        dataWidth,
         dfeNumTaps,
         dfeTapWidth
       ))
@@ -136,7 +136,7 @@ class TransceiverSubsystem(
 
     // Transceiver <> DLEV Loop
     val dLev = Module(new DLEV(
-      transceiverDataWidth,
+      dataWidth,
       dLevDACWidth
     ))
     txrx.io.dLevDAC := if(dLevHasOverride) Mux(io.dLevOverride === 1.U, io.dLevDACOverride, dLev.io.dLevDAC) else dLev.io.dLevDAC

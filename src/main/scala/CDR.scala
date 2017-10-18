@@ -29,6 +29,9 @@ class CDR(
     cdrPwidth
   ))
 
-  // TODO
+  // TODO Placeholder
+  io.cdrI := 0.U(cdrIWidth.W)
+  io.cdrP := 0.U(cdrPWidth.W)
+  io.clockDither := false.B
 
 }

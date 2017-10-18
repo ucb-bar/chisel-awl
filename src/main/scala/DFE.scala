@@ -27,6 +27,7 @@ class DFE(
     dfeTapWidth
   ))
 
-  //TODO
+  // TODO Placeholder
+  io.dfeTaps := Vec.fill(dfeNumTaps) { 0.U(dfeTapWidth.W) }
 
 }
