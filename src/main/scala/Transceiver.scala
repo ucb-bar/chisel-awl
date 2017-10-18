@@ -4,22 +4,25 @@ import chisel3._
 import chisel3.experimental._
 
 class Differential extends Bundle {
-  val p = Output(Bool())
-  val n = Output(Bool())
+  val p = Analog(1.W)
+  val n = Analog(1.W)
 }
 
 class TransceiverIO(
   transceiverDataWidth: Int,
   transceiverNumIrefs: Int,
   cdrIWidth: Int,
-  cdrPWidth: Int
+  cdrPWidth: Int,
+  dfeNumTaps: Int,
+  dfeTapWidth: Int,
+  dLevDACWidth: Int
 ) extends Bundle {
 
   // high speed clock input
-  val fastClk = Input(Clock())
+  val fastClock = Input(Clock())
 
   // low speed clock output
-  val slowClk = Output(Clock())
+  val slowClock = Output(Clock())
 
   // reset
   val resetIn = Input(Bool())
@@ -32,7 +35,7 @@ class TransceiverIO(
   val tx = new Differential
 
   // internal data interface
-  val dlev = Output(UInt(transceiverDataWidth.W))
+  val dataDLev = Output(UInt(transceiverDataWidth.W))
   val dataRx = Output(UInt(transceiverDataWidth.W))
   val dataTx = Input(UInt(transceiverDataWidth.W))
 
@@ -42,6 +45,13 @@ class TransceiverIO(
   // CDR stuff
   val cdrI = Input(UInt(cdrIWidth.W))
   val cdrP = Input(UInt(cdrPWidth.W))
+
+  // Clock dither for CDR
+  val clockDither = Input(Bool())
+
+  // DFE stuff
+  val dfeTaps = Input(Vec(dfeNumTaps, UInt(dfeTapWidth.W)))
+  val dLevDAC = Input(UInt(dLevDACWidth.W))
 
   //val config = TODO
 
@@ -53,10 +63,21 @@ class Transceiver(
   transceiverDataWidth: Int,
   transceiverNumIrefs: Int,
   cdrIWidth: Int,
-  cdrPWidth: Int
-  ) extends BlackBox {
+  cdrPWidth: Int,
+  dfeNumTaps: Int,
+  dfeTapWidth: Int,
+  dLevDACWidth: Int
+) extends BlackBox {
 
-  val io = IO(new TransceiverIO())
+  val io = IO(new TransceiverIO(
+    transceiverDataWidth: Int,
+    transceiverNumIrefs: Int,
+    cdrIWidth: Int,
+    cdrPWidth: Int,
+    dfeNumTaps: Int,
+    dfeTapWidth: Int,
+    dLevDACWidth: Int
+  ))
 
   override def desiredName = transceiverName
 
