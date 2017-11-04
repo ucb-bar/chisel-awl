@@ -8,25 +8,20 @@ class Differential extends Bundle {
   val n = Analog(1.W)
 }
 
-class TransceiverIO(
-  dataWidth: Int,
-  transceiverNumIrefs: Int,
-  cdrIWidth: Int,
-  cdrPWidth: Int,
-  dfeNumTaps: Int,
-  dfeTapWidth: Int,
-  dLevDACWidth: Int
-) extends Bundle {
 
-  // high speed clock input
-  val fastClock = Input(Clock())
+// This is a container class for the stuff that is shared between the TransceiverIO and TransceiverSubsystemIO
+// i.e. not the dlev, dfe, and cdr override stuff
+class TransceiverSharedIO()(implicit c: SerDesGeneratorConfig) extends Bundle {
+
+  // reference clock input
+  val clock_ref = Input(Clock())
 
   // low speed clock output
-  val dataClock = Output(Clock())
+  val clock_digital = Output(Clock())
 
   // reset
-  val resetIn = Input(Bool())
-  val resetOut = Output(Bool())
+  val async_reset_in = Input(Bool())
+  val reset_out = Output(Bool())
 
   // RX pad inputs
   val rx = Flipped(new Differential)
@@ -35,49 +30,37 @@ class TransceiverIO(
   val tx = new Differential
 
   // internal data interface
-  val dataDLev = Output(UInt(dataWidth.W))
-  val dataRx = Output(UInt(dataWidth.W))
-  val dataTx = Input(UInt(dataWidth.W))
-
-  // CDR stuff
-  val cdrI = Input(UInt(cdrIWidth.W))
-  val cdrP = Input(UInt(cdrPWidth.W))
-
-  // Clock dither for CDR
-  val clockDither = Input(Bool())
-
-  // DFE stuff
-  val dfeTaps = Input(Vec(dfeNumTaps, UInt(dfeTapWidth.W)))
-  val dLevDAC = Input(UInt(dLevDACWidth.W))
+  val data_dlev = Output(UInt(c.dataWidth.W))
+  val data_rx = Output(UInt(c.dataWidth.W))
+  val data_tx = Input(UInt(c.dataWidth.W))
 
   //val config = TODO
 
   //val debug = TODO
 
   // reference current (if any)
-  val bias = Analog(transceiverNumIrefs.W)
+  val bias = Analog(c.transceiverNumIrefs.W)
 
 }
 
-class Transceiver(
-  dataWidth: Int,
-  transceiverNumIrefs: Int,
-  cdrIWidth: Int,
-  cdrPWidth: Int,
-  dfeNumTaps: Int,
-  dfeTapWidth: Int,
-  dLevDACWidth: Int
-) extends BlackBox {
+class TransceiverIO()(implicit c: SerDesGeneratorConfig) extends TranscevierSharedIO()(c) {
 
-  val io = IO(new TransceiverIO(
-    dataWidth: Int,
-    transceiverNumIrefs: Int,
-    cdrIWidth: Int,
-    cdrPWidth: Int,
-    dfeNumTaps: Int,
-    dfeTapWidth: Int,
-    dLevDACWidth: Int
-  ))
+  // CDR stuff
+  val cdri = Input(UInt(c.cdrIWidth.W))
+  val cdrp = Input(UInt(c.cdrPWidth.W))
+
+  // Clock dither for CDR
+  val dither_clock = Input(Bool())
+
+  // DFE stuff
+  val dfe_taps = Input(Vec(c.dfeNumTaps, UInt(c.dfeTapWidth.W)))
+  val dlev_dac = Input(UInt(c.dlevDACWidth.W))
+
+}
+
+class Transceiver()(implicit c: SerDesGeneratorConfig) extends BlackBox {
+
+  val io = IO(new TransceiverIO)
 
   override def desiredName = transceiverName
 
