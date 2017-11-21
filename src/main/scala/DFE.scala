@@ -6,8 +6,8 @@ import chisel3.experimental._
 class DFEIO()(implicit c: SerDesGeneratorConfig) extends Bundle {
 
   val dfe_taps = Output(Vec(c.dfeNumTaps, UInt(c.dfeTapWidth.W)))
-  val data_dlev = Input(UInt(c.transceiverDataWidth.W))
-  val data_rx = Input(UInt(c.transceiverDataWidth.W))
+  val data_dlev = Input(UInt(c.dataWidth.W))
+  val data_rx = Input(UInt(c.dataWidth.W))
 
 }
 

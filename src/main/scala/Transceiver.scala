@@ -43,7 +43,7 @@ class TransceiverSharedIO()(implicit c: SerDesGeneratorConfig) extends Bundle {
 
 }
 
-class TransceiverIO()(implicit c: SerDesGeneratorConfig) extends TranscevierSharedIO()(c) {
+class TransceiverIO()(implicit c: SerDesGeneratorConfig) extends TransceiverSharedIO()(c) {
 
   // CDR stuff
   val cdri = Input(UInt(c.cdrIWidth.W))
@@ -62,7 +62,7 @@ class Transceiver()(implicit c: SerDesGeneratorConfig) extends BlackBox {
 
   val io = IO(new TransceiverIO)
 
-  override def desiredName = transceiverName
+  override def desiredName = c.transceiverName
 
 }
 
