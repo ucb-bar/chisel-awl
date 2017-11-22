@@ -24,14 +24,14 @@ class DefaultConfig extends SerDesGeneratorConfig(
     transceiverName = "generic_transceiver",
     transceiverResource = "/generic_transceiver.sv",
     transceiverNumIrefs = 1,
-    cdrHasOverride = false,
+    cdrHasOverride = true,
     cdrIWidth = 8,
     cdrPWidth = 8,
     dfeNumTaps = 4,
     dfeTapWidth = 4,
-    dfeHasOverride = false,
+    dfeHasOverride = true,
     dlevDACWidth = 4,
-    dlevHasOverride = false
+    dlevHasOverride = true
   )
 
 
