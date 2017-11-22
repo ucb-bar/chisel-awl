@@ -1,7 +1,8 @@
 package hbwif2
 
 import chisel3._
-import chisel3.experimental._
+import chisel3.experimental.Analog
+import chisel3.util.HasBlackBoxResource
 
 class Differential extends Bundle {
   val p = Analog(1.W)
@@ -58,12 +59,13 @@ class TransceiverIO()(implicit c: SerDesGeneratorConfig) extends TransceiverShar
 
 }
 
-class Transceiver()(implicit c: SerDesGeneratorConfig) extends BlackBox {
+class Transceiver()(implicit c: SerDesGeneratorConfig) extends BlackBox with HasBlackBoxResource {
 
   val io = IO(new TransceiverIO)
 
   override def desiredName = c.transceiverName
 
-}
+  setResource(c.transceiverResource)
 
+}
 

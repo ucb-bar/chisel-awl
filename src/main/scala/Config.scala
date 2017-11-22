@@ -5,6 +5,7 @@ import chisel3._
 class SerDesGeneratorConfig(
   val dataWidth: Int,
   val transceiverName: String,
+  val transceiverResource: String,
   val transceiverNumIrefs: Int,
   val cdrHasOverride: Boolean,
   val cdrIWidth: Int,
@@ -16,12 +17,12 @@ class SerDesGeneratorConfig(
   val dlevHasOverride: Boolean
 ) {
 
-
 }
 
 class DefaultConfig extends SerDesGeneratorConfig(
-    dataWidth = 8,
-    transceiverName = "generic",
+    dataWidth = 16,
+    transceiverName = "generic_transceiver",
+    transceiverResource = "/generic_transceiver.sv",
     transceiverNumIrefs = 1,
     cdrHasOverride = false,
     cdrIWidth = 8,
