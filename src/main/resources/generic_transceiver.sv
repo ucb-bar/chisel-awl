@@ -44,52 +44,49 @@ module generic_transceiver (
   //***********************************
 
   reg [`SERDES_LOGBITS-1:0] count;
-  reg clock_digital;
+  reg clock_digital_reg;
+  assign clock_digital = clock_digital_reg;
 
-  always @(posedge clock_fast or negedge clock_fast) begin
-    if (reset_out) count <= `SERDES_LOGBITS'd0;
-    else count <= count + `SERDES_LOGBITS'd1;
+  always @(posedge clock_fast or negedge clock_fast or posedge async_reset_in) begin
+    if (async_reset_in) count <= 0;
+    else count <= count + 1;
   end
 
-  always @(posedge clock_fast or negedge clock_fast) begin
-    if (reset_out) clock_digital <= 1'b1;
-    else if (count == `SERDES_BITS/2-1) clock_digital <= 1'b0;
-    else if (count == `SERDES_BITS-1) clock_digital <= 1'b1;
+  always @(posedge clock_fast or negedge clock_fast or posedge async_reset_in) begin
+    if (async_reset_in) clock_digital_reg <= 1'b1;
+    else if (count == `SERDES_BITS/2-1) clock_digital_reg <= 1'b0;
+    else if (count == `SERDES_BITS-1) clock_digital_reg <= 1'b1;
   end
 
   //***********************************
   //            Serializer
   //***********************************
 
-  reg [`SERDES_BITS:0] data_tx_reg;
-  reg tx_p_reg;
-  assign tx_p = tx_p_reg;
-  assign tx_n = ~tx_p_reg;
-
-  always @(posedge clock_digital) begin
-    data_tx_reg <= data_tx;
-  end
+  reg [`SERDES_BITS-1:0] data_tx_buf;
+  assign tx_p = data_tx_buf[`SERDES_BITS-1];
+  assign tx_n = ~tx_p;
 
   always @(posedge clock_fast or negedge clock_fast) begin
-    tx_p_reg <= data_tx_reg[count];
+    if (count == `SERDES_BITS-1)
+      data_tx_buf <= data_tx;
+    else
+      data_tx_buf <= {data_tx_buf[`SERDES_BITS-2:0],1'b0};
   end
 
   //***********************************
   //           Deserializer
   //***********************************
 
-  reg [`SERDES_BITS:0] data_rx_reg;
-  reg data_rx;
-  wire rx_p_val;
+  reg [`SERDES_BITS-1:0] data_rx_buf;
+  reg [`SERDES_BITS-1:0] data_rx_reg;
+  assign data_rx = data_rx_reg;
 
+  wire rx_p_val;
   assign rx_p_val = (rx_p ^ rx_n) ? rx_p : 1'bx;
 
-  always @(posedge clock_digital) begin
-    data_rx <= data_rx_reg;
-  end
-
   always @(posedge clock_fast or negedge clock_fast) begin
-    data_rx_reg[count] <= rx_p_val;
+    if (count == `SERDES_BITS-1) data_rx_reg <= data_rx_buf;
+    data_rx_buf <= {data_rx_buf[`SERDES_BITS-2:0],rx_p_val};
   end
 
   //***********************************

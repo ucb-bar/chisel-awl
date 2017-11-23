@@ -18,7 +18,7 @@ class HBWIFTester extends ChiselFlatSpec {
       }
 
       "Transceiver" should s"send and receive bits with $backendName" in {
-        Driver(() => new TransceiverDUT()(config), backendName) {
+        Driver(() => new TransceiverPair()(config), backendName) {
           c => new TransceiverUnitTester(c)
         } should be (true)
       }
