@@ -13,7 +13,7 @@ class CDRIO()(implicit c: SerDesGeneratorConfig) extends Bundle {
 
 }
 
-class CDR()(implicit c: SerDesGeneratorConfig) extends Module {
+class CDR()(implicit val c: SerDesGeneratorConfig) extends Module {
 
   val io = IO(new CDRIO)
 

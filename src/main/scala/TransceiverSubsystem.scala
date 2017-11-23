@@ -3,25 +3,37 @@ package hbwif2
 import chisel3._
 import chisel3.experimental._
 
-class TransceiverSubsystemIO()(implicit c: SerDesGeneratorConfig) extends TransceiverSharedIO()(c) {
+class TransceiverOverrideIF()(implicit val c: SerDesGeneratorConfig) extends Bundle {
 
   // CDR override
-  val cdri_override = Input(UInt((if (c.cdrHasOverride) c.cdrIWidth else 0).W))
-  val cdrp_override = Input(UInt((if (c.cdrHasOverride) c.cdrPWidth else 0).W))
-  val cdr_override = Input(UInt((if (c.cdrHasOverride) 1 else 0).W))
+  val cdri_value = Input(UInt((if (c.cdrHasOverride) c.cdrIWidth else 0).W))
+  val cdrp_value = Input(UInt((if (c.cdrHasOverride) c.cdrPWidth else 0).W))
+  val cdr = Input(UInt((if (c.cdrHasOverride) 1 else 0).W))
+
+  def get_cdri(default: UInt): UInt = (if(c.cdrHasOverride) Mux(cdr === 1.U, cdri_value, default) else default)
+  def get_cdrp(default: UInt): UInt = (if(c.cdrHasOverride) Mux(cdr === 1.U, cdrp_value, default) else default)
 
   // DFE override
-  val dfe_taps_override = Input(Vec(if (c.dfeHasOverride) c.dfeNumTaps else 0, UInt(c.dfeTapWidth.W)))
-  val dfe_override = Input(UInt((if (c.dfeHasOverride) 1 else 0).W))
+  val dfe_taps_value = Input(Vec(if (c.dfeHasOverride) c.dfeNumTaps else 0, UInt(c.dfeTapWidth.W)))
+  val dfe = Input(UInt((if (c.dfeHasOverride) 1 else 0).W))
+
+  def get_dfe_taps(default: Vec[UInt]): Vec[UInt] = (if(c.dfeHasOverride) Mux(dfe === 1.U, dfe_taps_value, default) else default)
 
   // DLEV override
-  val dlev_dac_override = Input(UInt((if (c.dlevHasOverride) c.dlevDACWidth else 0).W))
-  val dlev_override = Input(UInt((if (c.dlevHasOverride) 1 else 0).W))
+  val dlev_dac_value = Input(UInt((if (c.dlevHasOverride) c.dlevDACWidth else 0).W))
+  val dlev = Input(UInt((if (c.dlevHasOverride) 1 else 0).W))
+
+  def get_dlev_dac(default: UInt): UInt = (if(c.dlevHasOverride) Mux(dlev === 1.U, dlev_dac_value, default) else default)
 
 }
 
+class TransceiverSubsystemIO()(implicit val c: SerDesGeneratorConfig) extends Bundle with TransceiverSharedIF {
 
-class TransceiverSubsystem()(implicit c: SerDesGeneratorConfig) extends Module {
+  val overrides = new TransceiverOverrideIF
+
+}
+
+class TransceiverSubsystem()(implicit val c: SerDesGeneratorConfig) extends Module {
 
   val io = IO(new TransceiverSubsystemIO)
 
@@ -34,9 +46,9 @@ class TransceiverSubsystem()(implicit c: SerDesGeneratorConfig) extends Module {
   io.tx <> txrx.io.tx
   io.rx <> txrx.io.rx
 
-  io.data_dlev := txrx.io.data_dlev
-  io.data_rx := txrx.io.data_rx
-  txrx.io.data_tx := io.data_tx
+  io.data.dlev := txrx.io.data.dlev
+  io.data.rx := txrx.io.data.rx
+  txrx.io.data.tx := io.data.tx
 
   io.bias <> txrx.io.bias
 
@@ -45,25 +57,25 @@ class TransceiverSubsystem()(implicit c: SerDesGeneratorConfig) extends Module {
     // Transceiver <> CDR Loop
     val cdr = Module(new CDR)
 
-    txrx.io.cdri := (if(c.cdrHasOverride) Mux(io.cdr_override === 1.U, io.cdri_override, cdr.io.i) else cdr.io.i)
-    txrx.io.cdrp := (if(c.cdrHasOverride) Mux(io.cdr_override === 1.U, io.cdrp_override, cdr.io.p) else cdr.io.p)
+    txrx.io.cdri := io.overrides.get_cdri(cdr.io.i)
+    txrx.io.cdrp := io.overrides.get_cdrp(cdr.io.p)
     txrx.io.dither_clock := cdr.io.dither_clock
-    cdr.io.data_dlev := txrx.io.data_dlev
-    cdr.io.data_rx := txrx.io.data_rx
+    cdr.io.data_dlev := txrx.io.data.dlev
+    cdr.io.data_rx := txrx.io.data.rx
 
     // Transceiver <> DFE Loop
     if (c.dfeNumTaps > 0) {
       val dfe = Module(new DFE)
-      txrx.io.dfe_taps := (if(c.dfeHasOverride) Mux(io.dfe_override === 1.U, io.dfe_taps_override, dfe.io.dfe_taps) else dfe.io.dfe_taps)
-      dfe.io.data_dlev := txrx.io.data_dlev
-      dfe.io.data_rx := txrx.io.data_rx
+      txrx.io.dfe_taps := io.overrides.get_dfe_taps(dfe.io.taps)
+      dfe.io.data_dlev := txrx.io.data.dlev
+      dfe.io.data_rx := txrx.io.data.rx
     }
 
     // Transceiver <> DLEV Loop
     val dlev = Module(new DLEV)
-    txrx.io.dlev_dac := (if(c.dlevHasOverride) Mux(io.dlev_override === 1.U, io.dlev_dac_override, dlev.io.dlev_dac) else dlev.io.dlev_dac)
-    dlev.io.data_rx := txrx.io.data_rx
-    dlev.io.data_dlev := txrx.io.data_dlev
+    txrx.io.dlev_dac := io.overrides.get_dlev_dac(dlev.io.code)
+    dlev.io.data_rx := txrx.io.data.rx
+    dlev.io.data_dlev := txrx.io.data.dlev
 
   }
 

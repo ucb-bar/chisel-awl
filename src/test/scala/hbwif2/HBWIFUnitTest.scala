@@ -5,21 +5,6 @@ package hbwif2
 import chisel3.iotesters
 import chisel3.iotesters.{ChiselFlatSpec, Driver, PeekPokeTester}
 
-/*
-class HBWIFUnitTester(c: HBWIF) extends PeekPokeTester(c) {
-
-}
-*/
-
-class CDRUnitTester(c: CDR) extends PeekPokeTester(c) {
-
-}
-
-class TransceiverUnitTester(c: TransceiverSubsystem) extends PeekPokeTester(c) {
-
-
-}
-
 class HBWIFTester extends ChiselFlatSpec {
   private val backendNames = Array("vcs")
 
@@ -33,7 +18,7 @@ class HBWIFTester extends ChiselFlatSpec {
       }
 
       "Transceiver" should s"send and receive bits with $backendName" in {
-        Driver(() => new TransceiverSubsystem()(config), backendName) {
+        Driver(() => new TransceiverDUT()(config), backendName) {
           c => new TransceiverUnitTester(c)
         } should be (true)
       }

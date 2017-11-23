@@ -9,10 +9,19 @@ class Differential extends Bundle {
   val n = Analog(1.W)
 }
 
+class TransceiverDataIF()(implicit val c: SerDesGeneratorConfig) extends Bundle {
 
-// This is a container class for the stuff that is shared between the TransceiverIO and TransceiverSubsystemIO
+  // internal data interface
+  val dlev = Output(UInt(c.dataWidth.W))
+  val rx = Output(UInt(c.dataWidth.W))
+  val tx = Input(UInt(c.dataWidth.W))
+
+}
+
+// This is a container for the stuff that is shared between the TransceiverIO and TransceiverSubsystemIO
 // i.e. not the dlev, dfe, and cdr override stuff
-class TransceiverSharedIO()(implicit c: SerDesGeneratorConfig) extends Bundle {
+trait TransceiverSharedIF {
+  implicit val c: SerDesGeneratorConfig
 
   // reference clock input
   val clock_ref = Input(Clock())
@@ -30,10 +39,8 @@ class TransceiverSharedIO()(implicit c: SerDesGeneratorConfig) extends Bundle {
   // TX pad outputs
   val tx = new Differential
 
-  // internal data interface
-  val data_dlev = Output(UInt(c.dataWidth.W))
-  val data_rx = Output(UInt(c.dataWidth.W))
-  val data_tx = Input(UInt(c.dataWidth.W))
+  // Data
+  val data = new TransceiverDataIF
 
   //val config = TODO
 
@@ -44,7 +51,7 @@ class TransceiverSharedIO()(implicit c: SerDesGeneratorConfig) extends Bundle {
 
 }
 
-class TransceiverIO()(implicit c: SerDesGeneratorConfig) extends TransceiverSharedIO()(c) {
+class TransceiverIO()(implicit val c: SerDesGeneratorConfig) extends Bundle with TransceiverSharedIF {
 
   // CDR stuff
   val cdri = Input(UInt(c.cdrIWidth.W))
@@ -59,7 +66,7 @@ class TransceiverIO()(implicit c: SerDesGeneratorConfig) extends TransceiverShar
 
 }
 
-class Transceiver()(implicit c: SerDesGeneratorConfig) extends BlackBox with HasBlackBoxResource {
+class Transceiver()(implicit val c: SerDesGeneratorConfig) extends BlackBox with HasBlackBoxResource {
 
   val io = IO(new TransceiverIO)
 
