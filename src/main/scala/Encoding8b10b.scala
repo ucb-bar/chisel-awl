@@ -139,9 +139,6 @@ object Encoding8b10b {
       }
     }.filter(!_.isEmpty).map(_.get)
 
-  // Default comma sequence for the encoder (K.28.5)
-  val defaultComma = Integer.parseInt("10111100",2)
-
 }
 
 class Decoded8b10bSymbol extends DecodedSymbol {
@@ -151,7 +148,11 @@ class Decoded8b10bSymbol extends DecodedSymbol {
 
     val control = Bool()
 
+    override def ack: Decoded8b10bSymbol = Decoded8b10bSymbol.k(28,2)
+    override def nack: Decoded8b10bSymbol = Decoded8b10bSymbol.k(28,3)
+    override def sync: Decoded8b10bSymbol = Decoded8b10bSymbol.k(28,4)
     override def comma: Decoded8b10bSymbol = Decoded8b10bSymbol.comma
+
 
     def encode(rd: Bool): UInt = {
         MuxLookup(Cat(control,rd,bits), 0.U, Encoding8b10b.encodings.map
@@ -171,6 +172,17 @@ object Decoded8b10bSymbol {
         x
     }
 
+    // Helper method to easily recognize Kcodes
+    def k(edcba: Int, hgf: Int): Decoded8b10bSymbol = {
+        assert(hgf >= 0 && hgf <= 7, "HGF must be 0-7")
+        assert(edcba == 28 || edcba == 23 || edcba == 27 || edcba == 29 || edcba == 30, "EDCBA must be 28, 23, 27, 29, or 30")
+        assert(edcba == 28 || (hgf == 7), "HGF must be 7 for K codes other than EDCBA=28")
+        assert(edcba != 28 || hgf != 7, "K.28.7 is explicitly disallowed in this implementation because it would complicate comma detection")
+        Decoded8b10bSymbol((edcba << 5 | hgf).U, true.B)
+    }
+
+    def comma: Decoded8b10bSymbol = this.k(28,5)
+
     def decode(encoded: UInt, rd: Bool): Valid[Decoded8b10bSymbol] = {
         val x = Valid(Decoded8b10bSymbol())
         x.bits := MuxLookup(encoded, 0.U, Encoding8b10b.encodings.map
@@ -179,8 +191,6 @@ object Decoded8b10bSymbol {
             { case ((k,r,d),enc) => (enc.U(10.W), true.B) })
         x
     }
-
-    def comma: Decoded8b10bSymbol = Decoded8b10bSymbol(Encoding8b10b.defaultComma.U, true.B)
 
 }
 

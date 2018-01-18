@@ -11,8 +11,9 @@ abstract class DecodedSymbol extends Bundle {
 
     // Minimum set of literals needed for the protocol to work
     def comma: DecodedSymbol
-    //def ack: this.type
-    //def nack: this.type
+    def ack: DecodedSymbol
+    def nack: DecodedSymbol
+    def sync: DecodedSymbol
 }
 
 abstract class Encoder[T <: DecodedSymbol](val symbolFactory: () => T) extends Module {
