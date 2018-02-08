@@ -18,20 +18,18 @@ class TransceiverDataIF()(implicit val c: SerDesGeneratorConfig) extends Bundle 
 
 }
 
-// This is a container for the stuff that is shared between the TransceiverIO and TransceiverSubsystemIO
-// i.e. not the dlev, dfe, and cdr override stuff
-trait TransceiverSharedIF {
+// This is a container for all the things that are shared with the Lane
+trait TransceiverOuterIF {
   implicit val c: SerDesGeneratorConfig
 
   // reference clock input
   val clock_ref = Input(Clock())
 
-  // low speed clock output
-  val clock_digital = Output(Clock())
-
-  // reset
+  // async reset input
   val async_reset_in = Input(Bool())
-  val reset_out = Output(Bool())
+
+  // reference current (if any)
+  val bias = Analog(c.transceiverNumIrefs.W)
 
   // RX pad inputs
   val rx = Flipped(new Differential)
@@ -39,15 +37,25 @@ trait TransceiverSharedIF {
   // TX pad outputs
   val tx = new Differential
 
+}
+
+// This is a container for the stuff that is shared between the TransceiverIO and TransceiverSubsystemIO
+// i.e. not the dlev, dfe, and cdr override stuff
+trait TransceiverSharedIF extends TransceiverOuterIF {
+  implicit val c: SerDesGeneratorConfig
+
+  // low speed clock output
+  val clock_digital = Output(Clock())
+
+  // reset
+  val reset_out = Output(Bool())
+
   // Data
   val data = new TransceiverDataIF
 
   //val config = TODO
 
   //val debug = TODO
-
-  // reference current (if any)
-  val bias = Analog(c.transceiverNumIrefs.W)
 
 }
 

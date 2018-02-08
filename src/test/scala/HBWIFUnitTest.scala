@@ -22,6 +22,7 @@ class HBWIFTester extends ChiselFlatSpec {
           c => new TransceiverUnitTester(c)
         } should be (true)
       }
+
     }
   }
 }

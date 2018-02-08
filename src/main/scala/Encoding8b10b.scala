@@ -153,6 +153,9 @@ class Decoded8b10bSymbol extends DecodedSymbol {
     override def sync: Decoded8b10bSymbol = Decoded8b10bSymbol.k(28,4)
     override def comma: Decoded8b10bSymbol = Decoded8b10bSymbol.comma
 
+    override def fromData(x: UInt): Decoded8b10bSymbol = Decoded8b10bSymbol(x, false.B)
+    override def isData: Bool = ~control
+
 
     def encode(rd: Bool): UInt = {
         MuxLookup(Cat(control,rd,bits), 0.U, Encoding8b10b.encodings.map
@@ -263,7 +266,7 @@ class Encoder8b10b(val numSymbols: Int, val performanceEffort: Int = 0) extends 
         }
         (nextEncoded,nextRd)
     }
-    io.encoded := e
+    encoded := e
     rd := r
 }
 
