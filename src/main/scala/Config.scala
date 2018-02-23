@@ -14,7 +14,8 @@ class SerDesGeneratorConfig(
   val dfeTapWidth: Int,
   val dfeHasOverride: Boolean,
   val dlevDACWidth: Int,
-  val dlevHasOverride: Boolean
+  val dlevHasOverride: Boolean,
+  val hasDigitalLoopback: Boolean
 ) {
 
 }
@@ -31,7 +32,8 @@ class DefaultConfig extends SerDesGeneratorConfig(
     dfeTapWidth = 4,
     dfeHasOverride = true,
     dlevDACWidth = 4,
-    dlevHasOverride = true
+    dlevHasOverride = true,
+    hasDigitalLoopback = true
   )
 
 
