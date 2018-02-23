@@ -5,7 +5,7 @@ import chisel3.util._
 
 class Decoded64b66bSymbol extends DecodedSymbol {
 
-    val decodedWidth = 64
-    val encodedWidth = 66
+    val decodedWidth = 128
+    val encodedWidth = 130
 
 }

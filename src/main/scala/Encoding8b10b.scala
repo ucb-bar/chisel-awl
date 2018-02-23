@@ -186,11 +186,11 @@ object Decoded8b10bSymbol {
 
     def comma: Decoded8b10bSymbol = this.k(28,5)
 
-    def decode(encoded: UInt, rd: Bool): Valid[Decoded8b10bSymbol] = {
+    def decode(encoded: UInt, rd: Bool, valid: Bool): Valid[Decoded8b10bSymbol] = {
         val x = Valid(Decoded8b10bSymbol())
         x.bits := MuxLookup(encoded, 0.U, Encoding8b10b.encodings.map
             { case ((k,r,d),enc) => (enc.U(10.W), Decoded8b10bSymbol(d.U,k.B)) })
-        x.valid := MuxLookup(encoded, false.B, Encoding8b10b.encodings.map
+        x.valid := valid & MuxLookup(encoded, false.B, Encoding8b10b.encodings.map
             { case ((k,r,d),enc) => (enc.U(10.W), true.B) })
         x
     }
@@ -207,7 +207,7 @@ class Decoder8b10b(val numSymbols: Int, val performanceEffort: Int = 0) extends 
     val lock = RegInit(false.B)
     val rd = RegInit(false.B)
 
-    val extended = Cat(RegNext(io.encoded(8,0)),io.encoded)
+    val extended = Cat(RegNext(encoded.bits(8,0)),encoded.bits)
     val offsets = Vec( (0 to 9).map { i => extended(numSymbols*10+i-1,numSymbols*10+i-10) } )
     // Check that bits cdeif (7,3) are the same (this defines a comma)
     val commas = offsets.map { x => (x(9,3) === "b0011111".U) || (x(9,3) === "b1100000".U) }
@@ -219,18 +219,8 @@ class Decoder8b10b(val numSymbols: Int, val performanceEffort: Int = 0) extends 
         lock := true.B
     }
 
-    /*
-    when (found) {
-        // Force RD to a value based on the comma sequence
-        rd := offsets(nextIdx)(5)
-    } .elsewhen(~offsets(idx).toBools.reduce(_^_)) {
-        // Assume we got a valid symbol, if there are an uneven number of 1s and 0s, rd should flip
-        rd := ~rd
-    }
-    */
-
     (0 until numSymbols).foreach { i =>
-        io.decoded(i) := Decoded8b10bSymbol.decode(offsets(Mux(found,nextIdx,idx))(i*10+9,i*10), rd)
+        io.decoded(i) := Decoded8b10bSymbol.decode(offsets(Mux(found,nextIdx,idx))(i*10+9,i*10), rd, encoded.valid)
     }
 
 }
@@ -240,8 +230,8 @@ class Encoder8b10b(val numSymbols: Int, val performanceEffort: Int = 0) extends 
     val rd = RegInit(false.B)
 
     val (e,r) = io.decoded.foldLeft((0.U(0.W),rd)) { case ((prevEncoded,prevRd),decoded) =>
-        // Always ready to encode
-        decoded.ready := true.B
+        // ready to encode when next is high
+        decoded.ready := next
         val nextEncoded = UInt()
         val nextRd = Bool()
         if (performanceEffort <= 0) {
