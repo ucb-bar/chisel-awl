@@ -2,40 +2,54 @@ package hbwif2
 
 import chisel3._
 import chisel3.util._
+import chisel3.experimental.{DataMirror, requireIsChiselType}
+import scala.collection.mutable.ArrayBuffer
+import scala.collection.immutable.ListMap
 
-abstract class Control[T <: Bundle](val portFactory: () => T) extends Module {
+final class CustomBundle(elts: (String, Data)*) extends Record {
+  val elements = ListMap(elts map { case (field, elt) =>
+    requireIsChiselType(elt)
+    field -> elt
+  }: _*)
+  def apply(elt: String): Data = elements(elt)
+  override def cloneType = {
+    val cloned = elts.map { case (n, d) => n -> DataMirror.internal.chiselTypeClone(d) }
+    (new CustomBundle(cloned: _*)).asInstanceOf[this.type]
+  }
+}
 
-    val numStatus: Int
-    val numControl: Int
+class ControlIO[T <: Bundle](val portFactory: () => T, val wSeq: Seq[(String, UInt, Option[UInt])], val rSeq: Seq[(String, UInt)]) extends Bundle {
 
-    val io = IO(new Bundle {
-        val status = Input(TODO)
-        val control = Output(TODO)
-        val port = portFactory()
-    })
+    val r = Input(new CustomBundle(wSeq map {case (x,y,z) => (x,y)} : _*))
+    val w = Output(new CustomBundle(rSeq: _*))
+    val port = portFactory()
+}
 
+abstract class Control[T <: Bundle](val portFactory: () => T, val wSeq: Seq[(String, UInt, Option[UInt])], val rSeq: Seq[(String, UInt)]) extends Module {
+
+    final val io = IO(new ControlIO(portFactory, wSeq, rSeq))
 
 }
 
-class ControlBuilder[T <: Control](val controlFactory: () => T) {
+class ControlBuilder[T <: Bundle, U <: Control[T]](val controlFactory: (Seq[(String,UInt,Option[UInt])], Seq[(String,UInt)]) => U) {
 
-    private val controlMap = new HashMap[String,UInt]
-    private val statusMap = new HashMap[String,UInt]
+    private val wSeq = new ArrayBuffer[(String,UInt,Option[UInt])]
+    private val rSeq = new ArrayBuffer[(String,UInt)]
 
-    def control(name: String, signal: UInt, init: UInt = null) = {
-        if(init != null) require(init.isLit)
-        controlMap += (name, signal)
-        controlMap(name)
+    def w(name: String, signal: UInt, init: Option[UInt] = None) {
+        if (init != None) require(init.get.isLit, s"Initial value for $signal must be a Chisel literal.")
+        wSeq.append((name, signal, init))
     }
 
-    def status(name: String, signal: UInt) = {
-        statusMap += (name, signal)
-        statusMap(name)
+    def r(name: String, signal: UInt) {
+        rSeq.append((name, signal))
     }
 
-    def generate(): T = {
-        Module(controlFactory(controlMap,statusMap))
-        // Connect nets here
+    def generate(): U = {
+        val c = Module(controlFactory(wSeq,rSeq))
+        wSeq foreach { case (name, node, init) => node := c.io.w(name) }
+        rSeq foreach { case (name, node) => c.io.r(name) := node }
+        c
     }
 
 }

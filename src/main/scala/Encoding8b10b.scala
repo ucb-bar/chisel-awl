@@ -145,6 +145,7 @@ class Decoded8b10bSymbol extends DecodedSymbol {
 
     val decodedWidth = 8
     val encodedWidth = 10
+    val rate = 1
 
     val control = Bool()
 
@@ -177,10 +178,10 @@ object Decoded8b10bSymbol {
 
     // Helper method to easily recognize Kcodes
     def k(edcba: Int, hgf: Int): Decoded8b10bSymbol = {
-        assert(hgf >= 0 && hgf <= 7, "HGF must be 0-7")
-        assert(edcba == 28 || edcba == 23 || edcba == 27 || edcba == 29 || edcba == 30, "EDCBA must be 28, 23, 27, 29, or 30")
-        assert(edcba == 28 || (hgf == 7), "HGF must be 7 for K codes other than EDCBA=28")
-        assert(edcba != 28 || hgf != 7, "K.28.7 is explicitly disallowed in this implementation because it would complicate comma detection")
+        require(hgf >= 0 && hgf <= 7, "HGF must be 0-7")
+        require(edcba == 28 || edcba == 23 || edcba == 27 || edcba == 29 || edcba == 30, "EDCBA must be 28, 23, 27, 29, or 30")
+        require(edcba == 28 || (hgf == 7), "HGF must be 7 for K codes other than EDCBA=28")
+        require(edcba != 28 || hgf != 7, "K.28.7 is explicitly disallowed in this implementation because it would complicate comma detection")
         Decoded8b10bSymbol((edcba << 5 | hgf).U, true.B)
     }
 
@@ -197,18 +198,18 @@ object Decoded8b10bSymbol {
 
 }
 
-// Note that this only checks for a comma in the 0th symbol position (if numSymbols > 1),
-// so at least numSymbols commas must be transmitted to lock
+// Note that this only checks for a comma in the 0th symbol position (if decodedSymbolsPerCycle > 1),
+// so at least decodedSymbolsPerCycle commas must be transmitted to lock
 // TODO right now this ignores RD altogether
 // TODO need a flag to alert the user when lock or idx changes
-class Decoder8b10b(val numSymbols: Int, val performanceEffort: Int = 0) extends Decoder(Decoded8b10bSymbol.apply) {
+class Decoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Decoder(Decoded8b10bSymbol.apply) {
 
     val idx = RegInit(0.U(4.W))
     val lock = RegInit(false.B)
     val rd = RegInit(false.B)
 
-    val extended = Cat(RegNext(encoded.bits(8,0)),encoded.bits)
-    val offsets = Vec( (0 to 9).map { i => extended(numSymbols*10+i-1,numSymbols*10+i-10) } )
+    val extended = Cat(RegNext(io.encoded.bits(8,0)),io.encoded.bits)
+    val offsets = Vec( (0 to 9).map { i => extended(decodedSymbolsPerCycle*10+i-1,decodedSymbolsPerCycle*10+i-10) } )
     // Check that bits cdeif (7,3) are the same (this defines a comma)
     val commas = offsets.map { x => (x(9,3) === "b0011111".U) || (x(9,3) === "b1100000".U) }
     val found = commas.reduce(_|_)
@@ -219,19 +220,19 @@ class Decoder8b10b(val numSymbols: Int, val performanceEffort: Int = 0) extends 
         lock := true.B
     }
 
-    (0 until numSymbols).foreach { i =>
-        io.decoded(i) := Decoded8b10bSymbol.decode(offsets(Mux(found,nextIdx,idx))(i*10+9,i*10), rd, encoded.valid)
+    (0 until decodedSymbolsPerCycle).foreach { i =>
+        io.decoded(i) := Decoded8b10bSymbol.decode(offsets(Mux(found,nextIdx,idx))(i*10+9,i*10), rd, io.encoded.valid)
     }
 
 }
 
-class Encoder8b10b(val numSymbols: Int, val performanceEffort: Int = 0) extends Encoder(Decoded8b10bSymbol.apply) {
+class Encoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Encoder(Decoded8b10bSymbol.apply) {
 
     val rd = RegInit(false.B)
 
     val (e,r) = io.decoded.foldLeft((0.U(0.W),rd)) { case ((prevEncoded,prevRd),decoded) =>
         // ready to encode when next is high
-        decoded.ready := next
+        decoded.ready := io.next
         val nextEncoded = UInt()
         val nextRd = Bool()
         if (performanceEffort <= 0) {
@@ -256,7 +257,7 @@ class Encoder8b10b(val numSymbols: Int, val performanceEffort: Int = 0) extends 
         }
         (nextEncoded,nextRd)
     }
-    encoded := e
+    io.encoded := e
     rd := r
 }
 

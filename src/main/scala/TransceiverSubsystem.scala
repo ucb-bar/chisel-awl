@@ -25,13 +25,13 @@ class TransceiverOverrideIF()(implicit val c: SerDesGeneratorConfig) extends Bun
 
   def get_dlev_dac(default: UInt): UInt = (if(c.dlevHasOverride) Mux(dlev === 1.U, dlev_dac_value, default) else default)
 
-  val loopback_mode = Input(UInt((if (c.hasDigitalLoopback) 1 else 0).W))
-
 }
 
 class TransceiverSubsystemIO()(implicit val c: SerDesGeneratorConfig) extends Bundle with TransceiverSharedIF {
 
   val overrides = new TransceiverOverrideIF
+
+  val loopbackMode = Input(UInt((if (c.hasDigitalLoopback) 1 else 0).W))
 
 }
 
@@ -51,7 +51,7 @@ class TransceiverSubsystem()(implicit val c: SerDesGeneratorConfig) extends Modu
   io.data.dlev := txrx.io.data.dlev
   io.data.rx := txrx.io.data.rx
 
-  txrx.io.data.tx := if (c.hasDigitalLoopback) Mux(io.loopback_mode, io.data.tx, txrx.io.data.rx) else io.data.tx
+  txrx.io.data.tx := (if (c.hasDigitalLoopback) Mux(io.loopbackMode === 1.U, io.data.tx, txrx.io.data.rx) else io.data.tx)
 
   io.bias <> txrx.io.bias
 

@@ -8,6 +8,7 @@ abstract class DecodedSymbol extends Bundle {
 
     val decodedWidth: Int
     val encodedWidth: Int
+    val rate: Int // rate is how many decoded symbols are there per encoded symbol
     final val bits = UInt(decodedWidth.W)
 
     // Comparison
@@ -19,7 +20,7 @@ abstract class DecodedSymbol extends Bundle {
         }
     }
 
-    // Minimum set of literals needed for the protocol to work
+    // Define a minimum set of control symbols that must be implemented
     def comma: DecodedSymbol
     def ack: DecodedSymbol
     def nack: DecodedSymbol
@@ -32,62 +33,40 @@ abstract class DecodedSymbol extends Bundle {
 
 abstract class Encoder[T <: DecodedSymbol](val symbolFactory: () => T) extends Module {
 
-    val serdesDataWidth: Int
-    val numSymbols: Int
-    assert(numSymbols >= 1, "Cannot have 0- or negative-width Encoder")
+    val decodedSymbolsPerCycle: Int
+    require(decodedSymbolsPerCycle >= 1, "Cannot have 0- or negative-width Encoder")
 
-    val encodedWidth = symbolFactory().encodedWidth * numSymbols
-    // ensure we can always keep the line busy if we want to (have more data to send than bandwidth to send it)
-    assert(encodedWidth >= serdesDataWidth, "The bitwidth of the physical interface (serdesDataWidth) must not be larger than the aggregate bitwidth of the encoded interface")
-
+    final val encodedWidth = max(1, decodedSymbolsPerCycle / symbolFactory().rate) * symbolFactory().encodedWidth
 
     final val io = IO(new Bundle {
-        val dataOut = Output(UInt(serdesDataWidth.W))
-        val decoded = Input(Vec(numSymbols, Decoupled(symbolFactory())))
+        val encoded = UInt(encodedWidth.W)
+        val next = Input(Bool())
+        val decoded = Input(Vec(decodedSymbolsPerCycle, Decoupled(symbolFactory())))
     })
-
-    final val adapter = Module(new EncoderWidthAdapter(encodedWidth, serdesDataWidth))
-
-    // Write your encoded output to this wire
-    final val encoded = Wire(UInt(encodedWidth.W))
-    // Use this signal to move to the next symbol(s)
-    final val next: Bool = adapter.io.next
-
-    adapter.io.enq := encoded
-    io.dataOut := adapter.io.deq
 
 }
 
 abstract class Decoder[T <: DecodedSymbol](val symbolFactory: () => T) extends Module {
 
-    val serdesDataWidth: Int
-    val numSymbols: Int
-    assert(numSymbols >= 1, "Cannot have 0- or negative-width Decoder")
+    val decodedSymbolsPerCycle: Int
+    require(decodedSymbolsPerCycle >= 1, "Cannot have 0- or negative-width Decoder")
 
-    // ensure we have enough bandwidth to handle all of the data coming in
-    assert(symbolFactory().encodedWidth * numSymbols >= serdesDataWidth, "The bitwidth of the physical interface (serdesDataWidth) must not be larger than the aggregate bitwidth of the encoded interface")
+    final val encodedWidth = max(1, decodedSymbolsPerCycle / symbolFactory().rate) * symbolFactory().encodedWidth
 
     final val io = IO(new Bundle {
-        val dataIn = Input(UInt((symbolFactory().encodedWidth * numSymbols).W))
-        val decoded = Output(Vec(numSymbols, Valid(symbolFactory())))
+        val encoded = Valid(UInt(encodedWidth.W))
+        val decoded = Output(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())))
     })
-
-    final val adapter = Module(new DecoderWidthAdapter(serdesDataWidth, encodedWidth))
-
-    // Encoded output goes to this Valid[UInt] bundle
-    final val encoded: Valid[UInt] = adapter.io.deq
-
-    adapter.io.enq := io.dataIn
 
 }
 
-class EncoderWidthAdapter(val enqBits, val deqBits) extends Module {
+class EncoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Module {
 
-    val numStates = lcm(enqBits, deqBits) / deqBits
+    val numStates = Encoding.lcm(enqBits, deqBits) / deqBits
 
     // Assume that ENQ always has valid data we can consume
     val io = IO(new Bundle {
-        val enq = Input(UInt(enqBits.W)))
+        val enq = Input(UInt(enqBits.W))
         val next = Output(Bool())
         val deq = Valid(UInt(deqBits.W))
     })
@@ -96,37 +75,35 @@ class EncoderWidthAdapter(val enqBits, val deqBits) extends Module {
         io.deq := io.enq
         io.next := true.B
     } else {
-        assert(enqBits > deqBits, "Cannot have more enqBits than deqBits for the Encoder")
+        require(enqBits > deqBits, "Cannot have more deqBits than enqBits for the Encoder")
         val state = RegInit(0.U(log2Ceil(numStates).W))
-        val buf = Reg(2*enqBits - 1) // This can be reduced in some cases, but it should get optimized away
+        val buf = Reg(UInt((2*enqBits - 1).W)) // This can be reduced in some cases, but it should get optimized away
         io.deq := buf(deqBits - 1, 0)
-        switch (state) {
-            var rem = 0
-            (0 until numStates) foreach { x =>
-                is(x.U) {
-                    rem = rem + enqBits - deqBits
-                    if (rem >= deqBits) {
-                        rem = rem - enqBits
-                        io.next := false.B
-                        buf := Cat(buf(2*enqBits-2, deqBits), buf(2*deqBits-1, deqBits))
-                    } else {
-                        io.next := true.B
-                        buf := Cat(buf(2*enqBits-2, enqBits-1-rem-deqBits), io.enq,buf(deqBits+rem-1, deqBits))
+        var rem = 0
+        (0 until numStates) foreach { x =>
+            when (state === x.U) {
+                rem = rem + enqBits - deqBits
+                if (rem >= deqBits) {
+                    rem = rem - enqBits
+                    io.next := false.B
+                    buf := Cat(buf(2*enqBits-2, deqBits), buf(2*deqBits-1, deqBits))
+                } else {
+                    io.next := true.B
+                    buf := Cat(buf(2*enqBits-2, enqBits-1-rem-deqBits), io.enq,buf(deqBits+rem-1, deqBits))
 
-                    }
-                    state := ((x+1) % numStates).U
                 }
+                state := ((x+1) % numStates).U
             }
         }
     }
 }
 
-class DecoderWidthAdapter(val enqBits, val deqBits) extends Module {
+class DecoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Module {
 
-    val numStates = lcm(enqBits, deqBits) / enqBits
+    val numStates = Encoding.lcm(enqBits, deqBits) / enqBits
 
     val io = IO(new Bundle {
-        val enq = Input(UInt(enqBits.W)))
+        val enq = Input(UInt(enqBits.W))
         val deq = Valid(UInt(deqBits.W))
     })
 
@@ -134,28 +111,29 @@ class DecoderWidthAdapter(val enqBits, val deqBits) extends Module {
         io.deq.bits := io.enq
         io.deq.valid := true.B
     } else {
-        assert(deqBits > enqBits, "Cannot have more deqBits than enqBits for the Decoder")
+        require(deqBits > enqBits, "Cannot have more enqBits than deqBits for the Decoder")
         val state = RegInit(0.U(log2Ceil(numStates).W)) // TODO see note below
-        val buf = Reg(deqBits + enqBits - 1) // This can be reduced in some cases, but it should get optimized away
+        val buf = Reg(UInt((deqBits + enqBits - 1).W)) // This can be reduced in some cases, but it should get optimized away
         buf := Cat(buf(deqBits - 2, 0), io.enq)
         io.deq.bits := buf(deqBits - 1, 0)
-        switch (state) {
-            var filled = 0
-            (0 until numStates) foreach { x =>
-                is(x.U)) {
-                    filled = filled + enqBits
-                    if (filled >= deqBits) {
-                        filled = filled - deqBits
-                        io.deq.valid := true.B
-                    } else {
-                        io.deq.valid := false.B
-                    }
-                    state := ((x+1) % numStates).U // TODO this is redundant with the EncoderWidthAdapter one, may be able to optimize this out
+        var filled = 0
+        (0 until numStates) foreach { x =>
+            when (state === x.U) {
+                filled = filled + enqBits
+                if (filled >= deqBits) {
+                    filled = filled - deqBits
+                    io.deq.valid := true.B
+                } else {
+                    io.deq.valid := false.B
                 }
+                state := ((x+1) % numStates).U // TODO this is redundant with the EncoderWidthAdapter one, may be able to optimize this out
             }
         }
     }
 }
 
-def gcd(a: Int, b: Int): Int = if (b == 0) a else gcd(b, a%b)
-def lcm(a: Int, b: Int): Int = a*b / gcd(a, b)
+object Encoding {
+    def gcd(a: Int, b: Int): Int = if (b == 0) a else gcd(b, a%b)
+    def lcm(a: Int, b: Int): Int = a*b / gcd(a, b)
+}
+
