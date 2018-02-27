@@ -18,7 +18,7 @@ object ScanChainPort {
 }
 
 
-class ScanChainControl(spec: ControlSpec) extends Control(spec) {
+class ScanChainController(spec: ControlSpec) extends Controller(spec) {
 
     type PortType = ScanChainPort
     val portFactory = ScanChainPort.apply _
@@ -68,6 +68,6 @@ class ScanChainControl(spec: ControlSpec) extends Control(spec) {
 
 }
 
-object ScanChainControl {
-    def apply(spec: ControlSpec): ScanChainControl = new ScanChainControl(spec)
+object ScanChainController {
+    def apply(spec: ControlSpec): ScanChainController = new ScanChainController(spec)
 }

@@ -18,23 +18,23 @@ final class CustomBundle(elts: (String, Data)*) extends Record {
   }
 }
 
-class ControlIO[T <: Bundle](val portFactory: () => T, val spec: ControlSpec) extends Bundle {
+class ControllerIO[T <: Bundle](val portFactory: () => T, val spec: ControlSpec) extends Bundle {
 
     val r = Input(new CustomBundle(spec.w map {case (x,y,z) => (x,y)} : _*))
     val w = Output(new CustomBundle(spec.r: _*))
     val port = portFactory()
 }
 
-abstract class Control(val spec: ControlSpec) extends Module {
+abstract class Controller(val spec: ControlSpec) extends Module {
 
     type PortType <: Bundle
     val portFactory: () => PortType
 
-    final val io = IO(new ControlIO(portFactory, spec))
+    final val io = IO(new ControllerIO(portFactory, spec))
 
 }
 
-class ControlBuilder[T <: Control](val controlFactory: (ControlSpec) => T) {
+class ControllerBuilder[T <: Controller](val controlFactory: (ControlSpec) => T) {
 
     private val wSeq = new ArrayBuffer[(String,UInt,Option[UInt])]
     private val rSeq = new ArrayBuffer[(String,UInt)]

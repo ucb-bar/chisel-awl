@@ -8,12 +8,12 @@ trait LaneTypes {
     type DecodedSymbolType <: DecodedSymbol
     type TxDataType <: Data
     type RxDataType <: Data
-    type ControlPortType <: Bundle
-    type ControlType <: Control
-    val portFactory: () => ControlPortType
+    type ControllerPortType <: Bundle
+    type ControllerType <: Controller
+    val portFactory: () => ControllerPortType
     val txFactory: () => TxDataType
     val rxFactory: () => RxDataType
-    val controlFactory: (ControlSpec) => ControlType
+    val controllerFactory: (ControlSpec) => ControllerType
 }
 
 
@@ -30,16 +30,13 @@ abstract class Lane extends Module with LaneTypes {
     implicit val c: SerDesGeneratorConfig
 
     val txrxss = Module(new TransceiverSubsystem)
-    def encoder: Encoder
-    def decoder: Decoder
-    def packetizer: Packetizer
-    val encoderModule = Module(encoder)
-    val decoderModule = Module(decoder)
-    val packetizerModule = Module(packetizer)
-    val builder = new ControlBuilder(controlFactory)
+    val encoder: Encoder
+    val decoder: Decoder
+    val packetizer: Packetizer
+    val builder = new ControllerBuilder(controllerFactory)
 
-    val encoderAdapter = Module(new EncoderWidthAdapter(encoderModule.encodedWidth, c.dataWidth))
-    val decoderAdapter = Module(new DecoderWidthAdapter(c.dataWidth, decoderModule.encodedWidth))
+    val encoderAdapter = Module(new EncoderWidthAdapter(encoder.encodedWidth, c.dataWidth))
+    val decoderAdapter = Module(new DecoderWidthAdapter(c.dataWidth, decoder.encodedWidth))
 
     txrxss.io.clock_ref := io.clock_ref
     txrxss.io.async_reset_in := io.async_reset_in
@@ -48,23 +45,23 @@ abstract class Lane extends Module with LaneTypes {
     io.tx <> txrxss.io.rx
 
     // ensure we can always keep the line busy if we want to (have more data to send than bandwidth to send it)
-    require(encoderModule.encodedWidth >= c.dataWidth, "The bitwidth of the physical interface (serdesDataWidth) must not be larger than the aggregate bitwidth of the encoded interface")
-    require(decoderModule.encodedWidth >= c.dataWidth, "The bitwidth of the physical interface (serdesDataWidth) must not be larger than the aggregate bitwidth of the encoded interface")
+    require(encoder.encodedWidth >= c.dataWidth, "The bitwidth of the physical interface (serdesDataWidth) must not be larger than the aggregate bitwidth of the encoded interface")
+    require(decoder.encodedWidth >= c.dataWidth, "The bitwidth of the physical interface (serdesDataWidth) must not be larger than the aggregate bitwidth of the encoded interface")
 
     // TODO mux in BERT
 
-    encoderAdapter.io.enq := encoderModule.io.encoded
-    encoderModule.io.next := encoderAdapter.io.next
+    encoderAdapter.io.enq := encoder.io.encoded
+    encoder.io.next := encoderAdapter.io.next
     txrxss.io.data.tx := encoderAdapter.io.deq
 
-    decoderModule.io.encoded := decoderAdapter.io.deq
+    decoder.io.encoded := decoderAdapter.io.deq
     decoderAdapter.io.enq := txrxss.io.data.rx
 
     // TODO add overrideIF
 
-    encoderModule.io.decoded := packetizerModule.io.symbolsTx
+    encoder.io.decoded := packetizer.io.symbolsTx
     // packetizer.io.packetTx
-    packetizerModule.io.symbolsRx := decoderModule.io.decoded
+    packetizer.io.symbolsRx := decoder.io.decoded
     // packetizer.io.packetRx
 
 
@@ -72,4 +69,3 @@ abstract class Lane extends Module with LaneTypes {
     io.port <> ctrl.io.port
 
 }
-

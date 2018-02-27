@@ -270,6 +270,6 @@ class Encoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int =
 
 trait HasEncoding8b10b {
     implicit val c: SerDesGeneratorConfig
-    def encoder = new Encoder8b10b((c.dataWidth + 9) / 10, c.performanceEffort)
-    def decoder = new Decoder8b10b((c.dataWidth + 9) / 10, c.performanceEffort)
+    val encoder = Module(new Encoder8b10b((c.dataWidth + 9) / 10, c.performanceEffort))
+    val decoder = Module(new Decoder8b10b((c.dataWidth + 9) / 10, c.performanceEffort))
 }
