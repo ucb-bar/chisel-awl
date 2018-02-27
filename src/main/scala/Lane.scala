@@ -4,7 +4,15 @@ import chisel3._
 import chisel3.util._
 import chisel3.experimental._
 
-trait LaneTypes {
+final class LaneIO[T <: Bundle, U <: Data, V <: Data](portFactory: () => T, txFactory: () => U, rxFactory: () => V)(implicit val c: SerDesGeneratorConfig)
+    extends Bundle with TransceiverOuterIF {
+    val port = portFactory()
+    val dataTx = Decoupled(txFactory())
+    val dataRx = Flipped(Decoupled(rxFactory()))
+}
+
+abstract class Lane extends Module {
+
     type DecodedSymbolType <: DecodedSymbol
     type TxDataType <: Data
     type RxDataType <: Data
@@ -14,18 +22,8 @@ trait LaneTypes {
     val txFactory: () => TxDataType
     val rxFactory: () => RxDataType
     val controllerFactory: (ControlSpec) => ControllerType
-}
 
-
-abstract class LaneIO extends Bundle with TransceiverOuterIF with LaneTypes {
-    val port = portFactory()
-    val dataTx = Decoupled(txFactory())
-    val dataRx = Flipped(Decoupled(rxFactory()))
-}
-
-abstract class Lane extends Module with LaneTypes {
-
-    override val io: LaneIO
+    val io = IO(new LaneIO(portFactory, txFactory, rxFactory))
 
     implicit val c: SerDesGeneratorConfig
 
@@ -64,8 +62,6 @@ abstract class Lane extends Module with LaneTypes {
     packetizer.io.symbolsRx := decoder.io.decoded
     // packetizer.io.packetRx
 
-
-    val ctrl = builder.generate()
-    io.port <> ctrl.io.port
+    def connectController() = { io.port <> builder.generate().io.port }
 
 }

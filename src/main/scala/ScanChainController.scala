@@ -68,6 +68,9 @@ class ScanChainController(spec: ControlSpec) extends Controller(spec) {
 
 }
 
-object ScanChainController {
-    def apply(spec: ControlSpec): ScanChainController = new ScanChainController(spec)
+trait HasScanChainController {
+    type ControllerPortType = ScanChainPort
+    type ControllerType = ScanChainController
+    val portFactory = { () => new ScanChainPort }
+    val controllerFactory = { (spec: ControlSpec) => new ScanChainController(spec) }
 }
