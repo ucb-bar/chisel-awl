@@ -31,7 +31,10 @@ abstract class DecodedSymbol extends Bundle {
     def isData: Bool
 }
 
-abstract class Encoder[T <: DecodedSymbol](val symbolFactory: () => T) extends Module {
+abstract class Encoder extends Module {
+
+    type DecodedSymbolType <: DecodedSymbol
+    val symbolFactory: () => DecodedSymbolType
 
     val decodedSymbolsPerCycle: Int
     require(decodedSymbolsPerCycle >= 1, "Cannot have 0- or negative-width Encoder")
@@ -46,7 +49,10 @@ abstract class Encoder[T <: DecodedSymbol](val symbolFactory: () => T) extends M
 
 }
 
-abstract class Decoder[T <: DecodedSymbol](val symbolFactory: () => T) extends Module {
+abstract class Decoder extends Module {
+
+    type DecodedSymbolType <: DecodedSymbol
+    val symbolFactory: () => DecodedSymbolType
 
     val decodedSymbolsPerCycle: Int
     require(decodedSymbolsPerCycle >= 1, "Cannot have 0- or negative-width Decoder")

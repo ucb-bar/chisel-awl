@@ -15,7 +15,8 @@ class SerDesGeneratorConfig(
   val dfeHasOverride: Boolean,
   val dlevDACWidth: Int,
   val dlevHasOverride: Boolean,
-  val hasDigitalLoopback: Boolean
+  val hasDigitalLoopback: Boolean,
+  val performanceEffort: Int
 ) {
 
 }
@@ -33,7 +34,8 @@ class DefaultConfig extends SerDesGeneratorConfig(
     dfeHasOverride = true,
     dlevDACWidth = 4,
     dlevHasOverride = true,
-    hasDigitalLoopback = true
+    hasDigitalLoopback = true,
+    performanceEffort = 1
   )
 
 

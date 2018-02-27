@@ -18,20 +18,23 @@ final class CustomBundle(elts: (String, Data)*) extends Record {
   }
 }
 
-class ControlIO[T <: Bundle](val portFactory: () => T, val wSeq: Seq[(String, UInt, Option[UInt])], val rSeq: Seq[(String, UInt)]) extends Bundle {
+class ControlIO[T <: Bundle](val portFactory: () => T, val spec: ControlSpec) extends Bundle {
 
-    val r = Input(new CustomBundle(wSeq map {case (x,y,z) => (x,y)} : _*))
-    val w = Output(new CustomBundle(rSeq: _*))
+    val r = Input(new CustomBundle(spec.w map {case (x,y,z) => (x,y)} : _*))
+    val w = Output(new CustomBundle(spec.r: _*))
     val port = portFactory()
 }
 
-abstract class Control[T <: Bundle](val portFactory: () => T, val wSeq: Seq[(String, UInt, Option[UInt])], val rSeq: Seq[(String, UInt)]) extends Module {
+abstract class Control(val spec: ControlSpec) extends Module {
 
-    final val io = IO(new ControlIO(portFactory, wSeq, rSeq))
+    type PortType <: Bundle
+    val portFactory: () => PortType
+
+    final val io = IO(new ControlIO(portFactory, spec))
 
 }
 
-class ControlBuilder[T <: Bundle, U <: Control[T]](val controlFactory: (Seq[(String,UInt,Option[UInt])], Seq[(String,UInt)]) => U) {
+class ControlBuilder[T <: Control](val controlFactory: (ControlSpec) => T) {
 
     private val wSeq = new ArrayBuffer[(String,UInt,Option[UInt])]
     private val rSeq = new ArrayBuffer[(String,UInt)]
@@ -45,11 +48,16 @@ class ControlBuilder[T <: Bundle, U <: Control[T]](val controlFactory: (Seq[(Str
         rSeq.append((name, signal))
     }
 
-    def generate(): U = {
-        val c = Module(controlFactory(wSeq,rSeq))
+    def generate(): T = {
+        val c = Module(controlFactory(ControlSpec(wSeq,rSeq)))
         wSeq foreach { case (name, node, init) => node := c.io.w(name) }
         rSeq foreach { case (name, node) => c.io.r(name) := node }
         c
     }
 
 }
+
+case class ControlSpec(
+    val w: Seq[(String, UInt, Option[UInt])],
+    val r: Seq[(String, UInt)]
+)

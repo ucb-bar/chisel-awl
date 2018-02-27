@@ -202,7 +202,10 @@ object Decoded8b10bSymbol {
 // so at least decodedSymbolsPerCycle commas must be transmitted to lock
 // TODO right now this ignores RD altogether
 // TODO need a flag to alert the user when lock or idx changes
-class Decoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Decoder(Decoded8b10bSymbol.apply) {
+class Decoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Decoder {
+
+    type DecodedSymbolType = Decoded8b10bSymbol
+    val symbolFactory = Decoded8b10bSymbol.apply _
 
     val idx = RegInit(0.U(4.W))
     val lock = RegInit(false.B)
@@ -226,7 +229,10 @@ class Decoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int =
 
 }
 
-class Encoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Encoder(Decoded8b10bSymbol.apply) {
+class Encoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Encoder {
+
+    type DecodedSymbolType = Decoded8b10bSymbol
+    val symbolFactory = Decoded8b10bSymbol.apply _
 
     val rd = RegInit(false.B)
 
@@ -261,3 +267,9 @@ class Encoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int =
     rd := r
 }
 
+
+trait HasEncoding8b10b {
+    implicit val c: SerDesGeneratorConfig
+    def encoder = new Encoder8b10b((c.dataWidth + 9) / 10, c.performanceEffort)
+    def decoder = new Decoder8b10b((c.dataWidth + 9) / 10, c.performanceEffort)
+}

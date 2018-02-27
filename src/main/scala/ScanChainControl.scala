@@ -18,9 +18,12 @@ object ScanChainPort {
 }
 
 
-class ScanChainControl(wSeq: Seq[(String, UInt, Option[UInt])], rSeq: Seq[(String, UInt)]) extends Control(ScanChainPort.apply, wSeq, rSeq) {
+class ScanChainControl(spec: ControlSpec) extends Control(spec) {
 
-    val wScanOut = wSeq.foldLeft(io.port.scanIn) { case (scanIn, (name, node, init)) =>
+    type PortType = ScanChainPort
+    val portFactory = ScanChainPort.apply _
+
+    val wScanOut = spec.w.foldLeft(io.port.scanIn) { case (scanIn, (name, node, init)) =>
         val w = node.getWidth
 
         val shift = Wire(UInt(w.W))
@@ -43,7 +46,7 @@ class ScanChainControl(wSeq: Seq[(String, UInt, Option[UInt])], rSeq: Seq[(Strin
         shift(w-1)
     }
 
-    io.port.scanOut := rSeq.foldLeft(wScanOut) { case (scanIn, (name, node)) =>
+    io.port.scanOut := spec.r.foldLeft(wScanOut) { case (scanIn, (name, node)) =>
         val w = node.getWidth
 
         val shift = Wire(UInt(w.W))
@@ -61,8 +64,10 @@ class ScanChainControl(wSeq: Seq[(String, UInt, Option[UInt])], rSeq: Seq[(Strin
     }
 
 
+    // TODO output scan chain data in some custom format
+
 }
 
 object ScanChainControl {
-    def apply(wSeq: Seq[(String, UInt, Option[UInt])], rSeq: Seq[(String, UInt)]): ScanChainControl = new ScanChainControl(wSeq, rSeq)
+    def apply(spec: ControlSpec): ScanChainControl = new ScanChainControl(spec)
 }

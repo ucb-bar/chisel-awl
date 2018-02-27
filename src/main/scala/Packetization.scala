@@ -3,7 +3,14 @@ package hbwif2
 import chisel3._
 import chisel3.util._
 
-abstract class Packetizer[T <: DecodedSymbol, U <: Data, V <: Data](val symbolFactory: () => T, val dataTxFactory: () => U, val dataRxFactory: () => V) extends Module {
+abstract class Packetizer extends Module {
+
+    type DecodedSymbolType <: DecodedSymbol
+    type TxDataType <: Data
+    type RxDataType <: Data
+    val symbolFactory: () => DecodedSymbolType
+    val dataTxFactory: () => TxDataType
+    val dataRxFactory: () => RxDataType
 
     // TODO can we figure this out automatically from the Encoder?
     val decodedSymbolsPerCycle: Int

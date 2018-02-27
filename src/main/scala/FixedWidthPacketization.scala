@@ -3,7 +3,11 @@ package hbwif2
 import chisel3._
 import chisel3.util._
 
-class FixedWidthPacketizerMaster[T <: DecodedSymbol, U <: Data, V <: Data](val decodedSymbolsPerCycle: Int, symbolFactory: () => T, dataTxFactory: () => U, dataRxFactory: () => V) extends Packetizer[T,U,V](symbolFactory, dataTxFactory, dataRxFactory) {
+class FixedWidthPacketizerMaster[T <: DecodedSymbol, U <: Data, V <: Data](val decodedSymbolsPerCycle: Int, val symbolFactory: () => T, val dataTxFactory: () => U, val dataRxFactory: () => V) extends Packetizer {
+
+    type DecodedSymbolType = T
+    type TxDataType = U
+    type RxDataType = V
 
     val symbolWidth = symbolFactory().decodedWidth
     val totalTxSymbols = (dataTxFactory().getWidth + symbolWidth - 1) / symbolWidth
