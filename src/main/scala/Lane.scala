@@ -11,17 +11,13 @@ final class LaneIO[T <: Bundle, U <: Data, V <: Data](portFactory: () => T, txFa
     val dataRx = Flipped(Decoupled(rxFactory()))
 }
 
-abstract class Lane extends Module {
+abstract class Lane[T <: Bundle, U <: Controller[T]](val portFactory: () => T, val controllerFactory: (ControlSpec) => U) extends Module {
 
     type DecodedSymbolType <: DecodedSymbol
     type TxDataType <: Data
     type RxDataType <: Data
-    type ControllerPortType <: Bundle
-    type ControllerType <: Controller
-    val portFactory: () => ControllerPortType
     val txFactory: () => TxDataType
     val rxFactory: () => RxDataType
-    val controllerFactory: (ControlSpec) => ControllerType
 
     val io = IO(new LaneIO(portFactory, txFactory, rxFactory))
 
@@ -31,7 +27,7 @@ abstract class Lane extends Module {
     val encoder: Encoder
     val decoder: Decoder
     val packetizer: Packetizer
-    val builder = new ControllerBuilder(controllerFactory)
+    val builder = new ControllerBuilder[T, U](controllerFactory)
 
     val encoderAdapter = Module(new EncoderWidthAdapter(encoder.encodedWidth, c.dataWidth))
     val decoderAdapter = Module(new DecoderWidthAdapter(c.dataWidth, decoder.encodedWidth))

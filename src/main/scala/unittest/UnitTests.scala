@@ -11,7 +11,7 @@ class UnitTestConfig extends Config((site, here, up) => {
     case UnitTests => (q: Parameters) => {
         implicit val p = q
         Seq(
-            Module(new TransceiverTest)
+            Module(new ScanChainControllerTest)
         )
     }
 })

@@ -268,10 +268,9 @@ class Encoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int =
 }
 
 
-trait HasEncoding8b10b {
+trait HasEncoding8b10b[T <: Bundle, U <: Controller[T]] {
     implicit val c: SerDesGeneratorConfig
-    type ControllerType <: Controller
-    val builder: ControllerBuilder[ControllerType]
+    val builder: ControllerBuilder[T, U]
 
     val encoder = Module(new Encoder8b10b((c.dataWidth + 9) / 10, c.performanceEffort))
     val decoder = Module(new Decoder8b10b((c.dataWidth + 9) / 10, c.performanceEffort))

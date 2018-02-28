@@ -1,5 +1,4 @@
 package hbwif2
-// This is just copied from testchipip
 
 import chisel3.{Module, Driver}
 import freechips.rocketchip.config.{Parameters, Config}

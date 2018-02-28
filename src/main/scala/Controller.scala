@@ -20,21 +20,18 @@ final class CustomBundle(elts: (String, Data)*) extends Record {
 
 class ControllerIO[T <: Bundle](val portFactory: () => T, val spec: ControlSpec) extends Bundle {
 
-    val r = Input(new CustomBundle(spec.w map {case (x,y,z) => (x,y)} : _*))
-    val w = Output(new CustomBundle(spec.r: _*))
+    val w = Output(new CustomBundle(spec.w map {case (n,v,i) => (n,chiselTypeOf(v))}: _*))
+    val r = Input(new CustomBundle(spec.r map {case (n,v) => (n,chiselTypeOf(v))}: _*))
     val port = portFactory()
 }
 
-abstract class Controller(val spec: ControlSpec) extends Module {
-
-    type PortType <: Bundle
-    val portFactory: () => PortType
+abstract class Controller[T <: Bundle](val spec: ControlSpec, val portFactory: () => T) extends Module {
 
     final val io = IO(new ControllerIO(portFactory, spec))
 
 }
 
-class ControllerBuilder[T <: Controller](val controlFactory: (ControlSpec) => T) {
+class ControllerBuilder[T <: Bundle, U <: Controller[T]](val controllerFactory: (ControlSpec) => U) {
 
     private val wSeq = new ArrayBuffer[(String,UInt,Option[UInt])]
     private val rSeq = new ArrayBuffer[(String,UInt)]
@@ -48,8 +45,8 @@ class ControllerBuilder[T <: Controller](val controlFactory: (ControlSpec) => T)
         rSeq.append((name, signal))
     }
 
-    def generate(): T = {
-        val c = Module(controlFactory(ControlSpec(wSeq,rSeq)))
+    def generate(): U = {
+        val c = Module(controllerFactory(ControlSpec(wSeq,rSeq)))
         wSeq foreach { case (name, node, init) => node := c.io.w(name) }
         rSeq foreach { case (name, node) => c.io.r(name) := node }
         c

@@ -3,6 +3,7 @@ package hbwif2
 import chisel3._
 import chisel3.util._
 import chisel3.experimental.withClock
+import scala.collection.mutable.HashMap
 
 
 class ScanChainPort extends Bundle {
@@ -18,19 +19,26 @@ object ScanChainPort {
 }
 
 
-class ScanChainController(spec: ControlSpec) extends Controller(spec) {
+class ScanChainController(spec: ControlSpec) extends Controller(spec, ScanChainPort.apply _) {
 
-    type PortType = ScanChainPort
-    val portFactory = ScanChainPort.apply _
+    private val addressMap = new HashMap[String, (Int, Int)]
+    private var index = 0
 
-    val wScanOut = spec.w.foldLeft(io.port.scanIn) { case (scanIn, (name, node, init)) =>
+    private val wScanOut = spec.w.foldLeft(io.port.scanIn) { case (scanIn, (name, node, init)) =>
         val w = node.getWidth
+
+        addressMap += (name -> (index + w - 1, index))
+        index += w
 
         val shift = Wire(UInt(w.W))
         withClock (io.port.scanClock) {
             val shiftReg = Reg(UInt(w.W))
             when (io.port.scanEnable) {
-                shiftReg := Cat(shiftReg(w-2,0),scanIn)
+                if (w == 1) {
+                    shiftReg := scanIn
+                } else {
+                    shiftReg := Cat(shiftReg(w-2,0),scanIn)
+                }
             }
             shift := shiftReg
         }
@@ -46,14 +54,23 @@ class ScanChainController(spec: ControlSpec) extends Controller(spec) {
         shift(w-1)
     }
 
+    val wLength = index
+
     io.port.scanOut := spec.r.foldLeft(wScanOut) { case (scanIn, (name, node)) =>
         val w = node.getWidth
+
+        addressMap += (name -> (index + w - 1, index))
+        index += w
 
         val shift = Wire(UInt(w.W))
         withClock (io.port.scanClock) {
             val shiftReg = Reg(UInt(w.W))
             when (io.port.scanEnable) {
-                shiftReg := Cat(shiftReg(w-2,0),scanIn)
+                if (w == 1) {
+                    shiftReg := scanIn
+                } else {
+                    shiftReg := Cat(shiftReg(w-2,0),scanIn)
+                }
             } .otherwise {
                 shiftReg := io.r(name)
             }
@@ -63,14 +80,9 @@ class ScanChainController(spec: ControlSpec) extends Controller(spec) {
         shift(w-1)
     }
 
+    def getAddressMap(): Map[String, (Int, Int)] = addressMap.toMap
 
-    // TODO output scan chain data in some custom format
+    val rLength = index - wLength
+    def length = rLength + wLength
 
-}
-
-trait HasScanChainController {
-    type ControllerPortType = ScanChainPort
-    type ControllerType = ScanChainController
-    val portFactory = { () => new ScanChainPort }
-    val controllerFactory = { (spec: ControlSpec) => new ScanChainController(spec) }
 }
