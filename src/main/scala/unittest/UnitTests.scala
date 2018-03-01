@@ -12,6 +12,6 @@ class UnitTestConfig extends Config((site, here, up) => {
         implicit val p = q
         Seq(
             Module(new ScanChainControllerTest)
-        )
+        ) ++ Encoding8b10bTests()
     }
 })

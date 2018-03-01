@@ -42,9 +42,12 @@ object Encoding8b10b {
     ("0 0 11110" -> "011110"), ("0 1 11110" -> "100001"),
     ("0 0 11111" -> "101011"), ("0 1 11111" -> "010100"),
     // Control codes
-    // For simplicity, we omit K.*.7, so only K.28 is needed for the 5b/6b code
     // K=1 RD = -1            K=1 RD = +1
-    ("1 0 11100" -> "001111"), ("1 1 11100" -> "110000") // K.28
+    ("1 0 10111" -> "111010"), ("1 1 10111" -> "000101"), // K.23 == D.23
+    ("1 0 11011" -> "110110"), ("1 1 11011" -> "001001"), // K.27 == D.27
+    ("1 0 11100" -> "001111"), ("1 1 11100" -> "110000"), // K.28
+    ("1 0 11101" -> "101110"), ("1 1 11101" -> "010001"), // K.29 == D.29
+    ("1 0 11110" -> "011110"), ("1 1 11110" -> "100001")  // K.30 == D.30
   ).map({ x => (Integer.parseInt(x._1.replaceAll(" ",""),2) -> Integer.parseInt(x._2.replaceAll(" ",""),2)) }).toMap
 
   // magic bit count algorithm
@@ -92,7 +95,6 @@ object Encoding8b10b {
     ("0 0 1 110" -> "0110"), ("0 1 1 110" -> "0110"),
     ("0 0 1 111" -> "0111"), ("0 1 1 111" -> "1000"), // Note that only this one is different
     // Control codes
-    // For simplicity, we omit K.*.7, so only K.28 is needed for the 5b/6b code
     // The tables are identical for UA=0 and UA=1
     // K=1 RD=-1 UA=0        K=1 RD=+1 UA=0
     ("1 0 0 000" -> "1011"), ("1 1 0 000" -> "0100"),
@@ -102,7 +104,7 @@ object Encoding8b10b {
     ("1 0 0 100" -> "1101"), ("1 1 0 100" -> "0010"),
     ("1 0 0 101" -> "0101"), ("1 1 0 101" -> "1010"),
     ("1 0 0 110" -> "1001"), ("1 1 0 110" -> "0110"),
-    // K.x.7 is omitted
+    ("1 0 0 111" -> "0111"), ("1 1 0 111" -> "1000"),
     // K=1 RD=-1 UA=1        K=1 RD=+1 UA=1
     ("1 0 1 000" -> "1011"), ("1 1 1 000" -> "0100"),
     ("1 0 1 001" -> "0110"), ("1 1 1 001" -> "1001"),
@@ -110,8 +112,8 @@ object Encoding8b10b {
     ("1 0 1 011" -> "1100"), ("1 1 1 011" -> "0011"),
     ("1 0 1 100" -> "1101"), ("1 1 1 100" -> "0010"),
     ("1 0 1 101" -> "0101"), ("1 1 1 101" -> "1010"),
-    ("1 0 1 110" -> "1001"), ("1 1 1 110" -> "0110")
-    // K.x.7 is omitted
+    ("1 0 1 110" -> "1001"), ("1 1 1 110" -> "0110"),
+    ("1 0 1 111" -> "0111"), ("1 1 1 111" -> "1000")
   ).map({ x => (Integer.parseInt(x._1.replaceAll(" ",""),2) -> Integer.parseInt(x._2.replaceAll(" ",""),2)) }).toMap
 
   // construct the big LUT from the two intermediate LUTs
@@ -130,7 +132,7 @@ object Encoding8b10b {
         if (encodings3b4b.contains(lutIn2)) {
           val fghj = encodings3b4b(lutIn2)
           // k, rd, input, output
-          Some( ( (rd == 1, k == 1, i & 0xff), abcdei << 4 | fghj) )
+          Some( ( (k == 1, rd == 1, i & 0xff), abcdei << 4 | fghj) )
         } else {
           None
         }
@@ -141,13 +143,9 @@ object Encoding8b10b {
 
 }
 
-class Decoded8b10bSymbol extends DecodedSymbol {
+class Decoded8b10bSymbol extends DecodedSymbol(8, 10, 1) {
 
-    val decodedWidth = 8
-    val encodedWidth = 10
-    val rate = 1
-
-    val control = Bool()
+    val control = Output(Bool())
 
     override def ack: Decoded8b10bSymbol = Decoded8b10bSymbol.k(28,2)
     override def nack: Decoded8b10bSymbol = Decoded8b10bSymbol.k(28,3)
@@ -156,7 +154,6 @@ class Decoded8b10bSymbol extends DecodedSymbol {
 
     override def fromData(x: UInt): Decoded8b10bSymbol = Decoded8b10bSymbol(x, false.B)
     override def isData: Bool = ~control
-
 
     def encode(rd: Bool): UInt = {
         MuxLookup(Cat(control,rd,bits), 0.U, Encoding8b10b.encodings.map
@@ -170,11 +167,14 @@ object Decoded8b10bSymbol {
     def apply(): Decoded8b10bSymbol = new Decoded8b10bSymbol
 
     def apply(bits: UInt, control: Bool): Decoded8b10bSymbol = {
-        val x = new Decoded8b10bSymbol
+        val x = Wire(new Decoded8b10bSymbol)
         x.control := control
         x.bits := bits
         x
     }
+
+    def apply(tuple: (Int, Boolean)): Decoded8b10bSymbol = Decoded8b10bSymbol.apply(tuple._1.U, tuple._2.B)
+
 
     // Helper method to easily recognize Kcodes
     def k(edcba: Int, hgf: Int): Decoded8b10bSymbol = {
@@ -182,14 +182,14 @@ object Decoded8b10bSymbol {
         require(edcba == 28 || edcba == 23 || edcba == 27 || edcba == 29 || edcba == 30, "EDCBA must be 28, 23, 27, 29, or 30")
         require(edcba == 28 || (hgf == 7), "HGF must be 7 for K codes other than EDCBA=28")
         require(edcba != 28 || hgf != 7, "K.28.7 is explicitly disallowed in this implementation because it would complicate comma detection")
-        Decoded8b10bSymbol((edcba << 5 | hgf).U, true.B)
+        Decoded8b10bSymbol((hgf << 5 | edcba).U(8.W), true.B)
     }
 
-    def comma: Decoded8b10bSymbol = this.k(28,5)
+    def comma: Decoded8b10bSymbol = Decoded8b10bSymbol.k(28,5)
 
     def decode(encoded: UInt, rd: Bool, valid: Bool): Valid[Decoded8b10bSymbol] = {
-        val x = Valid(Decoded8b10bSymbol())
-        x.bits := MuxLookup(encoded, 0.U, Encoding8b10b.encodings.map
+        val x = Wire(Valid(Decoded8b10bSymbol()))
+        x.bits := MuxLookup(encoded, Decoded8b10bSymbol(0.U, false.B), Encoding8b10b.encodings.map
             { case ((k,r,d),enc) => (enc.U(10.W), Decoded8b10bSymbol(d.U,k.B)) })
         x.valid := valid & MuxLookup(encoded, false.B, Encoding8b10b.encodings.map
             { case ((k,r,d),enc) => (enc.U(10.W), true.B) })
@@ -202,20 +202,18 @@ object Decoded8b10bSymbol {
 // so at least decodedSymbolsPerCycle commas must be transmitted to lock
 // TODO right now this ignores RD altogether
 // TODO need a flag to alert the user when lock or idx changes
-class Decoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Decoder {
-
-    type DecodedSymbolType = Decoded8b10bSymbol
-    val symbolFactory = Decoded8b10bSymbol.apply _
+// See Encoder8b10b notes below for symbol and bit ordering
+class Decoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Decoder(Decoded8b10bSymbol.apply _, decodedSymbolsPerCycle) {
 
     val idx = RegInit(0.U(4.W))
     val lock = RegInit(false.B)
     val rd = RegInit(false.B)
 
     val extended = Cat(RegNext(io.encoded.bits(8,0)),io.encoded.bits)
-    val offsets = Vec( (0 to 9).map { i => extended(decodedSymbolsPerCycle*10+i-1,decodedSymbolsPerCycle*10+i-10) } )
+    val offsets = Vec( (0 to 9).map { i => extended(decodedSymbolsPerCycle*10+i-1, i) } )
     // Check that bits cdeif (7,3) are the same (this defines a comma)
     val commas = offsets.map { x => (x(9,3) === "b0011111".U) || (x(9,3) === "b1100000".U) }
-    val found = commas.reduce(_|_)
+    val found = commas.reduce(_||_)
     val nextIdx = MuxCase(0.U, commas.zipWithIndex.map { case (b, i) => (b, i.U) })
 
     when (found) {
@@ -229,18 +227,25 @@ class Decoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int =
 
 }
 
-class Encoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Encoder {
-
-    type DecodedSymbolType = Decoded8b10bSymbol
-    val symbolFactory = Decoded8b10bSymbol.apply _
+// io.decoded(MSB) is the LEAST recent time symbol
+// io.decoded(LSB) is the MOST recent time symbol
+// e.g. if we send A B C D E F G with decodedSymbolsPerCycle = 3,
+// io.decoded(2) = A
+// io.decoded(1) = B
+// io.decoded(0) = C
+//
+// Similarly, this expects the encoded interface to go MSB..LSB with MSB being sent over the line first
+class Encoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Encoder(Decoded8b10bSymbol.apply _, decodedSymbolsPerCycle) {
 
     val rd = RegInit(false.B)
 
-    val (e,r) = io.decoded.foldLeft((0.U(0.W),rd)) { case ((prevEncoded,prevRd),decoded) =>
-        // ready to encode when next is high
-        decoded.ready := io.next
-        val nextEncoded = UInt()
-        val nextRd = Bool()
+    // ready to encode when next is high
+    io.decodedReady := io.next
+
+    val (e,r) = io.decoded.foldRight((Option.empty[UInt],rd)) { case (decoded,(prevEncoded,prevRd)) =>
+    //val (e,r) = io.decoded.foldLeft((Wire(UInt(0.W)),rd)) { case ((prevEncoded,prevRd),decoded) =>
+        val nextEncoded = Wire(UInt())
+        val nextRd = Wire(Bool())
         if (performanceEffort <= 0) {
             // Low setting, prioritize area/power
             // Use a ripple topology to calculate RD
@@ -249,7 +254,8 @@ class Encoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int =
             // The number of 1s and 0s can only be (4,6), (5,5), or (6,4)
             // Therefore we can just invert RD whenever there is an even number of 1s
             nextRd := prevRd ^ ~encoded.xorR
-            nextEncoded := Cat(encoded, prevEncoded)
+            nextEncoded := prevEncoded.foldRight(encoded) { Cat(_,_) }
+            // nextEncoded := Cat(encoded, prevEncoded)
         } else {
             // High setting, prioritize speed
             // Use a lookahead topology to calculate RD
@@ -259,19 +265,14 @@ class Encoder8b10b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int =
             val nextRd0 = ~encoded0.xorR
             val nextRd1 = encoded1.xorR
             nextRd := Mux(prevRd, nextRd1, nextRd0)
-            nextEncoded := Cat(Mux(prevRd,encoded1,encoded0), prevEncoded)
+            nextEncoded := prevEncoded.foldRight(Mux(prevRd,encoded1,encoded0)) { Cat(_,_) }
+            // nextEncoded := Cat(Mux(prevRd,encoded1,encoded0), prevEncoded)
         }
-        (nextEncoded,nextRd)
+        (Some(nextEncoded),nextRd)
     }
-    io.encoded := e
-    rd := r
+    io.encoded := e.get
+    when (io.next) {
+        rd := r
+    }
 }
 
-
-trait HasEncoding8b10b[T <: Bundle, U <: Controller[T]] {
-    implicit val c: SerDesGeneratorConfig
-    val builder: ControllerBuilder[T, U]
-
-    val encoder = Module(new Encoder8b10b((c.dataWidth + 9) / 10, c.performanceEffort))
-    val decoder = Module(new Decoder8b10b((c.dataWidth + 9) / 10, c.performanceEffort))
-}

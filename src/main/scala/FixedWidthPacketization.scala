@@ -4,11 +4,8 @@ import chisel3._
 import chisel3.util._
 
 // TODO DO NOT USE
-class FixedWidthPacketizerMaster[T <: DecodedSymbol, U <: Data, V <: Data](val decodedSymbolsPerCycle: Int, val symbolFactory: () => T, val dataTxFactory: () => U, val dataRxFactory: () => V) extends Packetizer {
+class FixedWidthPacketizerMaster[P <: DecodedSymbol, T <: Data, R <: Data](val decodedSymbolsPerCycle: Int, symbolFactory: () => P, dataTxFactory: () => T, dataRxFactory: () => R) extends Packetizer(symbolFactory, dataTxFactory, dataRxFactory) {
 
-    type DecodedSymbolType = T
-    type TxDataType = U
-    type RxDataType = V
 
     val symbolWidth = symbolFactory().decodedWidth
     val totalTxSymbols = (dataTxFactory().getWidth + symbolWidth - 1) / symbolWidth

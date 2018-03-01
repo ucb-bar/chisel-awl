@@ -4,11 +4,7 @@ import chisel3._
 import chisel3.util._
 
 
-class Decoded128b130bSymbol extends DecodedSymbol {
-
-    val decodedWidth = 8
-    val encodedWidth = 130
-    val rate = 16
+class Decoded128b130bSymbol extends DecodedSymbol(8, 130, 16) {
 
     val control = Bool()
 
@@ -37,10 +33,7 @@ object Decoded128b130bSymbol {
 
 }
 
-class Encoder128b130b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Encoder {
-
-    type DecodedSymbolType = Decoded128b130bSymbol
-    val symbolFactory = Decoded128b130bSymbol.apply _
+class Encoder128b130b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Encoder(Decoded128b130bSymbol.apply _, decodedSymbolsPerCycle) {
 
     require(decodedSymbolsPerCycle <= 16, "FIXME, multiple encoded frames per cycle not implemented")
 
@@ -48,10 +41,7 @@ class Encoder128b130b(val decodedSymbolsPerCycle: Int, val performanceEffort: In
 
 }
 
-class Decoder128b130b(val decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Decoder {
-
-    type DecodedSymbolType = Decoded128b130bSymbol
-    val symbolFactory = Decoded128b130bSymbol.apply _
+class Decoder128b130b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Decoder(Decoded128b130bSymbol.apply _, decodedSymbolsPerCycle) {
 
     require(decodedSymbolsPerCycle <= 16, "FIXME, multiple encoded frames per cycle not implemented")
 

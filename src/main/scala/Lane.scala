@@ -4,30 +4,24 @@ import chisel3._
 import chisel3.util._
 import chisel3.experimental._
 
-final class LaneIO[T <: Bundle, U <: Data, V <: Data](portFactory: () => T, txFactory: () => U, rxFactory: () => V)(implicit val c: SerDesGeneratorConfig)
+final class LaneIO[P <: Bundle, T <: Data, R <: Data](portFactory: () => P, txFactory: () => T, rxFactory: () => R)(implicit val c: SerDesGeneratorConfig)
     extends Bundle with TransceiverOuterIF {
     val port = portFactory()
     val dataTx = Decoupled(txFactory())
     val dataRx = Flipped(Decoupled(rxFactory()))
 }
 
-abstract class Lane[T <: Bundle, U <: Controller[T]](val portFactory: () => T, val controllerFactory: (ControlSpec) => U) extends Module {
-
-    type DecodedSymbolType <: DecodedSymbol
-    type TxDataType <: Data
-    type RxDataType <: Data
-    val txFactory: () => TxDataType
-    val rxFactory: () => RxDataType
+abstract class Lane[S <: DecodedSymbol, T <: Data, R <: Data, P <: Bundle, C <: Controller[P]](val portFactory: () => P, val txFactory: () => T, val rxFactory: () => R, val controllerFactory: (ControlSpec) => C) extends Module {
 
     val io = IO(new LaneIO(portFactory, txFactory, rxFactory))
 
     implicit val c: SerDesGeneratorConfig
 
     val txrxss = Module(new TransceiverSubsystem)
-    val encoder: Encoder
-    val decoder: Decoder
-    val packetizer: Packetizer
-    val builder = new ControllerBuilder[T, U](controllerFactory)
+    val encoder: Encoder[S]
+    val decoder: Decoder[S]
+    val packetizer: Packetizer[S, T, R]
+    val builder = new ControllerBuilder[P, C](controllerFactory)
 
     val encoderAdapter = Module(new EncoderWidthAdapter(encoder.encodedWidth, c.dataWidth))
     val decoderAdapter = Module(new DecoderWidthAdapter(c.dataWidth, decoder.encodedWidth))
@@ -53,7 +47,8 @@ abstract class Lane[T <: Bundle, U <: Controller[T]](val portFactory: () => T, v
 
     // TODO add overrideIF
 
-    encoder.io.decoded := packetizer.io.symbolsTx
+    encoder.io.decoded <> packetizer.io.symbolsTx
+    packetizer.io.symbolsTxReady := encoder.io.decodedReady
     // packetizer.io.packetTx
     packetizer.io.symbolsRx := decoder.io.decoded
     // packetizer.io.packetRx

@@ -4,12 +4,10 @@ import chisel3._
 import chisel3.util._
 import scala.math.max
 
-abstract class DecodedSymbol extends Bundle {
+// rate is how many decoded symbols are there per encoded symbol
+abstract class DecodedSymbol(val decodedWidth: Int, val encodedWidth: Int, val rate: Int) extends Bundle {
 
-    val decodedWidth: Int
-    val encodedWidth: Int
-    val rate: Int // rate is how many decoded symbols are there per encoded symbol
-    final val bits = UInt(decodedWidth.W)
+    final val bits = Output(UInt(decodedWidth.W))
 
     // Comparison
     def ===(other: DecodedSymbol): Bool = {
@@ -19,6 +17,7 @@ abstract class DecodedSymbol extends Bundle {
             false.B
         }
     }
+    def =/=(other: DecodedSymbol): Bool = !(this === other)
 
     // Define a minimum set of control symbols that must be implemented
     def comma: DecodedSymbol
@@ -31,36 +30,29 @@ abstract class DecodedSymbol extends Bundle {
     def isData: Bool
 }
 
-abstract class Encoder extends Module {
+abstract class Encoder[S <: DecodedSymbol](val symbolFactory: () => S, val decodedSymbolsPerCycle: Int) extends Module {
 
-    type DecodedSymbolType <: DecodedSymbol
-    val symbolFactory: () => DecodedSymbolType
-
-    val decodedSymbolsPerCycle: Int
     require(decodedSymbolsPerCycle >= 1, "Cannot have 0- or negative-width Encoder")
 
     final val encodedWidth = max(1, decodedSymbolsPerCycle / symbolFactory().rate) * symbolFactory().encodedWidth
 
     final val io = IO(new Bundle {
-        val encoded = UInt(encodedWidth.W)
+        val encoded = Output(UInt(encodedWidth.W))
         val next = Input(Bool())
-        val decoded = Input(Vec(decodedSymbolsPerCycle, Decoupled(symbolFactory())))
+        val decoded = Input(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())))
+        val decodedReady = Output(Bool())
     })
 
 }
 
-abstract class Decoder extends Module {
+abstract class Decoder[S <: DecodedSymbol](val symbolFactory: () => S, val decodedSymbolsPerCycle: Int) extends Module {
 
-    type DecodedSymbolType <: DecodedSymbol
-    val symbolFactory: () => DecodedSymbolType
-
-    val decodedSymbolsPerCycle: Int
     require(decodedSymbolsPerCycle >= 1, "Cannot have 0- or negative-width Decoder")
 
     final val encodedWidth = max(1, decodedSymbolsPerCycle / symbolFactory().rate) * symbolFactory().encodedWidth
 
     final val io = IO(new Bundle {
-        val encoded = Valid(UInt(encodedWidth.W))
+        val encoded = Flipped(Valid(UInt(encodedWidth.W)))
         val decoded = Output(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())))
     })
 
