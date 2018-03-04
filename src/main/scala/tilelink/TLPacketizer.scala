@@ -5,7 +5,7 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.tilelink._
 
-abstract class TLPacketizer[S <: DecodedSymbol](val params: TLBundleParameters, val decodedSymbolsPerCycle: Int, val symbolFactory: () => S)
+abstract class TLPacketizer[S <: DecodedSymbol](params: TLBundleParameters, decodedSymbolsPerCycle: Int, symbolFactory: () => S)
     extends Packetizer(decodedSymbolsPerCycle, symbolFactory, {() => TLBundle(params)}) with TLPacketizerLike {
 
     val tl = io.data
@@ -20,7 +20,7 @@ abstract class TLPacketizer[S <: DecodedSymbol](val params: TLBundleParameters, 
 
 }
 
-class TLPacketizerMaster[S <: DecodedSymbol](val params: TLBundleParameters, val decodedSymbolsPerCycle: Int, val symbolFactory: () => S, implicit val opt: Boolean = false)
+class TLPacketizerMaster[S <: DecodedSymbol](params: TLBundleParameters, decodedSymbolsPerCycle: Int, symbolFactory: () => S, val opt: Boolean = false)
     extends TLPacketizer(params, decodedSymbolsPerCycle, symbolFactory) {
 
     // TODO not implemented
@@ -38,9 +38,9 @@ class TLPacketizerMaster[S <: DecodedSymbol](val params: TLBundleParameters, val
         else
             Mux(tl.a.fire(), tl.a.bits.data, tl.c.bits.data)
 
-    val aPadBits = txBufferBits - aHeaderBits - params.dataBits
-    val cPadBits = txBufferBits - cHeaderBits - params.dataBits
-    val ePadBits = txBufferBits - eHeaderBits
+    val aPadBits = txBufferBits - headerWidth(tl.a.bits) - params.dataBits
+    val cPadBits = txBufferBits - headerWidth(tl.c.bits) - params.dataBits
+    val ePadBits = txBufferBits - headerWidth(tl.e.bits)
     val aHeader = Cat(typeA, tl.a.bits.opcode, tl.a.bits.param, tl.a.bits.size, tl.a.bits.source, tl.a.bits.address, tl.a.bits.mask, if (aPadBits > 0) 0.U(aPadBits.W) else Wire(UInt(0.W)))
     val cHeader = Cat(typeC, tl.c.bits.opcode, tl.c.bits.param, tl.c.bits.size, tl.c.bits.source, tl.c.bits.address, tl.c.bits.error, if (cPadBits > 0) 0.U(cPadBits.W) else Wire(UInt(0.W)))
     val eHeader = Cat(typeE, tl.e.bits.sink, if (ePadBits > 0) 0.U(ePadBits.W) else Wire(UInt(0.W)))
@@ -118,7 +118,7 @@ class TLPacketizerMaster[S <: DecodedSymbol](val params: TLBundleParameters, val
 
 }
 
-class TLPacketizerSlave[S <: DecodedSymbol](val params: TLBundleParameters, val decodedSymbolsPerCycle: Int, val symbolFactory: () => S, val opt: Boolean = false)
+class TLPacketizerSlave[S <: DecodedSymbol](params: TLBundleParameters, decodedSymbolsPerCycle: Int, symbolFactory: () => S, val opt: Boolean = false)
     extends TLPacketizer(params, decodedSymbolsPerCycle, symbolFactory) {
 
     // TODO not implemented
@@ -133,8 +133,8 @@ class TLPacketizerSlave[S <: DecodedSymbol](val params: TLBundleParameters, val 
     // TODO if we process more than one request at a time, this needs to change
     val txData = Mux(tl.b.fire(), tl.b.bits.data, tl.d.bits.data)
 
-    val bPadBits = txBufferBits - bHeaderBits - params.dataBits
-    val dPadBits = txBufferBits - dHeaderBits - params.dataBits
+    val bPadBits = txBufferBits - headerWidth(tl.b.bits) - params.dataBits
+    val dPadBits = txBufferBits - headerWidth(tl.d.bits) - params.dataBits
     val bHeader = Cat(typeB, tl.b.bits.opcode, tl.b.bits.param, tl.b.bits.size, tl.b.bits.source, tl.b.bits.address, tl.b.bits.mask, if (bPadBits > 0) 0.U(bPadBits.W) else Wire(UInt(0.W)))
     val dHeader = Cat(typeD, tl.d.bits.opcode, tl.d.bits.param, tl.d.bits.size, tl.d.bits.source, tl.d.bits.sink, tl.d.bits.error, if (dPadBits > 0) 0.U(dPadBits.W) else Wire(UInt(0.W)))
 
@@ -185,7 +185,7 @@ class TLPacketizerSlave[S <: DecodedSymbol](val params: TLBundleParameters, val 
         txState := sSync
     }
 
-    io.symbolsTx.reverse.zipWithIndex.foreach { (s,i) =>
+    io.symbolsTx.reverse.zipWithIndex.foreach { case (s,i) =>
         val doAck = ((i.U === 0.U) && (txState === sAck))
         s.valid := ((i.U < count) && (txState === sReady)) || doAck
         s.bits := Mux(doAck, symbolFactory().ack, symbolFactory().fromData(txBuffer(txBufferBits-8*i-1,txBufferBits-8*i-8)))
@@ -215,10 +215,10 @@ trait TLPacketizerLike {
 
     val tlTypeWidth = 3
 
-    def headerWidth(a: TLBundleA): Int = tlTypeWidth + List(a.opcode,a.param,a.size,a.source,a.address,a.mask) map { _.getWidth } reduce (_+_)
-    def headerWidth(b: TLBundleB): Int = tlTypeWidth + List(b.opcode,b.param,b.size,b.source,b.address,b.mask) map { _.getWidth } reduce (_+_)
-    def headerWidth(c: TLBundleC): Int = tlTypeWidth + 1 + List(c.opcode,c.param,c.size,c.source,c.address) map { _.getWidth } reduce (_+_)
-    def headerWidth(d: TLBundleD): Int = tlTypeWidth + 1 + List(d.opcode,d.param,d.size,d.source,d.sink) map { _.getWidth } reduce (_+_)
+    def headerWidth(a: TLBundleA): Int = tlTypeWidth + List(a.opcode,a.param,a.size,a.source,a.address,a.mask).map( _.getWidth).reduce(_+_)
+    def headerWidth(b: TLBundleB): Int = tlTypeWidth + List(b.opcode,b.param,b.size,b.source,b.address,b.mask).map(_.getWidth).reduce(_+_)
+    def headerWidth(c: TLBundleC): Int = tlTypeWidth + 1 + List(c.opcode,c.param,c.size,c.source,c.address).map(_.getWidth).reduce(_+_)
+    def headerWidth(d: TLBundleD): Int = tlTypeWidth + 1 + List(d.opcode,d.param,d.size,d.source,d.sink).map(_.getWidth).reduce(_+_)
     def headerWidth(e: TLBundleE): Int = tlTypeWidth + e.sink.getWidth
 
     val typeA = 0.U(tlTypeWidth.W)
@@ -231,17 +231,17 @@ trait TLPacketizerLike {
 
     def tlSymbolMap(a: TLBundleA, mask: UInt) = Map(
         (TLMessages.PutFullData    -> div8Ceil(headerWidth(a) + a.data.getWidth).U),
-        (TLMessages.PutPartialData -> div8Ceil(headerWidth(a)).U + (if (opt) PopCount(mask) else b.data.getWidth.U)),
+        (TLMessages.PutPartialData -> (div8Ceil(headerWidth(a)).U + (if (opt) PopCount(mask) else a.data.getWidth.U))),
         (TLMessages.ArithmeticData -> div8Ceil(headerWidth(a) + a.data.getWidth).U),
         (TLMessages.LogicalData    -> div8Ceil(headerWidth(a) + a.data.getWidth).U),
         (TLMessages.Get            -> div8Ceil(headerWidth(a)).U),
         (TLMessages.Hint           -> div8Ceil(headerWidth(a)).U),
         (TLMessages.AcquireBlock   -> div8Ceil(headerWidth(a)).U),
-        (TLMessages.AcquirePerm    -> div8Ceil(headerWidth(a)),U))
+        (TLMessages.AcquirePerm    -> div8Ceil(headerWidth(a)).U))
 
     def tlSymbolMap(b: TLBundleB, mask: UInt) = Map(
         (TLMessages.PutFullData    -> div8Ceil(headerWidth(b) + b.data.getWidth).U),
-        (TLMessages.PutPartialData -> div8Ceil(headerWidth(b)).U + (if (opt) PopCount(mask) else b.data.getWidth.U)),
+        (TLMessages.PutPartialData -> (div8Ceil(headerWidth(b)).U + (if (opt) PopCount(mask) else b.data.getWidth.U))),
         (TLMessages.ArithmeticData -> div8Ceil(headerWidth(b) + b.data.getWidth).U),
         (TLMessages.LogicalData    -> div8Ceil(headerWidth(b) + b.data.getWidth).U),
         (TLMessages.Get            -> div8Ceil(headerWidth(b)).U),
@@ -268,11 +268,49 @@ trait TLPacketizerLike {
     def tlSymbolMap(e: TLBundleE, mask: UInt) = Map(
         (TLMessages.GrantAck       -> div8Ceil(headerWidth(e)).U))
 
-    def getNumSymbols[T <: TLChannel](chan: T, opcode: UInt, mask: UInt): UInt = {
+    // TODO can we collapse these with some type parameter voodoo?
+    //def getNumSymbols[T <: TLChannel](chan: T, opcode: UInt, mask: UInt): UInt = {
+    def getNumSymbols(chan: TLBundleA, opcode: UInt, mask: UInt): UInt = {
         val ret = MuxLookup(
             opcode,
             0.U,
-            tlSymbolMap(chan, mask)
+            tlSymbolMap(chan, mask).toSeq
+        )
+        assert(ret =/= 0.U, "Illegal TLMessage")
+        ret
+    }
+    def getNumSymbols(chan: TLBundleB, opcode: UInt, mask: UInt): UInt = {
+        val ret = MuxLookup(
+            opcode,
+            0.U,
+            tlSymbolMap(chan, mask).toSeq
+        )
+        assert(ret =/= 0.U, "Illegal TLMessage")
+        ret
+    }
+    def getNumSymbols(chan: TLBundleC, opcode: UInt, mask: UInt): UInt = {
+        val ret = MuxLookup(
+            opcode,
+            0.U,
+            tlSymbolMap(chan, mask).toSeq
+        )
+        assert(ret =/= 0.U, "Illegal TLMessage")
+        ret
+    }
+    def getNumSymbols(chan: TLBundleD, opcode: UInt, mask: UInt): UInt = {
+        val ret = MuxLookup(
+            opcode,
+            0.U,
+            tlSymbolMap(chan, mask).toSeq
+        )
+        assert(ret =/= 0.U, "Illegal TLMessage")
+        ret
+    }
+    def getNumSymbols(chan: TLBundleE, opcode: UInt, mask: UInt): UInt = {
+        val ret = MuxLookup(
+            opcode,
+            0.U,
+            tlSymbolMap(chan, mask).toSeq
         )
         assert(ret =/= 0.U, "Illegal TLMessage")
         ret

@@ -4,23 +4,22 @@ import chisel3._
 import chisel3.util._
 import chisel3.experimental._
 
-final class LaneIO[P <: Bundle, T <: Data, R <: Data](portFactory: () => P, txFactory: () => T, rxFactory: () => R)(implicit val c: SerDesGeneratorConfig)
+final class LaneIO[P <: Bundle, T <: Data](portFactory: () => P, dataFactory: () => T)(implicit val c: SerDesGeneratorConfig)
     extends Bundle with TransceiverOuterIF {
     val port = portFactory()
-    val dataTx = Decoupled(txFactory())
-    val dataRx = Flipped(Decoupled(rxFactory()))
+    val data = dataFactory()
 }
 
-abstract class Lane[S <: DecodedSymbol, T <: Data, R <: Data, P <: Bundle, C <: Controller[P]](val portFactory: () => P, val txFactory: () => T, val rxFactory: () => R, val controllerFactory: (ControlSpec) => C) extends Module {
+abstract class Lane[S <: DecodedSymbol, T <: Data, P <: Bundle, C <: Controller[P]](val portFactory: () => P, val dataFactory: () => T, val controllerFactory: (ControlSpec) => C) extends Module {
 
-    val io = IO(new LaneIO(portFactory, txFactory, rxFactory))
+    val io = IO(new LaneIO(portFactory, dataFactory))
 
     implicit val c: SerDesGeneratorConfig
 
     val txrxss = Module(new TransceiverSubsystem)
     val encoder: Encoder[S]
     val decoder: Decoder[S]
-    val packetizer: Packetizer[S, T, R]
+    val packetizer: Packetizer[S, T]
     val builder = new ControllerBuilder[P, C](controllerFactory)
 
     val encoderAdapter = Module(new EncoderWidthAdapter(encoder.encodedWidth, c.dataWidth))
