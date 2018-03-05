@@ -141,6 +141,10 @@ object Encoding8b10b {
       }
     }.filter(!_.isEmpty).map(_.get)
 
+    def encode(k: Boolean, rd: Boolean, edcba: Int, hgf: Int): Int = {
+        this.encodings filter { case x => x._1._1 == k && x._1._2 == rd && x._1._3 == (hgf << 5 | edcba) } map { case x => x._2 }
+    }
+
 }
 
 class Decoded8b10bSymbol extends DecodedSymbol(8, 10, 1) {
@@ -156,8 +160,9 @@ class Decoded8b10bSymbol extends DecodedSymbol(8, 10, 1) {
     override def isData: Bool = ~control
 
     def encode(rd: Bool): UInt = {
-        MuxLookup(Cat(control,rd,bits), 0.U, Encoding8b10b.encodings.map
-            { case ((k,r,d),enc) => (Cat(k.B,r.B,d.U(8.W)), enc.U(10.W)) })
+        MuxLookup(Cat(control,rd,bits),
+            Mux(rd, Encoding8b10b.encode(true, true, 28, 3), Encoding8b10b.encode(true, false, 28, 3)),
+            Encoding8b10b.encodings.map { case ((k,r,d),enc) => (Cat(k.B,r.B,d.U(8.W)), enc.U(10.W)) })
     }
 
 }
@@ -189,10 +194,10 @@ object Decoded8b10bSymbol {
 
     def decode(encoded: UInt, rd: Bool, valid: Bool): Valid[Decoded8b10bSymbol] = {
         val x = Wire(Valid(Decoded8b10bSymbol()))
-        x.bits := MuxLookup(encoded, Decoded8b10bSymbol(0.U, false.B), Encoding8b10b.encodings.map
+        // Now we output a nack on a failed decode
+        x.bits := MuxLookup(encoded, Decoded8b10bSymbol().nack, Encoding8b10b.encodings.map
             { case ((k,r,d),enc) => (enc.U(10.W), Decoded8b10bSymbol(d.U,k.B)) })
-        x.valid := valid & MuxLookup(encoded, false.B, Encoding8b10b.encodings.map
-            { case ((k,r,d),enc) => (enc.U(10.W), true.B) })
+        x.valid := valid
         x
     }
 

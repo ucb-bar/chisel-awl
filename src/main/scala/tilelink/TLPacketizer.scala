@@ -9,6 +9,7 @@ abstract class TLPacketizer[S <: DecodedSymbol](params: TLBundleParameters, deco
     extends Packetizer(decodedSymbolsPerCycle, symbolFactory, {() => TLBundle(params)}) with TLPacketizerLike {
 
     val tl = io.data
+    val tlQueueDepth = 8 // TODO XXX
 
     require(symbolFactory().decodedWidth == 8, "TLPacketizer* only supports 8-bit wide symbols")
 
@@ -17,14 +18,13 @@ abstract class TLPacketizer[S <: DecodedSymbol](params: TLBundleParameters, deco
     require(tl.b.bits.opcode.getWidth == 3)
     require(tl.c.bits.opcode.getWidth == 3)
     require(tl.d.bits.opcode.getWidth == 3)
+    // We want the opcode to fit in the first byte with the type
+    require(tlTypeWidth == 3)
 
 }
 
-class TLPacketizerMaster[S <: DecodedSymbol](params: TLBundleParameters, decodedSymbolsPerCycle: Int, symbolFactory: () => S, val opt: Boolean = false)
+class TLPacketizerMaster[S <: DecodedSymbol](params: TLBundleParameters, decodedSymbolsPerCycle: Int, symbolFactory: () => S)
     extends TLPacketizer(params, decodedSymbolsPerCycle, symbolFactory) {
-
-    // TODO not implemented
-    require(!opt, "Not implemented")
 
     /************************ TX *************************/
 
@@ -32,11 +32,7 @@ class TLPacketizerMaster[S <: DecodedSymbol](params: TLBundleParameters, decoded
     val txBufferBits = div8Ceil(txHeaderBits)*8 + params.dataBits
     val txBuffer = Reg(UInt(txBufferBits.W))
 
-    // TODO if we process more than one request at a time, this needs to change
-    val txData = if (opt)
-            Mux(tl.a.fire(), Mux(tl.a.bits.opcode === TLMessages.PutPartialData, packData(tl.a.bits.data, tl.a.bits.mask), tl.a.bits.data), tl.c.bits.data)
-        else
-            Mux(tl.a.fire(), tl.a.bits.data, tl.c.bits.data)
+    val txData = Mux(tl.a.fire(), tl.a.bits.data, tl.c.bits.data)
 
     val aPadBits = txBufferBits - headerWidth(tl.a.bits) - params.dataBits
     val cPadBits = txBufferBits - headerWidth(tl.c.bits) - params.dataBits
@@ -59,70 +55,96 @@ class TLPacketizerMaster[S <: DecodedSymbol](params: TLBundleParameters, decoded
     }
 
     val txFire = tl.a.fire() || tl.c.fire() || tl.e.fire()
-    val count = RegInit(0.U(log2Ceil(txBufferBits/8 + 1).W))
+    val txCount = RegInit(0.U(log2Ceil(txBufferBits/8 + 1).W))
 
     // TODO can we process more than one request at a time (e + other?)
     // Assign priorities to the downstream channels
-    val txReady = ((count <= decodedSymbolsPerCycle.U) && io.symbolsTxReady) || (count === 0.U)
+    val txReady = ((txCount <= decodedSymbolsPerCycle.U) && io.symbolsTxReady) || (txCount === 0.U)
     io.data.a.ready := txReady && !io.data.c.valid && !io.data.e.valid
     io.data.c.ready := txReady && !io.data.e.valid
     io.data.e.ready := txReady
 
-    val sReset :: sSync :: sAck :: sReady :: Nil = Enum(4)
-    val txState = RegInit(sReset)
+    val sTxReset :: sTxSync :: sTxAck :: sTxReady :: Nil = Enum(4)
+    val txState = RegInit(sTxReset)
 
     // These come from the RX
     val ack = io.symbolsRx map { x => x.valid && x.bits === symbolFactory().ack } reduce (_||_)
     val nack = io.symbolsRx map { x => x.valid && x.bits === symbolFactory().nack } reduce (_||_)
 
-    when (txState === sReset) {
-        txState := sSync
-    } .elsewhen(txState === sSync) {
-        txState := sAck
-    } .elsewhen(txState === sAck) {
+    when (txState === sTxReset) {
+        txState := sTxSync
+    } .elsewhen(txState === sTxSync) {
+        txState := sTxAck
+    } .elsewhen(txState === sTxAck) {
         when (nack) {
-            txState := sSync
+            txState := sTxSync
         } .elsewhen(ack) {
-            txState := sReady
+            txState := sTxReady
         }
-    } .elsewhen(txState === sReady) {
+    } .elsewhen(txState === sTxReady) {
         when (nack) {
-            txState := sSync
+            txState := sTxSync
         }
     } .otherwise {
         // shouldn't get here
-        txState := sSync
+        txState := sTxSync
     }
 
     io.symbolsTx.reverse.zipWithIndex.foreach { case (s,i) =>
-        val doSync = ((i.U === 0.U) && (txState === sSync))
-        s.valid := ((i.U < count) && (txState === sReady)) || doSync
+        val doSync = ((i.U === 0.U) && (txState === sTxSync))
+        s.valid := ((i.U < txCount) && (txState === sTxReady)) || doSync
         s.bits := Mux(doSync, symbolFactory().sync, symbolFactory().fromData(txBuffer(txBufferBits-8*i-1,txBufferBits-8*i-8)))
     }
 
     when (txFire) {
-        count := txPayloadBytes
+        txCount := txPayloadBytes
         txBuffer := txPacked
-    } .elsewhen(count > decodedSymbolsPerCycle.U) {
+    } .elsewhen(txCount > decodedSymbolsPerCycle.U) {
         when (io.symbolsTxReady) {
-            count := count - decodedSymbolsPerCycle.U
+            txCount := txCount - decodedSymbolsPerCycle.U
             txBuffer := Cat(txBuffer(txBufferBits-decodedSymbolsPerCycle*8-1,0),txBuffer(decodedSymbolsPerCycle*8-1,0))
         }
     } .otherwise {
         when (io.symbolsTxReady) {
-            count := 0.U
+            txCount := 0.U
         }
     }
 
     /************************ RX *************************/
 
+    val bBuf = Reg(new TLBundleB(params))
+    val dBuf = Reg(new TLBundleD(params))
+
+    val bQueue = Queue(new TLBundleB(params), tlQueueDepth)
+    val dQueue = Queue(new TLBundleD(params), tlQueueDepth)
+
+    val rxHeaderBits = tlTypeWidth + List(headerWidth(tl.b.bits), headerWidth(tl.d.bits)).max
+    val rxBufferBytes = div8Ceil(rxHeaderBits) + params.dataBits/8
+    val maxBundlesPerCycle = max(1,decodedSymbolsPerCycle/div8Ceil(tlTypeWidth + List(headerWidth(tl.b.bits), headerWidth(tl.d.bits)).min))
+
+    val rxBuffer = Reg(Vec(rxBufferBytes, UInt(8.W)))
+    val rxType = Reg(UInt(tlTypeWidth.W))
+    val rxCount = RegInit(0.U(log2Ceil(rxBufferBytes + 1).W))
+
+    val rxReversed = io.symbolsRx.reverse
+    val (rxPacked, rxPackedCount) = Pack(rxReversed.map { x =>
+        val v = Wire(Valid(UInt(8.W)))
+        v.bits := x.bits.isData
+        v.valid := x.bits.isData && x.valid
+        v
+    })
+
+    val rxHeaderCounts = Wire(Vec(maxBundlesPerCycle, UInt(log2Ceil(2*rxBufferBytes + 1).W)))
+    val rxTypesOpcodes = rxHeaderCounts.map { rxReversed(_) } map { x => (x(7,8-tlTypeWidth), x(7-tlTypeWidth,8-tlTypeWidth-3)) }
+    val rxCountRem = rxHeaderCounts.zip(rxTypesOpcodes).foldLeft(rxCount) { case (prev, (count, (t, o))) => {
+        count := prev
+        prev + getNumSymbolsFromType(tl, t, o)
+    }
+
 }
 
-class TLPacketizerSlave[S <: DecodedSymbol](params: TLBundleParameters, decodedSymbolsPerCycle: Int, symbolFactory: () => S, val opt: Boolean = false)
+class TLPacketizerSlave[S <: DecodedSymbol](params: TLBundleParameters, decodedSymbolsPerCycle: Int, symbolFactory: () => S)
     extends TLPacketizer(params, decodedSymbolsPerCycle, symbolFactory) {
-
-    // TODO not implemented
-    require(!opt, "Not implemented")
 
     /************************ TX *************************/
 
@@ -149,69 +171,77 @@ class TLPacketizerSlave[S <: DecodedSymbol](params: TLBundleParameters, decodedS
     }
 
     val txFire = tl.b.fire() || tl.d.fire()
-    val count = RegInit(0.U(log2Ceil(txBufferBits/8 + 1).W))
+    val txCount = RegInit(0.U(log2Ceil(txBufferBits/8 + 1).W))
 
     // TODO can we process more than one request at a time (e + other?)
     // Assign priorities to the downstream channels
-    val txReady = ((count <= decodedSymbolsPerCycle.U) && io.symbolsTxReady) || (count === 0.U)
+    val txReady = ((txCount <= decodedSymbolsPerCycle.U) && io.symbolsTxReady) || (txCount === 0.U)
     io.data.b.ready := txReady && !io.data.d.valid
     io.data.d.ready := txReady
 
-    val sReset :: sSync :: sAck :: sReady :: Nil = Enum(4)
-    val txState = RegInit(sReset)
+    val sTxReset :: sTxSync :: sTxAck :: sTxReady :: Nil = Enum(4)
+    val txState = RegInit(sTxReset)
 
     // These come from the RX
     val sync = io.symbolsRx map { x => x.valid && x.bits === symbolFactory().sync } reduce (_||_)
     val nack = io.symbolsRx map { x => x.valid && x.bits === symbolFactory().nack } reduce (_||_)
 
-    when (txState === sReset) {
-        txState := sSync
-    } .elsewhen(txState === sSync) {
+    when (txState === sTxReset) {
+        txState := sTxSync
+    } .elsewhen(txState === sTxSync) {
         when (sync) {
-            txState := sAck
+            txState := sTxAck
         }
-    } .elsewhen(txState === sAck) {
+    } .elsewhen(txState === sTxAck) {
         when (nack) {
-            txState := sSync
-        } .otherwise {
-            txState := sReady
+            txState := sTxSync
+        } .otherwise
+            txState := sTxReady
         }
-    } .elsewhen(txState === sReady) {
+    } .elsewhen(txState === sTxReady) {
         when (nack) {
-            txState := sSync
+            txState := sTxSync
+        } .elsewhen (sync) {
+            txState := sTxAck
         }
     } .otherwise {
         // shouldn't get here
-        txState := sSync
+        txState := sTxSync
     }
 
     io.symbolsTx.reverse.zipWithIndex.foreach { case (s,i) =>
-        val doAck = ((i.U === 0.U) && (txState === sAck))
-        s.valid := ((i.U < count) && (txState === sReady)) || doAck
+        val doAck = ((i.U === 0.U) && (txState === sTxAck))
+        s.valid := ((i.U < txCount) && (txState === sTxReady)) || doAck
         s.bits := Mux(doAck, symbolFactory().ack, symbolFactory().fromData(txBuffer(txBufferBits-8*i-1,txBufferBits-8*i-8)))
     }
 
     when (txFire) {
-        count := txPayloadBytes
+        txCount := txPayloadBytes
         txBuffer := txPacked
-    } .elsewhen(count > decodedSymbolsPerCycle.U) {
+    } .elsewhen(txCount > decodedSymbolsPerCycle.U) {
         when (io.symbolsTxReady) {
-            count := count - decodedSymbolsPerCycle.U
+            txCount := txCount - decodedSymbolsPerCycle.U
             txBuffer := Cat(txBuffer(txBufferBits-decodedSymbolsPerCycle*8-1,0),txBuffer(decodedSymbolsPerCycle*8-1,0))
         }
     } .otherwise {
         when (io.symbolsTxReady) {
-            count := 0.U
+            txCount := 0.U
         }
     }
 
     /************************ RX *************************/
 
+    val aBuf = Reg(new TLBundleA(params))
+    val cBuf = Reg(new TLBundleC(params))
+    val dBuf = Reg(new TLBundleE(params))
+
+    val aQueue = Queue(new TLBundleA(params), tlQueueDepth)
+    val cQueue = Queue(new TLBundleC(params), tlQueueDepth)
+    val eQueue = Queue(new TLBundleE(params), tlQueueDepth)
+
 }
 
 trait TLPacketizerLike {
-
-    val opt: Boolean
 
     val tlTypeWidth = 3
 
@@ -229,9 +259,10 @@ trait TLPacketizerLike {
 
     def div8Ceil(x: Int) = (x + 7)/8
 
+    // There's a vestigial mask input here that we would use for only sending the data in the mask, but this is not implemented
     def tlSymbolMap(a: TLBundleA, mask: UInt) = Map(
         (TLMessages.PutFullData    -> div8Ceil(headerWidth(a) + a.data.getWidth).U),
-        (TLMessages.PutPartialData -> (div8Ceil(headerWidth(a)).U + (if (opt) PopCount(mask) else a.data.getWidth.U))),
+        (TLMessages.PutPartialData -> div8Ceil(headerWidth(a) + a.data.getWidth).U), // This would use the mask
         (TLMessages.ArithmeticData -> div8Ceil(headerWidth(a) + a.data.getWidth).U),
         (TLMessages.LogicalData    -> div8Ceil(headerWidth(a) + a.data.getWidth).U),
         (TLMessages.Get            -> div8Ceil(headerWidth(a)).U),
@@ -241,7 +272,7 @@ trait TLPacketizerLike {
 
     def tlSymbolMap(b: TLBundleB, mask: UInt) = Map(
         (TLMessages.PutFullData    -> div8Ceil(headerWidth(b) + b.data.getWidth).U),
-        (TLMessages.PutPartialData -> (div8Ceil(headerWidth(b)).U + (if (opt) PopCount(mask) else b.data.getWidth.U))),
+        (TLMessages.PutPartialData -> div8Ceil(headerWidth(b) + b.data.getWidth).U), // This would use the mask
         (TLMessages.ArithmeticData -> div8Ceil(headerWidth(b) + b.data.getWidth).U),
         (TLMessages.LogicalData    -> div8Ceil(headerWidth(b) + b.data.getWidth).U),
         (TLMessages.Get            -> div8Ceil(headerWidth(b)).U),
@@ -268,52 +299,35 @@ trait TLPacketizerLike {
     def tlSymbolMap(e: TLBundleE, mask: UInt) = Map(
         (TLMessages.GrantAck       -> div8Ceil(headerWidth(e)).U))
 
+    def getNumSymbolsFromType(tl: TLBundle, tlType: UInt, opcode: UInt): UInt = {
+        require(tlSymbolMap(tl.e, 0.U).length === 1)
+        Mux((tlType === typeA),
+            MuxLookup(opcode, 0.U, tlSymbolMap(tl.a, 0.U)),
+        Mux((tlType === typeB),
+            MuxLookup(opcode, 0.U, tlSymbolMap(tl.b, 0.U)),
+        Mux((tlType === typeC),
+            MuxLookup(opcode, 0.U, tlSymbolMap(tl.c, 0.U)),
+        Mux((tlType === typeD),
+            MuxLookup(opcode, 0.U, tlSymbolMap(tl.d, 0.U)),
+            tlSymbolMap(tl.e, 0.U)(TLMessages.GrantAck)))))
+    }
+
     // TODO can we collapse these with some type parameter voodoo?
     //def getNumSymbols[T <: TLChannel](chan: T, opcode: UInt, mask: UInt): UInt = {
     def getNumSymbols(chan: TLBundleA, opcode: UInt, mask: UInt): UInt = {
-        val ret = MuxLookup(
-            opcode,
-            0.U,
-            tlSymbolMap(chan, mask).toSeq
-        )
-        assert(ret =/= 0.U, "Illegal TLMessage")
-        ret
+        MuxLookup(opcode, 0.U, tlSymbolMap(chan, mask).toSeq)
     }
     def getNumSymbols(chan: TLBundleB, opcode: UInt, mask: UInt): UInt = {
-        val ret = MuxLookup(
-            opcode,
-            0.U,
-            tlSymbolMap(chan, mask).toSeq
-        )
-        assert(ret =/= 0.U, "Illegal TLMessage")
-        ret
+        MuxLookup(opcode, 0.U, tlSymbolMap(chan, mask).toSeq)
     }
     def getNumSymbols(chan: TLBundleC, opcode: UInt, mask: UInt): UInt = {
-        val ret = MuxLookup(
-            opcode,
-            0.U,
-            tlSymbolMap(chan, mask).toSeq
-        )
-        assert(ret =/= 0.U, "Illegal TLMessage")
-        ret
+        MuxLookup(opcode, 0.U, tlSymbolMap(chan, mask).toSeq)
     }
     def getNumSymbols(chan: TLBundleD, opcode: UInt, mask: UInt): UInt = {
-        val ret = MuxLookup(
-            opcode,
-            0.U,
-            tlSymbolMap(chan, mask).toSeq
-        )
-        assert(ret =/= 0.U, "Illegal TLMessage")
-        ret
+        MuxLookup(opcode, 0.U, tlSymbolMap(chan, mask).toSeq)
     }
     def getNumSymbols(chan: TLBundleE, opcode: UInt, mask: UInt): UInt = {
-        val ret = MuxLookup(
-            opcode,
-            0.U,
-            tlSymbolMap(chan, mask).toSeq
-        )
-        assert(ret =/= 0.U, "Illegal TLMessage")
-        ret
+        MuxLookup(opcode, 0.U, tlSymbolMap(chan, mask).toSeq)
     }
 
     def packData(data: UInt, mask: UInt): UInt = {
@@ -325,6 +339,61 @@ trait TLPacketizerLike {
         out.asUInt
         */
         ???
+    }
+
+}
+
+// pack all valid bytes into the lowest-indexed slots available
+// e.g.
+//
+// symbol valid  => symbol
+// A      0         C
+// B      0         D
+// C      1         F
+// D      1         F
+// E      0         F
+// F      1         F
+class Packer(entries: Int, width: Int = 8) extends Module {
+
+    val io = IO(new Bundle {
+        val in = Vec(entries, Valid(UInt(width.W)))
+        val out = Vec(entries, Output((UInt(width.W)))
+        val count = Output(UInt())
+    })
+
+    io.out := (1 until entries) foldLeft(io.in) { case (prev, stage) =>
+        Vec((0 until entries) map { i =>
+            if (i >= entries-stage) {
+                prev(i)
+            } else {
+                val next = Wire(Valid(UInt(width.W)))
+                next.bits := Mux(prev(i).valid, prev(i), prev(i+1))
+                next.valid := prev(i) || prev(i+1)
+                next
+            }
+        })
+    } map { _.bits }
+
+    io.count := PopCount(io.in map {_.valid})
+
+}
+
+object Pack {
+
+    def apply(vec: Vec[Valid[UInt]]): (Vec[UInt], UInt) = {
+        val mod = Module(new Packer(vec.length, vec(0).bits.getWidth))
+        mod.io.in := vec
+        (mod.io.out, mod.io.count)
+    }
+
+    def apply(bits: UInt, mask: UInt): (Vec[UInt], UInt) = {
+        val w = bits.getWidth / mask.getWidth
+        require(bits.getWidth % mask.getWidth == 0)
+        this.apply(Vec((0 until mask.getWidth) map { i => 
+            val v = Wire(Valid(UInt(w.W)))
+            v.bits := bits(w * i + w - 1, w * i)
+            v.valid := mask(i)
+        }))
     }
 
 }
