@@ -10,10 +10,10 @@ trait TLPacketizerLike {
 
     val tlTypeWidth = 3
 
-    def headerWidth(a: TLBundleA): Int = tlTypeWidth + List(a.opcode,a.param,a.size,a.source,a.address,a.mask).map( _.getWidth).reduce(_+_)
-    def headerWidth(b: TLBundleB): Int = tlTypeWidth + List(b.opcode,b.param,b.size,b.source,b.address,b.mask).map(_.getWidth).reduce(_+_)
-    def headerWidth(c: TLBundleC): Int = tlTypeWidth + 1 + List(c.opcode,c.param,c.size,c.source,c.address).map(_.getWidth).reduce(_+_)
-    def headerWidth(d: TLBundleD): Int = tlTypeWidth + 1 + List(d.opcode,d.param,d.size,d.source,d.sink).map(_.getWidth).reduce(_+_)
+    def headerWidth(a: TLBundleA): Int = tlTypeWidth + List(a.opcode,a.param,a.size,a.source,a.address).map( _.getWidth).reduce(_+_) // mask is separate
+    def headerWidth(b: TLBundleB): Int = tlTypeWidth + List(b.opcode,b.param,b.size,b.source,b.address).map(_.getWidth).reduce(_+_)  // mask is separate
+    def headerWidth(c: TLBundleC): Int = tlTypeWidth + List(c.opcode,c.param,c.size,c.source,c.address).map(_.getWidth).reduce(_+_)  // ignore error
+    def headerWidth(d: TLBundleD): Int = tlTypeWidth + List(d.opcode,d.param,d.size,d.source,d.sink).map(_.getWidth).reduce(_+_)     // ignore error
     def headerWidth(e: TLBundleE): Int = tlTypeWidth + e.sink.getWidth
 
     val typeA = 0.U(tlTypeWidth.W)
@@ -24,78 +24,105 @@ trait TLPacketizerLike {
 
     def div8Ceil(x: Int): Int = (x + 7)/8
 
-    def tlSymbolMap(x: TLChannel): Map[UInt, UInt] = {
+    def tlFromBuffer[T <: TLChannel](edge: TLEdge, x: T, buf: UInt, error: Bool): T = {
+        val w = buf.getWidth - tlTypeWidth
         x match {
-            case _:TLBundleA => { Map(
-                (TLMessages.PutFullData    -> div8Ceil(headerWidth(x) + x.data.getWidth).U),
-                (TLMessages.PutPartialData -> div8Ceil(headerWidth(x) + x.data.getWidth).U),
-                (TLMessages.ArithmeticData -> div8Ceil(headerWidth(x) + x.data.getWidth).U),
-                (TLMessages.LogicalData    -> div8Ceil(headerWidth(x) + x.data.getWidth).U),
-                (TLMessages.Get            -> div8Ceil(headerWidth(x)).U),
-                (TLMessages.Hint           -> div8Ceil(headerWidth(x)).U),
-                (TLMessages.AcquireBlock   -> div8Ceil(headerWidth(x)).U),
-                (TLMessages.AcquirePerm    -> div8Ceil(headerWidth(x)).U)) }
-            case _:TLBundleB => { Map(
-                (TLMessages.PutFullData    -> div8Ceil(headerWidth(x) + x.data.getWidth).U),
-                (TLMessages.PutPartialData -> div8Ceil(headerWidth(x) + x.data.getWidth).U),
-                (TLMessages.ArithmeticData -> div8Ceil(headerWidth(x) + x.data.getWidth).U),
-                (TLMessages.LogicalData    -> div8Ceil(headerWidth(x) + x.data.getWidth).U),
-                (TLMessages.Get            -> div8Ceil(headerWidth(x)).U),
-                (TLMessages.Hint           -> div8Ceil(headerWidth(x)).U),
-                (TLMessages.Probe          -> div8Ceil(headerWidth(x)).U)) }
-            case _:TLBundleC => { Map(
-                (TLMessages.AccessAck      -> div8Ceil(headerWidth(x)).U),
-                (TLMessages.AccessAckData  -> div8Ceil(headerWidth(x) + x.data.getWidth).U),
-                (TLMessages.HintAck        -> div8Ceil(headerWidth(x)).U),
-                (TLMessages.ProbeAck       -> div8Ceil(headerWidth(x)).U),
-                (TLMessages.ProbeAckData   -> div8Ceil(headerWidth(x) + x.data.getWidth).U),
-                (TLMessages.Release        -> div8Ceil(headerWidth(x)).U),
-                (TLMessages.ReleaseData    -> div8Ceil(headerWidth(x) + x.data.getWidth).U)) }
-            case _:TLBundleD => { Map(
-                (TLMessages.AccessAck      -> div8Ceil(headerWidth(x)).U),
-                (TLMessages.AccessAckData  -> div8Ceil(headerWidth(x) + x.data.getWidth).U),
-                (TLMessages.HintAck        -> div8Ceil(headerWidth(x)).U),
-                (TLMessages.Grant          -> div8Ceil(headerWidth(x)).U),
-                (TLMessages.GrantData      -> div8Ceil(headerWidth(x) + x.data.getWidth).U),
-                (TLMessages.ReleaseAck     -> div8Ceil(headerWidth(x)).U)) }
-            case _:TLBundleE => { Map(
-                (TLMessages.GrantAck       -> div8Ceil(headerWidth(x)).U)) }
-        }
-
-/*
-    def tlResponseMap(x: TLChannel): UInt = {
-        x match {
-            case _:TLBundleA => {}
-            case _:TLBundleB => {}
-            case _:TLBundleC => {}
-            case _:TLBundleD => {}
-            case _:TLBundleE => {}
-        }
-    }
-*/
-
-    def getNumSymbolsFromType(x: TLChannel, tlType: UInt, opcode: UInt): UInt = {
-        require(tlSymbolMap(x.e).length === 1)
-        Mux((tlType === typeA),
-            MuxLookup(opcode, 1.U, tlSymbolMap(x.a)),
-        Mux((tlType === typeB),
-            MuxLookup(opcode, 1.U, tlSymbolMap(x.b)),
-        Mux((tlType === typeC),
-            MuxLookup(opcode, 1.U, tlSymbolMap(x.c)),
-        Mux((tlType === typeD),
-            MuxLookup(opcode, 1.U, tlSymbolMap(x.d)),
-            tlSymbolMap(x.e)(TLMessages.GrantAck)))))
+            case a: TLBundleA => {
+                val out = TLBundleA(edge.bundle)
+                List(out.opcode, out.param, out.size, out.source, out.address, out.mask, out.data).foldLeft(w) { (left, sig) =>
+                    sig := buf(left - 1, left - sig.getWidth)
+                    left - sig.getWidth
+                }
+                out
+            }
+            case b: TLBundleB => {
+                val out = TLBundleB(edge.bundle)
+                List(out.opcode, out.param, out.size, out.source, out.address, out.mask, out.data).foldLeft(w) { (left, sig) =>
+                    sig := buf(left - 1, left - sig.getWidth)
+                    left - sig.getWidth
+                }
+                out
+            }
+            case c: TLBundleC => {
+                val out = TLBundleC(edge.bundle)
+                List(out.opcode, out.param, out.size, out.source, out.address, out.data).foldLeft(w) { (left, sig) =>
+                    sig := buf(left - 1, left - sig.getWidth)
+                    left - sig.getWidth
+                }
+                out.error := error
+                out
+            }
+            case d: TLBundleD => {
+                val out = TLBundleD(edge.bundle)
+                List(out.opcode, out.param, out.size, out.source, out.address, out.sink, out.data).foldLeft(w) { (left, sig) =>
+                    sig := buf(left - 1, left - sig.getWidth)
+                    left - sig.getWidth
+                }
+                out.error := error
+                out
+            }
+            case e: TLBundleE => {
+                val out = TLBundleE(edge.bundle)
+                out.sink := buf(w - 1, w - out.sink.getWidth)
+                out
+            }
+        }.asInstanceOf[T]
     }
 
-    def getNumSymbols(x: TLBundleA): UInt = {
-        require(tlSymbolMap(x.e).length === 1)
+    def tlToBuffer[T <: TLChannel](edge: TLEdge, x: T): UInt = {
         x match {
-            case _:TLBundleA => { MuxLookup(x.opcode, 1.U, tlSymbolMap(x).toSeq) }
-            case _:TLBundleB => { MuxLookup(x.opcode, 1.U, tlSymbolMap(x).toSeq) }
-            case _:TLBundleC => { MuxLookup(x.opcode, 1.U, tlSymbolMap(x).toSeq) }
-            case _:TLBundleD => { MuxLookup(x.opcode, 1.U, tlSymbolMap(x).toSeq) }
-            case _:TLBundleE => { tlSymbolMap(x)(TLMessages.GrantAck) }
+            case a: TLBundleA => {
+                Cat(typeA, tltx.a.bits.opcode, tltx.a.bits.param, tltx.a.bits.size, tltx.a.bits.source, tltx.a.bits.address, tltx.a.bits.mask, tltx.a.bits.data, if (aPadBits > 0) 0.U(aPadBits.W) else Wire(UInt(0.W)))
+            }
+            case b: TLBundleB => {
+                Cat(typeB, tltx.b.bits.opcode, tltx.b.bits.param, tltx.b.bits.size, tltx.b.bits.source, tltx.b.bits.address, tltx.b.bits.mask, tltx.b.bits.data, if (bPadBits > 0) 0.U(bPadBits.W) else Wire(UInt(0.W)))
+            }
+            case c: TLBundleC => {
+                Cat(typeC, tltx.c.bits.opcode, tltx.c.bits.param, tltx.c.bits.size, tltx.c.bits.source, tltx.c.bits.address, tltx.c.bits.data, if (cPadBits > 0) 0.U(cPadBits.W) else Wire(UInt(0.W)))
+            }
+            case d: TLBundleD => {
+                Cat(typeD, tltx.d.bits.opcode, tltx.d.bits.param, tltx.d.bits.size, tltx.d.bits.source, tltx.d.bits.sink, tltx.d.bits.data, if (dPadBits > 0) 0.U(dPadBits.W) else Wire(UInt(0.W)))
+            }
+            case e: TLBundleE => {
+                Cat(typeE, tltx.e.bits.sink, if (ePadBits > 0) 0.U(ePadBits.W) else Wire(UInt(0.W)))
+            }
         }
+    }
+
+    def typeFromBuffer(buf: UInt): (UInt, UInt) = (buf(buf.getWidth - 1, buf.getWidth - tlTypeWidth), buf(buf.getWidth - tlTypeWidth - 1, buf.getWidth - tlTypeWidth - 3))
+
+    def getNumSymbolsFromType(aceEdge: TLEdge, bdEdge: TLEdge, tlType: UInt, opcode: UInt, first: Bool): UInt = {
+        val ret = Wire(UInt())
+        when (tlType === typeA) {
+            val a = Wire(new TLBundleA(aceEdge.bundle))
+            a.opcode := opcode
+            ret := getNumSymbols(aceEdge, a, first)
+        } .elsewhen (tlType === typeB) {
+            val b = Wire(new TLBundleB(bdEdge.bundle))
+            b.opcode := opcode
+            ret := getNumSymbols(bdEdge, b, first)
+        } .elsewhen (tlType === typeC) {
+            val c = Wire(new TLBundleC(aceEdge.bundle))
+            c.opcode := opcode
+            ret := getNumSymbols(aceEdge, c, first)
+        } .elsewhen (tlType === typeD) {
+            val d = Wire(new TLBundleD(bdEdge.bundle))
+            d.opcode := opcode
+            ret := getNumSymbols(bdEdge, d, first)
+        } .otherwise {
+            val e = Wire(new TLBundleE(aceEdge.bundle))
+            ret := getNumSymbols(aceEdge, e, first)
+        }
+        ret
+    }
+
+    // Ignore error signals here, we'll generate our own
+    def getNumSymbols(edge: TLEdge, x: TLChannel, first: Bool): UInt = {
+        Mux(first, div8Ceil(headerWidth(x)), 0.U) + Mux(edge.hasData(x), (x.data.getWidth/8).U + x match {
+            case a: TLBundleA => { div8Ceil(a.mask.getWidth) }
+            case b: TLBundleB => { div8Ceil(b.mask.getWidth) }
+            case _ => { 0.U }
+        }, 0.U)
     }
 }
 
