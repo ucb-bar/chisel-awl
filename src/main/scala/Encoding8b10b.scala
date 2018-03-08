@@ -142,7 +142,7 @@ object Encoding8b10b {
     }.filter(!_.isEmpty).map(_.get)
 
     def encode(k: Boolean, rd: Boolean, edcba: Int, hgf: Int): Int = {
-        this.encodings filter { case x => x._1._1 == k && x._1._2 == rd && x._1._3 == (hgf << 5 | edcba) } map { case x => x._2 }
+        this.encodings.filter({ x:((Boolean, Boolean, Int), Int) => x._1._1 == k && x._1._2 == rd && x._1._3 == (hgf << 5 | edcba) }).map({ x => x._2 }).head
     }
 
 }
@@ -161,7 +161,7 @@ class Decoded8b10bSymbol extends DecodedSymbol(8, 10, 1) {
 
     def encode(rd: Bool): UInt = {
         MuxLookup(Cat(control,rd,bits),
-            Mux(rd, Encoding8b10b.encode(true, true, 28, 3), Encoding8b10b.encode(true, false, 28, 3)),
+            Mux(rd, Encoding8b10b.encode(true, true, 28, 3).U(10.W), Encoding8b10b.encode(true, false, 28, 3).U(10.W) ),
             Encoding8b10b.encodings.map { case ((k,r,d),enc) => (Cat(k.B,r.B,d.U(8.W)), enc.U(10.W)) })
     }
 

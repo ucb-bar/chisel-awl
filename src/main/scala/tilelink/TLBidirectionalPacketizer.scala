@@ -5,8 +5,17 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.tilelink._
 
+class TLBidirectionalPacketizerPort(masterEdge: TLEdgeIn, slaveEdge: TLEdgeOut) extends Bundle {
+    val master = TLBundle(masterEdge.bundle)
+    val slave = Flipped(TLBundle(slaveEdge.bundle))
+}
+
+object TLBidirectionalPacketizerPort {
+    def apply(masterEdge: TLEdgeIn, slaveEdge: TLEdgeOut)() =  new TLBidirectionalPacketizerPort(masterEdge, slaveEdge)
+}
+
 class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveEdge: TLEdgeOut, decodedSymbolsPerCycle: Int, symbolFactory: () => S)
-    extends Packetizer(decodedSymbolsPerCycle, symbolFactory, {() => new Bundle { val master = TLBundle(masterEdge); val slave = Flipped(TLBundle(slaveEdge))}) with TLPacketizerLike {
+    extends Packetizer(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerPort.apply(masterEdge, slaveEdge) _) with TLPacketizerLike {
 
     val tltx = new Object {
         val a = io.data.master.a
@@ -60,35 +69,34 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveE
     val txBufferBits = div8Ceil(txHeaderBits)*8 + List(slaveEdge.bundle.dataBits, masterEdge.bundle.dataBits).max + List(slaveEdge.bundle.dataBits/8, masterEdge.bundle.dataBits/8).max
     val txBuffer = Reg(UInt(txBufferBits.W))
 
-    val aPadBits = txBufferBits - headerWidth(tltx.a.bits) - tltx.a.bits.data.getWidth - tltx.a.bits.mask.getWidth
-    val bPadBits = txBufferBits - headerWidth(tltx.b.bits) - tltx.b.bits.data.getWidth - tltx.b.bits.mask.getWidth
-    val cPadBits = txBufferBits - headerWidth(tltx.c.bits) - tltx.c.bits.data.getWidth
-    val dPadBits = txBufferBits - headerWidth(tltx.d.bits) - tltx.d.bits.data.getWidth
-    val ePadBits = txBufferBits - headerWidth(tltx.e.bits)
+    val txA = tlToBuffer(tlrx.aEdge, tlrx.a.bits, txBufferBits)
+    val txB = tlToBuffer(tlrx.bEdge, tlrx.b.bits, txBufferBits)
+    val txC = tlToBuffer(tlrx.cEdge, tlrx.c.bits, txBufferBits)
+    val txD = tlToBuffer(tlrx.dEdge, tlrx.d.bits, txBufferBits)
+    val txE = tlToBuffer(tlrx.eEdge, tlrx.e.bits, txBufferBits)
 
-    val txA = tlToBuffer(tlrx.edgeA, tlrx.a, false.B)
-    val txB = tlToBuffer(tlrx.edgeB, tlrx.b, false.B)
-    val txC = tlToBuffer(tlrx.edgeC, tlrx.c, false.B)
-    val txD = tlToBuffer(tlrx.edgeD, tlrx.d, false.B)
-    val txE = tlToBuffer(tlrx.edgeE, tlrx.e, false.B)
+    val (txAFirst, txALast, txADone, txACount) = tltx.aEdge.firstlastHelper(tltx.a.bits, tltx.a.fire())
+    val (txBFirst, txBLast, txBDone, txBCount) = tltx.bEdge.firstlastHelper(tltx.b.bits, tltx.b.fire())
+    val (txCFirst, txCLast, txCDone, txCCount) = tltx.cEdge.firstlastHelper(tltx.c.bits, tltx.c.fire())
+    val (txDFirst, txDLast, txDDone, txDCount) = tltx.dEdge.firstlastHelper(tltx.d.bits, tltx.d.fire())
 
     val txPayloadBytes = Wire(UInt())
     val txPacked = Wire(UInt(txBufferBits.W))
 
     when (tltx.e.fire()) {
-        txPayloadBytes := getNumSymbols(tltx.e.bits)
+        txPayloadBytes := getNumSymbols(tltx.eEdge, tltx.e.bits, true.B)
         txPacked := txE
     } .elsewhen (tltx.d.fire()) {
-        txPayloadBytes := getNumSymbols(tltx.c.bits)
+        txPayloadBytes := getNumSymbols(tltx.dEdge, tltx.d.bits, txDFirst)
         txPacked := txD
     } .elsewhen (tltx.c.fire()) {
-        txPayloadBytes := getNumSymbols(tltx.c.bits)
+        txPayloadBytes := getNumSymbols(tltx.cEdge, tltx.c.bits, txCFirst)
         txPacked := txC
     } .elsewhen (tltx.b.fire()) {
-        txPayloadBytes := getNumSymbols(tltx.b.bits)
+        txPayloadBytes := getNumSymbols(tltx.bEdge, tltx.b.bits, txBFirst)
         txPacked := txB
     } .otherwise { // a
-        txPayloadBytes := getNumSymbols(tltx.a.bits)
+        txPayloadBytes := getNumSymbols(tltx.aEdge, tltx.a.bits, txAFirst)
         txPacked := txA
     }
 
@@ -102,11 +110,6 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveE
     val cOutstanding = RegInit(0.U(log2Up(cMaxOutstanding+1).W))
     val dOutstanding = RegInit(0.U(log2Up(dMaxOutstanding+1).W))
     val eOutstanding = RegInit(0.U(log2Up(eMaxOutstanding+1).W))
-
-    val (txAFirst, txALast, txADone, txACount) = tltx.aEdge.firstlastHelper(tltx.a, tltx.a.fire())
-    val (txBFirst, txBLast, txBDone, txBCount) = tltx.bEdge.firstlastHelper(tltx.b, tltx.b.fire())
-    val (txCFirst, txCLast, txCDone, txCCount) = tltx.cEdge.firstlastHelper(tltx.c, tltx.c.fire())
-    val (txDFirst, txDLast, txDDone, txDCount) = tltx.dEdge.firstlastHelper(tltx.d, tltx.d.fire())
 
     when (tltx.a.fire()) {
         txADataInflight := !txALast
@@ -123,17 +126,17 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveE
     val dataInflight = txADataInflight || txBDataInflight || txCDataInflight || txDDataInflight
 
     // TODO how to handle a,b backpressure, and c needs something to handle Release/ReleaseData
-    cOutstanding := cOutstanding + Mux(tltx.b.fire() && txBFirst, tlResponseMap(tltx.b), 0.U) - tlrx.c.fire()
-    dOutstanding := aOutstanding + Mux(tltx.a.fire() && txAFirst, tlResponseMap(tltx.a), 0.U) + Mux(tltx.c.fire() && txCFirst, tlResponseMap(tltx.c), 0.U) - tlrx.d.fire()
-    eOutstanding := eOutstanding + Mux(tltx.d.fire() && txDFirst, tlResponseMap(tltx.d), 0.U) - tlrx.e.fire()
+    cOutstanding := cOutstanding + Mux(tltx.b.fire() && txBFirst, tlResponseMap(tltx.b.bits), 0.U) - tlrx.c.fire()
+    dOutstanding := dOutstanding + Mux(tltx.a.fire() && txAFirst, tlResponseMap(tltx.a.bits), 0.U) + Mux(tltx.c.fire() && txCFirst, tlResponseMap(tltx.c.bits), 0.U) - tlrx.d.fire()
+    eOutstanding := eOutstanding + Mux(tltx.d.fire() && txDFirst, tlResponseMap(tltx.d.bits), 0.U) - tlrx.e.fire()
 
     // TODO can we process more than one request at a time (e + other?)
     // Assign priorities to the channels
     val txReady = (((txCount <= decodedSymbolsPerCycle.U) && io.symbolsTxReady) || (txCount === 0.U)) && txState === sTxReady
-    val aReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.a)))
-    val bReady = txReady && (cOutstanding < (cMaxOutstanding.U - tlResponseMap(tltx.b)))
-    val cReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.c)))
-    val dReady = txReady && (eOutstanding < (eMaxOutstanding.U - tlResponseMap(tltx.d)))
+    val aReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.a.bits)))
+    val bReady = txReady && (cOutstanding < (cMaxOutstanding.U - tlResponseMap(tltx.b.bits)))
+    val cReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.c.bits)))
+    val dReady = txReady && (eOutstanding < (eMaxOutstanding.U - tlResponseMap(tltx.d.bits)))
     val eReady = txReady
 
     tltx.a.ready := (aReady && !tltx.b.valid && !tltx.c.valid && !tltx.d.valid && !tltx.e.valid && !dataInflight) || (txReady && txADataInflight)
@@ -192,58 +195,50 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveE
 
     /************************ RX *************************/
 
-    val rxHeaderBitsMax = List(headerWidth(tlrx.a.bits), headerWidth(tlrx.b.bits), headerWidth(tlrx.c.bits), headerWidth(tlrx.d.bits), headerWidth(tlrx.e.bits)).max
-    val rxBufferBytes = div8Ceil(rxHeaderBits) + List(clientParams.dataBits, managerParams.dataBits).max/8 + (decodedSymbolsPerCycle - 1)
-    //val abcdeBundlesPerCycle = List(tlrx.a, tlrx.b, tlrx.c, tlrx.d, tlrx.e).map { case x => List(1, decodedSymbolsPerCycle/div8Ceil(headerWidth(x.bits))).max }
-    //val maxBundlesPerCycle = abcdeBundlesPerCycle.max
+    val rxHeaderBits = List(headerWidth(tlrx.a.bits), headerWidth(tlrx.b.bits), headerWidth(tlrx.c.bits), headerWidth(tlrx.d.bits), headerWidth(tlrx.e.bits)).max
+    val rxBufferBytes = div8Ceil(rxHeaderBits) + List(slaveEdge.bundle.dataBits/64, masterEdge.bundle.dataBits/64).max + List(slaveEdge.bundle.dataBits, masterEdge.bundle.dataBits).max/8 + (decodedSymbolsPerCycle - 1)
+
+    val rxA = tlFromBuffer(tlrx.aEdge, tlrx.a.bits, rxBuffer.asUInt, false.B)
+    val rxB = tlFromBuffer(tlrx.bEdge, tlrx.b.bits, rxBuffer.asUInt, false.B)
+    val rxC = tlFromBuffer(tlrx.cEdge, tlrx.c.bits, rxBuffer.asUInt, false.B)
+    val rxD = tlFromBuffer(tlrx.dEdge, tlrx.d.bits, rxBuffer.asUInt, false.B)
+    val rxE = tlFromBuffer(tlrx.eEdge, tlrx.e.bits, rxBuffer.asUInt, false.B)
 
     // Assume we can only handle one thing at a time, for now
-    val aQueue = Queue(tlrx.a.bits, aMaxOutstanding)
-    val bQueue = Queue(tlrx.b.bits, bMaxOutstanding)
-    val cQueue = Queue(tlrx.c.bits, cMaxOutstanding)
-    val dQueue = Queue(tlrx.d.bits, dMaxOutstanding)
-    val eQueue = Queue(tlrx.e.bits, eMaxOutstanding)
+    tlrx.a <> Queue(rxA, aMaxOutstanding)
+    tlrx.b <> Queue(rxB, bMaxOutstanding)
+    tlrx.c <> Queue(rxC, cMaxOutstanding)
+    tlrx.d <> Queue(rxD, dMaxOutstanding)
+    tlrx.e <> Queue(rxE, eMaxOutstanding)
 
-    tlrx.a <> aQueue.io.deq
-    tlrx.b <> bQueue.io.deq
-    tlrx.c <> cQueue.io.deq
-    tlrx.d <> dQueue.io.deq
-    tlrx.e <> eQueue.io.deq
-
-    aQueue.enq.bits := tlFromBuffer(tlrx.aAdge, tlrx.a, rxBuffer)
-    bQueue.enq.bits := tlFromBuffer(tlrx.bEdge, tlrx.b, rxBuffer)
-    cQueue.enq.bits := tlFromBuffer(tlrx.cEdge, tlrx.c, rxBuffer)
-    dQueue.enq.bits := tlFromBuffer(tlrx.dEdge, tlrx.d, rxBuffer)
-    eQueue.enq.bits := tlFromBuffer(tlrx.eEdge, tlrx.e, rxBuffer)
-
-    val (rxAFirst, rxALast, rxADone, rxACount) = tlrx.aEdge.firstlastHelper(aQueue.enq.bits, aQueue.enq.fire())
-    val (rxBFirst, rxBLast, rxBDone, rxBCount) = tlrx.bEdge.firstlastHelper(bQueue.enq.bits, bQueue.enq.fire())
-    val (rxCFirst, rxCLast, rxCDone, rxCCount) = tlrx.cEdge.firstlastHelper(cQueue.enq.bits, cQueue.enq.fire())
-    val (rxDFirst, rxDLast, rxDDone, rxDCount) = tlrx.dEdge.firstlastHelper(dQueue.enq.bits, dQueue.enq.fire())
+    val (rxAFirst, rxALast, rxADone, rxACount) = tlrx.aEdge.firstlastHelper(rxA.bits, rxA.fire())
+    val (rxBFirst, rxBLast, rxBDone, rxBCount) = tlrx.bEdge.firstlastHelper(rxB.bits, rxB.fire())
+    val (rxCFirst, rxCLast, rxCDone, rxCCount) = tlrx.cEdge.firstlastHelper(rxC.bits, rxC.fire())
+    val (rxDFirst, rxDLast, rxDDone, rxDCount) = tlrx.dEdge.firstlastHelper(rxD.bits, rxD.fire())
 
     val rxADataInflight = RegInit(false.B)
     val rxBDataInflight = RegInit(false.B)
     val rxCDataInflight = RegInit(false.B)
     val rxDDataInflight = RegInit(false.B)
 
-    when (aQueue.enq.fire()) {
+    when (rxA.fire()) {
         rxADataInflight := !rxALast
     }
-    when (bQueue.enq.fire()) {
+    when (rxB.fire()) {
         rxBDataInflight := !rxBLast
     }
-    when (cQueue.enq.fire()) {
+    when (rxC.fire()) {
         rxCDataInflight := !rxCLast
     }
-    when (dQueue.enq.fire()) {
+    when (rxD.fire()) {
         rxDDataInflight := !rxDLast
     }
 
     val rxFirst = !rxADataInflight && !rxBDataInflight && !rxCDataInflight && !rxDDataInflight
-    val rxFire = aQueue.enq.fire() || bQueue.enq.fire() || cQueue.enq.fire() || dQueue.enq.fire() || eQueue.enq.fire()
+    val rxFire = rxA.fire() || rxB.fire() || rxC.fire() || rxD.fire() || rxE.fire()
 
     val rxBuffer = Reg(Vec(rxBufferBytes, UInt(8.W)))
-    val (rxType, rxOpcode) = typeFromBuffer(rxBuffer)
+    val (rxType, rxOpcode) = typeFromBuffer(rxBuffer.asUInt)
 
     val rxSymCount = RegInit(0.U(log2Ceil(rxBufferBytes + 1).W))
 
@@ -260,16 +255,16 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveE
         (rxDLast && (rxType === typeD)) ||
         (rxType === typeE), rxNumSymbols, rxNumSymbolsNotLast)
 
-    aQueue.enq.valid := rxValid && (rxType === typeA)
-    bQueue.enq.valid := rxValid && (rxType === typeB)
-    cQueue.enq.valid := rxValid && (rxType === typeC)
-    dQueue.enq.valid := rxValid && (rxType === typeD)
-    eQueue.enq.valid := rxValid && (rxType === typeE)
-    assert(aQueue.enq.ready || !aQueue.enq.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
-    assert(bQueue.enq.ready || !bQueue.enq.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
-    assert(cQueue.enq.ready || !cQueue.enq.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
-    assert(dQueue.enq.ready || !dQueue.enq.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
-    assert(eQueue.enq.ready || !eQueue.enq.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
+    rxA.valid := rxValid && (rxType === typeA)
+    rxB.valid := rxValid && (rxType === typeB)
+    rxC.valid := rxValid && (rxType === typeC)
+    rxD.valid := rxValid && (rxType === typeD)
+    rxE.valid := rxValid && (rxType === typeE)
+    assert(rxA.ready || !rxA.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
+    assert(rxB.ready || !rxB.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
+    assert(rxC.ready || !rxC.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
+    assert(rxD.ready || !rxE.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
+    assert(rxE.ready || !rxD.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
 
     rxSymCount := rxSymCount + PopCount(io.symbolsRx.map(_.valid)) - Mux(rxFire, rxSymPopped, 0.U)
 
