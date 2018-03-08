@@ -5,17 +5,17 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.tilelink._
 
-class TLBidirectionalPacketizerPort(masterEdge: TLEdgeIn, slaveEdge: TLEdgeOut) extends Bundle {
+class TLBidirectionalPacketizerIF(masterEdge: TLEdgeIn, slaveEdge: TLEdgeOut) extends Bundle {
     val master = TLBundle(masterEdge.bundle)
     val slave = Flipped(TLBundle(slaveEdge.bundle))
 }
 
-object TLBidirectionalPacketizerPort {
-    def apply(masterEdge: TLEdgeIn, slaveEdge: TLEdgeOut)() =  new TLBidirectionalPacketizerPort(masterEdge, slaveEdge)
+object TLBidirectionalPacketizerIF {
+    def apply(masterEdge: TLEdgeIn, slaveEdge: TLEdgeOut)() =  new TLBidirectionalPacketizerIF(masterEdge, slaveEdge)
 }
 
 class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveEdge: TLEdgeOut, decodedSymbolsPerCycle: Int, symbolFactory: () => S)
-    extends Packetizer(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerPort.apply(masterEdge, slaveEdge) _) with TLPacketizerLike {
+    extends Packetizer(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIF.apply(masterEdge, slaveEdge) _) with TLPacketizerLike {
 
     val tltx = new Object {
         val a = io.data.master.a
@@ -279,3 +279,4 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveE
     // TODO can we add another symbol to NACK a transaction in progress (and set error)
     // TODO need to not assume that the sender interface looks like ours, it's possible we get multiple E messages per cycle
 }
+
