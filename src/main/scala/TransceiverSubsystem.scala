@@ -35,7 +35,7 @@ class TransceiverSubsystemIO()(implicit val c: SerDesGeneratorConfig) extends Bu
 
 }
 
-class TransceiverSubsystem()(implicit val c: SerDesGeneratorConfig) extends Module {
+class TransceiverSubsystem()(implicit val c: SerDesGeneratorConfig) extends Module with HasControllerConnector {
 
   val io = IO(new TransceiverSubsystemIO)
 

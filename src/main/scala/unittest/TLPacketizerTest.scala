@@ -5,6 +5,8 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.unittest._
 
+/*
+
 class TLBidirectionalPacketizerTestLazy[S <: DecodedSymbol](decodedSymbolsPerCycle: Int, symbolFactory: () => S, )(implicit p: Parameters) extends LazyModule {
 
     val fuzz = LazyModule(new TLFuzzer(txns))
@@ -27,3 +29,5 @@ class TLBidirectionalPacketizerTest[S <: DecodedSymbol](decodedSymbolsPerCycle: 
 
 class TLBidirectionalPacketizerTest8b10b(decodedSymbolsPerCycle: Int, timeout: Int = 50000)
     extends TLBidirectionalPacketizerTest(Decoded8b10bSymbol.apply _, timeout)(implicit p: Parameters)
+
+*/

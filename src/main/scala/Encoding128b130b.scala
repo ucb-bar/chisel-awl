@@ -33,7 +33,10 @@ object Decoded128b130bSymbol {
 
 }
 
-class Encoder128b130b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Encoder(Decoded128b130bSymbol.apply _, decodedSymbolsPerCycle) {
+class Encoder128b130b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Encoder(decodedSymbolsPerCycle) {
+
+    type S = Decoded128b130bSymbol
+    def symbolFactory = Decoded128b130bSymbol.apply
 
     require(decodedSymbolsPerCycle <= 16, "FIXME, multiple encoded frames per cycle not implemented")
 
@@ -41,7 +44,10 @@ class Encoder128b130b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 
 
 }
 
-class Decoder128b130b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Decoder(Decoded128b130bSymbol.apply _, decodedSymbolsPerCycle) {
+class Decoder128b130b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Decoder(decodedSymbolsPerCycle) {
+
+    type S = Decoded128b130bSymbol
+    def symbolFactory = Decoded128b130bSymbol.apply
 
     require(decodedSymbolsPerCycle <= 16, "FIXME, multiple encoded frames per cycle not implemented")
 

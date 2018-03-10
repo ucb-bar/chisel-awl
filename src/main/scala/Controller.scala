@@ -25,13 +25,16 @@ class ControllerIO[P <: Bundle](val portFactory: () => P, val spec: ControlSpec)
     val port = portFactory()
 }
 
-abstract class Controller[P <: Bundle](val spec: ControlSpec, val portFactory: () => P) extends Module {
+abstract class Controller(val spec: ControlSpec) extends Module {
+
+    type P <: Bundle
+    def portFactory(): P
 
     final val io = IO(new ControllerIO(portFactory, spec))
 
 }
 
-class ControllerBuilder[P <: Bundle, C <: Controller[P]](val controllerFactory: (ControlSpec) => C) {
+class ControllerBuilder[C <: Controller](val controllerFactory: (ControlSpec) => C) {
 
     private val wSeq = new ArrayBuffer[(String,UInt,Option[UInt])]
     private val rSeq = new ArrayBuffer[(String,UInt)]
@@ -58,3 +61,12 @@ case class ControlSpec(
     val w: Seq[(String, UInt, Option[UInt])],
     val r: Seq[(String, UInt)]
 )
+
+
+trait HasControllerConnector {
+
+    // Override this to connect your signals to the controller
+    def connectController[C <: Controller](builder: ControllerBuilder[C]) {
+    }
+
+}

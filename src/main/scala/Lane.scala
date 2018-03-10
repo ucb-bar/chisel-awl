@@ -10,30 +10,29 @@ final class LaneIO[P <: Bundle, T <: Data](portFactory: () => P, dataFactory: ()
     val data = dataFactory()
 }
 
-abstract class Lane[S <: DecodedSymbol, T <: Data, P <: Bundle, C <: Controller[P]](val portFactory: () => P, val dataFactory: () => T, val controllerFactory: (ControlSpec) => C) extends Module {
+abstract class Lane extends Module {
 
-    val io = IO(new LaneIO(portFactory, dataFactory))
+    type C <: Controller
 
     implicit val c: SerDesGeneratorConfig
 
+    def genEncoder(): Encoder
+    def genDecoder(): Decoder
+    def genPacketizer[S <: DecodedSymbol, T <: Data](symbolFactory: () => S, decodedSymbolsPerCycle: Int): Packetizer[S, T]
+    def genBuilder(): ControllerBuilder[C]
+
+    val builder = genBuilder()
     val txrxss = Module(new TransceiverSubsystem)
-    val encoder: Encoder[S]
-    val decoder: Decoder[S]
-    val packetizer: Packetizer[S, T]
-    val builder = new ControllerBuilder[P, C](controllerFactory)
-
-    val encoderAdapter = Module(new EncoderWidthAdapter(encoder.encodedWidth, c.dataWidth))
-    val decoderAdapter = Module(new DecoderWidthAdapter(c.dataWidth, decoder.encodedWidth))
-
-    txrxss.io.clock_ref := io.clock_ref
-    txrxss.io.async_reset_in := io.async_reset_in
-    io.bias <> txrxss.io.bias
-    io.rx <> txrxss.io.rx
-    io.tx <> txrxss.io.rx
+    val encoder = Module(genEncoder())
+    val decoder = Module(genDecoder())
+    val packetizer = Module(genPacketizer(encoder.symbolFactory, encoder.decodedSymbolsPerCycle))
 
     // ensure we can always keep the line busy if we want to (have more data to send than bandwidth to send it)
     require(encoder.encodedWidth >= c.dataWidth, "The bitwidth of the physical interface (serdesDataWidth) must not be larger than the aggregate bitwidth of the encoded interface")
     require(decoder.encodedWidth >= c.dataWidth, "The bitwidth of the physical interface (serdesDataWidth) must not be larger than the aggregate bitwidth of the encoded interface")
+
+    val encoderAdapter = Module(new EncoderWidthAdapter(encoder.encodedWidth, c.dataWidth))
+    val decoderAdapter = Module(new DecoderWidthAdapter(c.dataWidth, decoder.encodedWidth))
 
     // TODO mux in BERT
 
@@ -52,6 +51,21 @@ abstract class Lane[S <: DecodedSymbol, T <: Data, P <: Bundle, C <: Controller[
     packetizer.io.symbolsRx := decoder.io.decoded
     // packetizer.io.packetRx
 
-    def connectController() = { io.port <> builder.generate().io.port }
+    txrxss.connectController(builder)
+    encoder.connectController(builder)
+    decoder.connectController(builder)
+    packetizer.connectController(builder)
+
+    val controller = builder.generate()
+
+    val io = IO(new LaneIO(controller.portFactory, packetizer.dataFactory))
+
+    io.port <> controller.io.port
+
+    txrxss.io.clock_ref := io.clock_ref
+    txrxss.io.async_reset_in := io.async_reset_in
+    io.bias <> txrxss.io.bias
+    io.rx <> txrxss.io.rx
+    io.tx <> txrxss.io.rx
 
 }

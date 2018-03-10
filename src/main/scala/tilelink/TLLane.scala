@@ -5,16 +5,17 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.tilelink._
 
-case class SerDesGeneratorKey extends Field[SerDesGeneratorConfig]
+//case class SerDesGeneratorKey extends Field[SerDesGeneratorConfig]
 
+/*
 class TLLane(masterEdge: TLEdgeIn, slaveEdge: TLEdgeOut, configEdge: TLEdgeIn)(implicit p: Parameters)
-    extends Lane(TLControllerPort.apply _, TLBidirectionalPacketizerIF.apply _, TLController.apply(configEdge) _) {
+    extends Lane(TLControllerPort.apply _, TLBidirectionalPacketizerIF.apply ) {
 
     implicit val c: SerDesGeneratorConfig = p(SerDesGeneratorKey)
 
 }
-
-
+*/
+/*
 class HBWIFModule(numLanes: Int, addresses: Seq[AddressSet], beatBytes: Int, devName: Option[String] = None)(implicit p: Parameters) extends LazyModule {
 
     val device = devName
@@ -59,3 +60,4 @@ class HBWIFModule(numLanes: Int, addresses: Seq[AddressSet], beatBytes: Int, dev
     }
 
 }
+*/

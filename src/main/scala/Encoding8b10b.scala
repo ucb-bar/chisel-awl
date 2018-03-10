@@ -208,7 +208,10 @@ object Decoded8b10bSymbol {
 // TODO right now this ignores RD altogether
 // TODO need a flag to alert the user when lock or idx changes
 // See Encoder8b10b notes below for symbol and bit ordering
-class Decoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Decoder(Decoded8b10bSymbol.apply _, decodedSymbolsPerCycle) {
+class Decoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Decoder(decodedSymbolsPerCycle) {
+
+    type S = Decoded8b10bSymbol
+    def symbolFactory = Decoded8b10bSymbol.apply
 
     val idx = RegInit(0.U(4.W))
     val lock = RegInit(false.B)
@@ -240,7 +243,10 @@ class Decoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
 // io.decoded(0) = C
 //
 // Similarly, this expects the encoded interface to go MSB..LSB with MSB being sent over the line first
-class Encoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Encoder(Decoded8b10bSymbol.apply _, decodedSymbolsPerCycle) {
+class Encoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Encoder(decodedSymbolsPerCycle) {
+
+    type S = Decoded8b10bSymbol
+    def symbolFactory = Decoded8b10bSymbol.apply
 
     val rd = RegInit(false.B)
 

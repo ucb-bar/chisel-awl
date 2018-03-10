@@ -130,6 +130,9 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveE
     dOutstanding := dOutstanding + Mux(tltx.a.fire() && txAFirst, tlResponseMap(tltx.a.bits), 0.U) + Mux(tltx.c.fire() && txCFirst, tlResponseMap(tltx.c.bits), 0.U) - tlrx.d.fire()
     eOutstanding := eOutstanding + Mux(tltx.d.fire() && txDFirst, tlResponseMap(tltx.d.bits), 0.U) - tlrx.e.fire()
 
+    val sTxReset :: sTxSync :: sTxAck :: sTxReady :: Nil = Enum(4)
+    val txState = RegInit(sTxReset)
+
     // TODO can we process more than one request at a time (e + other?)
     // Assign priorities to the channels
     val txReady = (((txCount <= decodedSymbolsPerCycle.U) && io.symbolsTxReady) || (txCount === 0.U)) && txState === sTxReady
@@ -144,9 +147,6 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveE
     tltx.c.ready := (cReady && !tltx.d.valid && !tltx.e.valid && !dataInflight) || (txReady && txCDataInflight)
     tltx.d.ready := (dReady && !tltx.e.valid && !dataInflight) || (txReady && txDDataInflight)
     tltx.e.ready := (eReady && !dataInflight)
-
-    val sTxReset :: sTxSync :: sTxAck :: sTxReady :: Nil = Enum(4)
-    val txState = RegInit(sTxReset)
 
     // These come from the RX
     val ack = io.symbolsRx map { x => x.valid && x.bits === symbolFactory().ack } reduce (_||_)
@@ -195,6 +195,9 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveE
 
     /************************ RX *************************/
 
+    val rxBuffer = Reg(Vec(rxBufferBytes, UInt(8.W)))
+    val (rxType, rxOpcode) = typeFromBuffer(rxBuffer.asUInt)
+
     val rxHeaderBits = List(headerWidth(tlrx.a.bits), headerWidth(tlrx.b.bits), headerWidth(tlrx.c.bits), headerWidth(tlrx.d.bits), headerWidth(tlrx.e.bits)).max
     val rxBufferBytes = div8Ceil(rxHeaderBits) + List(slaveEdge.bundle.dataBits/64, masterEdge.bundle.dataBits/64).max + List(slaveEdge.bundle.dataBits, masterEdge.bundle.dataBits).max/8 + (decodedSymbolsPerCycle - 1)
 
@@ -236,9 +239,6 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveE
 
     val rxFirst = !rxADataInflight && !rxBDataInflight && !rxCDataInflight && !rxDDataInflight
     val rxFire = rxA.fire() || rxB.fire() || rxC.fire() || rxD.fire() || rxE.fire()
-
-    val rxBuffer = Reg(Vec(rxBufferBytes, UInt(8.W)))
-    val (rxType, rxOpcode) = typeFromBuffer(rxBuffer.asUInt)
 
     val rxSymCount = RegInit(0.U(log2Ceil(rxBufferBytes + 1).W))
 

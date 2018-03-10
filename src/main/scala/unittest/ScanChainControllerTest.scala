@@ -42,7 +42,7 @@ class ScanChainControllerTest(timeout: Int = 50000) extends UnitTest(timeout) {
 
     val widget = Module(new ScanChainControllerTestWidget)
 
-    val builder = new ControllerBuilder[ScanChainPort, ScanChainController]({ (spec:ControlSpec) => new ScanChainController(spec) })
+    val builder = new ControllerBuilder[ScanChainController]({ (spec:ControlSpec) => new ScanChainController(spec) })
 
     builder.w("A", ctrlA)
     builder.w("B", ctrlB)

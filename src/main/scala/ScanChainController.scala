@@ -19,7 +19,10 @@ object ScanChainPort {
 }
 
 
-class ScanChainController(spec: ControlSpec) extends Controller(spec, ScanChainPort.apply _) {
+class ScanChainController(spec: ControlSpec) extends Controller(spec) {
+
+    type P = ScanChainPort
+    def portFactory = ScanChainPort.apply
 
     private val addressMap = new HashMap[String, (Int, Int)]
     private var index = 0
