@@ -30,39 +30,47 @@ abstract class DecodedSymbol(val decodedWidth: Int, val encodedWidth: Int, val r
     def isData: Bool
 }
 
-abstract class Encoder(val decodedSymbolsPerCycle: Int) extends Module with HasControllerConnector {
+trait HasEncoderParams {
 
     type S <: DecodedSymbol
-
     def symbolFactory(): S
+    val decodedSymbolsPerCycle: Int
 
-    require(decodedSymbolsPerCycle >= 1, "Cannot have 0- or negative-width Encoder")
-
-    final val encodedWidth = max(1, decodedSymbolsPerCycle / symbolFactory().rate) * symbolFactory().encodedWidth
-
-    final val io = IO(new Bundle {
-        val encoded = Output(UInt(encodedWidth.W))
-        val next = Input(Bool())
-        val decoded = Input(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())))
-        val decodedReady = Output(Bool())
-    })
+    require(decodedSymbolsPerCycle >= 1, "Cannot have 0- or negative-width Encoder/Decoder")
 
 }
 
-abstract class Decoder(val decodedSymbolsPerCycle: Int) extends Module with HasControllerConnector {
-
-    type S <: DecodedSymbol
-
-    def symbolFactory(): S
-
-    require(decodedSymbolsPerCycle >= 1, "Cannot have 0- or negative-width Decoder")
-
+trait HasEncodedWidth[S <: DecodedSymbol] {
+    val decodedSymbolsPerCycle: Int
+    val symbolFactory: () => S
     final val encodedWidth = max(1, decodedSymbolsPerCycle / symbolFactory().rate) * symbolFactory().encodedWidth
+}
 
-    final val io = IO(new Bundle {
-        val encoded = Flipped(Valid(UInt(encodedWidth.W)))
-        val decoded = Output(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())))
-    })
+class EncoderIO[S <: DecodedSymbol](val symbolFactory: () => S, val decodedSymbolsPerCycle: Int) extends Bundle with HasEncodedWidth[S] {
+    final val encoded = Output(UInt(encodedWidth.W))
+    final val next = Input(Bool())
+    final val decoded = Input(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())))
+    final val decodedReady = Output(Bool())
+}
+
+abstract class Encoder(val decodedSymbolsPerCycle: Int) extends Module with HasControllerConnector with HasEncoderParams {
+
+    val io: EncoderIO[S]
+
+    final def encodedWidth = io.encodedWidth
+
+}
+
+class DecoderIO[S <: DecodedSymbol](val symbolFactory: () => S, val decodedSymbolsPerCycle: Int) extends Bundle with HasEncodedWidth[S] {
+    final val encoded = Flipped(Valid(UInt(encodedWidth.W)))
+    final val decoded = Output(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())))
+}
+
+abstract class Decoder(val decodedSymbolsPerCycle: Int) extends Module with HasControllerConnector with HasEncoderParams {
+
+    val io: DecoderIO[S]
+
+    final def encodedWidth = io.encodedWidth
 
 }
 

@@ -195,11 +195,11 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveE
 
     /************************ RX *************************/
 
-    val rxBuffer = Reg(Vec(rxBufferBytes, UInt(8.W)))
-    val (rxType, rxOpcode) = typeFromBuffer(rxBuffer.asUInt)
-
     val rxHeaderBits = List(headerWidth(tlrx.a.bits), headerWidth(tlrx.b.bits), headerWidth(tlrx.c.bits), headerWidth(tlrx.d.bits), headerWidth(tlrx.e.bits)).max
     val rxBufferBytes = div8Ceil(rxHeaderBits) + List(slaveEdge.bundle.dataBits/64, masterEdge.bundle.dataBits/64).max + List(slaveEdge.bundle.dataBits, masterEdge.bundle.dataBits).max/8 + (decodedSymbolsPerCycle - 1)
+
+    val rxBuffer = Reg(Vec(rxBufferBytes, UInt(8.W)))
+    val (rxType, rxOpcode) = typeFromBuffer(rxBuffer.asUInt)
 
     val rxA = tlFromBuffer(tlrx.aEdge, tlrx.a.bits, rxBuffer.asUInt, false.B)
     val rxB = tlFromBuffer(tlrx.bEdge, tlrx.b.bits, rxBuffer.asUInt, false.B)

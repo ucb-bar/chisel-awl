@@ -40,6 +40,7 @@ class Encoder128b130b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 
 
     require(decodedSymbolsPerCycle <= 16, "FIXME, multiple encoded frames per cycle not implemented")
 
+    val io = IO(new EncoderIO(symbolFactory, decodedSymbolsPerCycle))
     // TODO
 
 }
@@ -51,6 +52,7 @@ class Decoder128b130b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 
 
     require(decodedSymbolsPerCycle <= 16, "FIXME, multiple encoded frames per cycle not implemented")
 
+    val io = IO(new DecoderIO(symbolFactory, decodedSymbolsPerCycle))
     // TODO
 }
 

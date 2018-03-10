@@ -180,7 +180,6 @@ object Decoded8b10bSymbol {
 
     def apply(tuple: (Int, Boolean)): Decoded8b10bSymbol = Decoded8b10bSymbol.apply(tuple._1.U, tuple._2.B)
 
-
     // Helper method to easily recognize Kcodes
     def k(edcba: Int, hgf: Int): Decoded8b10bSymbol = {
         require(hgf >= 0 && hgf <= 7, "HGF must be 0-7")
@@ -212,6 +211,8 @@ class Decoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
 
     type S = Decoded8b10bSymbol
     def symbolFactory = Decoded8b10bSymbol.apply
+
+    val io = IO(new DecoderIO(symbolFactory, decodedSymbolsPerCycle))
 
     val idx = RegInit(0.U(4.W))
     val lock = RegInit(false.B)
@@ -247,6 +248,8 @@ class Encoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
 
     type S = Decoded8b10bSymbol
     def symbolFactory = Decoded8b10bSymbol.apply
+
+    val io = IO(new EncoderIO(symbolFactory, decodedSymbolsPerCycle))
 
     val rd = RegInit(false.B)
 
