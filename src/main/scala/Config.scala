@@ -4,6 +4,7 @@ import chisel3._
 
 class SerDesGeneratorConfig(
   val dataWidth: Int,
+  val numWays: Int,
   val transceiverName: String,
   val transceiverResource: String,
   val transceiverNumIrefs: Int,
@@ -16,13 +17,16 @@ class SerDesGeneratorConfig(
   val dlevDACWidth: Int,
   val dlevHasOverride: Boolean,
   val hasDigitalLoopback: Boolean,
-  val performanceEffort: Int
+  val performanceEffort: Int,
+  val bertSampleCounterWidth: Int,
+  val bertErrorCounterWidth: Int
 ) {
 
 }
 
 class DefaultConfig extends SerDesGeneratorConfig(
     dataWidth = 16,
+    numWays = 4,
     transceiverName = "generic_transceiver",
     transceiverResource = "/generic_transceiver.sv",
     transceiverNumIrefs = 1,
@@ -35,7 +39,9 @@ class DefaultConfig extends SerDesGeneratorConfig(
     dlevDACWidth = 4,
     dlevHasOverride = true,
     hasDigitalLoopback = true,
-    performanceEffort = 1
+    performanceEffort = 1,
+    bertSampleCounterWidth = 48,
+    bertErrorCounterWidth = 64
   )
 
 

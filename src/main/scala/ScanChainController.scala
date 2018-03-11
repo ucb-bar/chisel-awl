@@ -18,6 +18,9 @@ object ScanChainPort {
     def apply(): ScanChainPort = new ScanChainPort
 }
 
+object ScanChainController {
+    def apply(spec: ControlSpec) = new ScanChainController(spec)
+}
 
 class ScanChainController(spec: ControlSpec) extends Controller(spec) {
 
@@ -88,4 +91,9 @@ class ScanChainController(spec: ControlSpec) extends Controller(spec) {
     val rLength = index - wLength
     def length = rLength + wLength
 
+}
+
+trait HasScanChainController {
+    type C = ScanChainController
+    def genBuilder() = new ControllerBuilder(ScanChainController.apply)
 }

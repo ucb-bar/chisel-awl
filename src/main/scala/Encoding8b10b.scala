@@ -161,7 +161,7 @@ class Decoded8b10bSymbol extends DecodedSymbol(8, 10, 1) {
 
     def encode(rd: Bool): UInt = {
         MuxLookup(Cat(control,rd,bits),
-            Mux(rd, Encoding8b10b.encode(true, true, 28, 3).U(10.W), Encoding8b10b.encode(true, false, 28, 3).U(10.W) ),
+            Mux(rd, Encoding8b10b.encode(true, true, 28, 5).U(10.W), Encoding8b10b.encode(true, false, 28, 5).U(10.W) ),
             Encoding8b10b.encodings.map { case ((k,r,d),enc) => (Cat(k.B,r.B,d.U(8.W)), enc.U(10.W)) })
     }
 
@@ -193,10 +193,10 @@ object Decoded8b10bSymbol {
 
     def decode(encoded: UInt, rd: Bool, valid: Bool): Valid[Decoded8b10bSymbol] = {
         val x = Wire(Valid(Decoded8b10bSymbol()))
-        // Now we output a nack on a failed decode
-        x.bits := MuxLookup(encoded, Decoded8b10bSymbol().nack, Encoding8b10b.encodings.map
+        x.bits := MuxLookup(encoded, Decoded8b10bSymbol().comma, Encoding8b10b.encodings.map
             { case ((k,r,d),enc) => (enc.U(10.W), Decoded8b10bSymbol(d.U,k.B)) })
-        x.valid := valid
+        x.valid := MuxLookup(encoded, false.B, Encoding8b10b.encodings.map
+            { case ((k,r,d),enc) => (enc.U(10.W), true.B) }) && valid
         x
     }
 
@@ -212,7 +212,9 @@ class Decoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
     type S = Decoded8b10bSymbol
     def symbolFactory = Decoded8b10bSymbol.apply
 
-    val io = IO(new DecoderIO(symbolFactory, decodedSymbolsPerCycle))
+    val io = IO(new DecoderIO(symbolFactory, decodedSymbolsPerCycle) {
+        val error = Output(Bool())
+    })
 
     val idx = RegInit(0.U(4.W))
     val lock = RegInit(false.B)
@@ -232,6 +234,14 @@ class Decoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
 
     (0 until decodedSymbolsPerCycle).foreach { i =>
         io.decoded(i) := Decoded8b10bSymbol.decode(offsets(Mux(found,nextIdx,idx))(i*10+9,i*10), rd, io.encoded.valid)
+    }
+
+    val error = RegInit(false.B)
+    error := (!(io.decoded.map(_.valid).reduce(_&&_)) && io.encoded.valid) || error
+    io.error := error
+
+    override def connectController[C <: Controller](builder: ControllerBuilder[C]) {
+        builder.r("decoder_error", io.error)
     }
 
 }
@@ -257,7 +267,6 @@ class Encoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
     io.decodedReady := io.next
 
     val (e,r) = io.decoded.foldRight((Option.empty[UInt],rd)) { case (decoded,(prevEncoded,prevRd)) =>
-    //val (e,r) = io.decoded.foldLeft((Wire(UInt(0.W)),rd)) { case ((prevEncoded,prevRd),decoded) =>
         val nextEncoded = Wire(UInt())
         val nextRd = Wire(Bool())
         if (performanceEffort <= 0) {
@@ -269,7 +278,6 @@ class Encoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
             // Therefore we can just invert RD whenever there is an even number of 1s
             nextRd := prevRd ^ ~encoded.xorR
             nextEncoded := prevEncoded.foldRight(encoded) { Cat(_,_) }
-            // nextEncoded := Cat(encoded, prevEncoded)
         } else {
             // High setting, prioritize speed
             // Use a lookahead topology to calculate RD
@@ -280,13 +288,23 @@ class Encoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
             val nextRd1 = encoded1.xorR
             nextRd := Mux(prevRd, nextRd1, nextRd0)
             nextEncoded := prevEncoded.foldRight(Mux(prevRd,encoded1,encoded0)) { Cat(_,_) }
-            // nextEncoded := Cat(Mux(prevRd,encoded1,encoded0), prevEncoded)
         }
         (Some(nextEncoded),nextRd)
     }
     io.encoded := e.get
-    when (io.next) {
+    when (io.next) {       rd := r
         rd := r
     }
 }
 
+trait HasEncoding8b10b {
+    val decodedSymbolsPerCycle: Int
+    def genEncoder() = new Encoder8b10b(decodedSymbolsPerCycle, 0)
+    def genDecoder() = new Decoder8b10b(decodedSymbolsPerCycle, 0)
+}
+
+trait HasEncoding8b10bHighPerf {
+    val decodedSymbolsPerCycle: Int
+    def genEncoder() = new Encoder8b10b(decodedSymbolsPerCycle, 1)
+    def genDecoder() = new Decoder8b10b(decodedSymbolsPerCycle, 1)
+}

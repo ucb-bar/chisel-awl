@@ -82,7 +82,7 @@ class EncoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Module {
     val io = IO(new Bundle {
         val enq = Input(UInt(enqBits.W))
         val next = Output(Bool())
-        val deq = Valid(UInt(deqBits.W))
+        val deq = Output(UInt(deqBits.W))
     })
 
     if (enqBits == deqBits) {
