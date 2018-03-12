@@ -6,11 +6,13 @@ import chisel3.experimental._
 
 final class LaneIO[P <: Bundle, T <: Data](portFactory: () => P, dataFactory: () => T)(implicit val c: SerDesGeneratorConfig)
     extends Bundle with TransceiverOuterIF {
-    val port = portFactory()
+    val control = portFactory()
     val data = dataFactory()
 }
 
-abstract class Lane(val decodedSymbolsPerCycle: Int) extends Module with HasDebug {
+abstract class Lane extends Module with HasDebug {
+
+    def decodedSymbolsPerCycle: Int
 
     type C <: Controller
     type T <: Data
@@ -66,7 +68,7 @@ abstract class Lane(val decodedSymbolsPerCycle: Int) extends Module with HasDebu
 
     // TODO why is this broken
     //io.data <> packetizer.io.data
-    io.port <> controller.io.port
+    io.control <> controller.io.control
 
     txrxss.io.clock_ref := io.clock_ref
     txrxss.io.async_reset_in := io.async_reset_in

@@ -130,7 +130,7 @@ trait HasPRBS31 extends HasPRBS {
 
 trait HasAllPRBS extends HasPRBS7 with HasPRBS15 with HasPRBS31
 
-trait HasBert extends HasDebug {
+trait HasBertDebug extends HasDebug {
     implicit val c: SerDesGeneratorConfig
     abstract override def genDebug() = Seq(new BertDebug with HasAllPRBS) ++ super.genDebug()
 }

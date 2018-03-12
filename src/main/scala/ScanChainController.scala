@@ -30,16 +30,16 @@ class ScanChainController(spec: ControlSpec) extends Controller(spec) {
     private val addressMap = new HashMap[String, (Int, Int)]
     private var index = 0
 
-    private val wScanOut = spec.w.foldLeft(io.port.scanIn) { case (scanIn, (name, node, init)) =>
+    private val wScanOut = spec.w.foldLeft(io.control.scanIn) { case (scanIn, (name, node, init)) =>
         val w = node.getWidth
 
         addressMap += (name -> (index + w - 1, index))
         index += w
 
         val shift = Wire(UInt(w.W))
-        withClock (io.port.scanClock) {
+        withClock (io.control.scanClock) {
             val shiftReg = Reg(UInt(w.W))
-            when (io.port.scanEnable) {
+            when (io.control.scanEnable) {
                 if (w == 1) {
                     shiftReg := scanIn
                 } else {
@@ -53,7 +53,7 @@ class ScanChainController(spec: ControlSpec) extends Controller(spec) {
 
         io.w(name) := shadow
 
-        when (io.port.scanCommit) {
+        when (io.control.scanCommit) {
             shadow := shift
         }
 
@@ -62,16 +62,16 @@ class ScanChainController(spec: ControlSpec) extends Controller(spec) {
 
     val wLength = index
 
-    io.port.scanOut := spec.r.foldLeft(wScanOut) { case (scanIn, (name, node)) =>
+    io.control.scanOut := spec.r.foldLeft(wScanOut) { case (scanIn, (name, node)) =>
         val w = node.getWidth
 
         addressMap += (name -> (index + w - 1, index))
         index += w
 
         val shift = Wire(UInt(w.W))
-        withClock (io.port.scanClock) {
+        withClock (io.control.scanClock) {
             val shiftReg = Reg(UInt(w.W))
-            when (io.port.scanEnable) {
+            when (io.control.scanEnable) {
                 if (w == 1) {
                     shiftReg := scanIn
                 } else {

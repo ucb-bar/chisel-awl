@@ -5,41 +5,41 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.tilelink._
 
-class TLBidirectionalPacketizerIF(masterEdge: TLEdgeIn, slaveEdge: TLEdgeOut) extends Bundle {
-    val master = TLBundle(masterEdge.bundle)
-    val slave = Flipped(TLBundle(slaveEdge.bundle))
+class TLBidirectionalPacketizerIO(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn) extends Bundle {
+    val client = TLBundle(clientEdge.bundle)
+    val manager = Flipped(TLBundle(managerEdge.bundle))
 }
 
-object TLBidirectionalPacketizerIF {
-    def apply(masterEdge: TLEdgeIn, slaveEdge: TLEdgeOut)() =  new TLBidirectionalPacketizerIF(masterEdge, slaveEdge)
+object TLBidirectionalPacketizerIO {
+    def apply(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn)() =  new TLBidirectionalPacketizerIO(clientEdge, managerEdge)
 }
 
-class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveEdge: TLEdgeOut, decodedSymbolsPerCycle: Int, symbolFactory: () => S)
-    extends Packetizer(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIF.apply(masterEdge, slaveEdge) _) with TLPacketizerLike {
+class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, managerEdge: TLEdgeIn, decodedSymbolsPerCycle: Int, symbolFactory: () => S)
+    extends Packetizer(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIO.apply(clientEdge, managerEdge) _) with TLPacketizerLike {
 
     val tltx = new Object {
-        val a = io.data.master.a
-        val b = io.data.slave.b
-        val c = io.data.master.c
-        val d = io.data.slave.d
-        val e = io.data.master.e
-        val aEdge = masterEdge
-        val bEdge = slaveEdge
-        val cEdge = masterEdge
-        val dEdge = slaveEdge
-        val eEdge = masterEdge
+        val a = io.data.manager.a
+        val b = io.data.client.b
+        val c = io.data.manager.c
+        val d = io.data.client.d
+        val e = io.data.manager.e
+        val aEdge = managerEdge
+        val bEdge = clientEdge
+        val cEdge = managerEdge
+        val dEdge = clientEdge
+        val eEdge = managerEdge
     }
     val tlrx = new Object {
-        val a = io.data.slave.a
-        val b = io.data.master.b
-        val c = io.data.slave.c
-        val d = io.data.master.d
-        val e = io.data.slave.e
-        val aEdge = slaveEdge
-        val bEdge = masterEdge
-        val cEdge = slaveEdge
-        val dEdge = masterEdge
-        val eEdge = slaveEdge
+        val a = io.data.client.a
+        val b = io.data.manager.b
+        val c = io.data.client.c
+        val d = io.data.manager.d
+        val e = io.data.client.e
+        val aEdge = clientEdge
+        val bEdge = managerEdge
+        val cEdge = clientEdge
+        val dEdge = managerEdge
+        val eEdge = clientEdge
     }
     val aMaxOutstanding = 8
     val bMaxOutstanding = 8
@@ -60,13 +60,13 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveE
     require(tlrx.d.bits.opcode.getWidth == 3)
     // We want the opcode to fit in the first byte with the type
     require(tlTypeWidth == 3)
-    require(isPow2(slaveEdge.bundle.dataBits))
-    require(slaveEdge.bundle.dataBits/8 >= 8) // mask must be a multiple of bytes
+    require(isPow2(managerEdge.bundle.dataBits))
+    require(managerEdge.bundle.dataBits/8 >= 8) // mask must be a multiple of bytes
 
     /************************ TX *************************/
 
     val txHeaderBits = List(headerWidth(tltx.a.bits), headerWidth(tltx.b.bits), headerWidth(tltx.c.bits), headerWidth(tltx.d.bits), headerWidth(tltx.e.bits)).max
-    val txBufferBits = div8Ceil(txHeaderBits)*8 + List(slaveEdge.bundle.dataBits, masterEdge.bundle.dataBits).max + List(slaveEdge.bundle.dataBits/8, masterEdge.bundle.dataBits/8).max
+    val txBufferBits = div8Ceil(txHeaderBits)*8 + List(managerEdge.bundle.dataBits, clientEdge.bundle.dataBits).max + List(managerEdge.bundle.dataBits/8, clientEdge.bundle.dataBits/8).max
     val txBuffer = Reg(UInt(txBufferBits.W))
 
     val txA = tlToBuffer(tlrx.aEdge, tlrx.a.bits, txBufferBits)
@@ -196,7 +196,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveE
     /************************ RX *************************/
 
     val rxHeaderBits = List(headerWidth(tlrx.a.bits), headerWidth(tlrx.b.bits), headerWidth(tlrx.c.bits), headerWidth(tlrx.d.bits), headerWidth(tlrx.e.bits)).max
-    val rxBufferBytes = div8Ceil(rxHeaderBits) + List(slaveEdge.bundle.dataBits/64, masterEdge.bundle.dataBits/64).max + List(slaveEdge.bundle.dataBits, masterEdge.bundle.dataBits).max/8 + (decodedSymbolsPerCycle - 1)
+    val rxBufferBytes = div8Ceil(rxHeaderBits) + List(managerEdge.bundle.dataBits/64, clientEdge.bundle.dataBits/64).max + List(managerEdge.bundle.dataBits, clientEdge.bundle.dataBits).max/8 + (decodedSymbolsPerCycle - 1)
 
     val rxBuffer = Reg(Vec(rxBufferBytes, UInt(8.W)))
     val (rxType, rxOpcode) = typeFromBuffer(rxBuffer.asUInt)
@@ -278,5 +278,16 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](masterEdge: TLEdgeIn, slaveE
 
     // TODO can we add another symbol to NACK a transaction in progress (and set error)
     // TODO need to not assume that the sender interface looks like ours, it's possible we get multiple E messages per cycle
+}
+
+trait HasTLBidirectionalPacketizer {
+
+    type T = TLBidirectionalPacketizerIO
+
+    def decodedSymbolsPerCycle: Int
+    val clientEdge: TLEdgeOut
+    val managerEdge: TLEdgeIn
+
+    def genPacketizer[S <: DecodedSymbol](symbolFactory: () => S) = new TLBidirectionalPacketizer[S](clientEdge, managerEdge, decodedSymbolsPerCycle, symbolFactory)
 }
 

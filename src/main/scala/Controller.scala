@@ -22,7 +22,7 @@ class ControllerIO[P <: Bundle](val portFactory: () => P, val spec: ControlSpec)
 
     val w = Output(new CustomBundle(spec.w map {case (n,v,i) => (n,chiselTypeOf(v))}: _*))
     val r = Input(new CustomBundle(spec.r map {case (n,v) => (n,chiselTypeOf(v))}: _*))
-    val port = portFactory()
+    val control = portFactory()
 }
 
 abstract class Controller(val spec: ControlSpec) extends Module {

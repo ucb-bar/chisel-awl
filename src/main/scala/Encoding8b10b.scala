@@ -298,13 +298,9 @@ class Encoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
 }
 
 trait HasEncoding8b10b {
-    val decodedSymbolsPerCycle: Int
-    def genEncoder() = new Encoder8b10b(decodedSymbolsPerCycle, 0)
-    def genDecoder() = new Decoder8b10b(decodedSymbolsPerCycle, 0)
-}
-
-trait HasEncoding8b10bHighPerf {
-    val decodedSymbolsPerCycle: Int
-    def genEncoder() = new Encoder8b10b(decodedSymbolsPerCycle, 1)
-    def genDecoder() = new Decoder8b10b(decodedSymbolsPerCycle, 1)
+    implicit val c: SerDesGeneratorConfig
+    // we want the encoded width to be >= the bit width but as small as possible
+    final def decodedSymbolsPerCycle = (c.dataWidth + 9)/10
+    final def genEncoder() = new Encoder8b10b(decodedSymbolsPerCycle, c.performanceEffort)
+    final def genDecoder() = new Decoder8b10b(decodedSymbolsPerCycle, c.performanceEffort)
 }

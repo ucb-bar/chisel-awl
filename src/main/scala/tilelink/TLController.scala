@@ -6,10 +6,10 @@ import chisel3.util._
 import freechips.rocketchip.tilelink._
 
 object TLControllerPort {
-    def apply(edge: TLEdgeIn)(): TLBundle = TLBundle(edge.bundle)
+    def apply(edge: TLEdgeOut)(): TLBundle = TLBundle(edge.bundle)
 }
 
-class TLController(spec: ControlSpec, edge: TLEdgeIn) extends Controller(spec) {
+class TLController(spec: ControlSpec, edge: TLEdgeOut) extends Controller(spec) {
 
     type P = TLBundle
     def portFactory = TLControllerPort.apply(edge)
@@ -19,11 +19,11 @@ class TLController(spec: ControlSpec, edge: TLEdgeIn) extends Controller(spec) {
 }
 
 object TLController {
-    def apply(edge: TLEdgeIn)(spec: ControlSpec): TLController = new TLController(spec, edge)
+    def apply(edge: TLEdgeOut)(spec: ControlSpec): TLController = new TLController(spec, edge)
 }
 
-trait HasScanChainController {
+trait HasTLController {
     type C = TLController
-    val edge: TLEdgeIn // TODO
-    def genBuilder() = new ControllerBuilder(TLController.apply(edge))
+    val configEdge: TLEdgeOut // TODO
+    def genBuilder() = new ControllerBuilder(TLController.apply(configEdge))
 }

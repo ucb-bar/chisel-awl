@@ -62,7 +62,7 @@ trait HasEncoding128b130b {
     implicit val c: SerDesGeneratorConfig
     // This basically treats the output bitwidth as if it has 0% overhead,
     // but compensates for the two extra bits per 128 with the c.dataWidth/65 term (2/130 = 1/65)
-    val optimalSymbolsPerCycle = (c.dataWidth + 7 - c.dataWidth/65) / 8
-    val encoder = Module(new Encoder128b130b(optimalSymbolsPerCycle, c.performanceEffort))
-    val decoder = Module(new Decoder128b130b(optimalSymbolsPerCycle, c.performanceEffort))
+    def decodedSymbolsPerCycle = (c.dataWidth + 7 - c.dataWidth/65) / 8
+    final def denEncoder() = new Encoder128b130b(decodedSymbolsPerCycle, c.performanceEffort)
+    final def genDecoder() = new Decoder128b130b(decodedSymbolsPerCycle, c.performanceEffort)
 }

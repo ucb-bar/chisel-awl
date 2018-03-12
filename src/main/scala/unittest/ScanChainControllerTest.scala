@@ -73,15 +73,15 @@ class ScanChainControllerTest(timeout: Int = 50000) extends UnitTest(timeout) {
     val sScanIn :: sUpdate :: sWait :: sScanOut :: sCheck :: sDone :: Nil = Enum(6)
     val state = RegInit(sScanIn)
     io.finished := state === sDone
-    dut.io.port.scanEnable := state === sScanIn || state === sScanOut
-    dut.io.port.scanCommit := state === sUpdate
+    dut.io.control.scanEnable := state === sScanIn || state === sScanOut
+    dut.io.control.scanCommit := state === sUpdate
     val wCounter = Counter(dut.wLength)
     val counter = Counter(dut.length)
-    dut.io.port.scanIn := scanInData((wLength-1).U - wCounter.value)
-    dut.io.port.scanClock := clock
+    dut.io.control.scanIn := scanInData((wLength-1).U - wCounter.value)
+    dut.io.control.scanClock := clock
 
-    when (dut.io.port.scanEnable) {
-        scanOutData := Cat(scanOutData(dut.length - 2, 0), dut.io.port.scanOut)
+    when (dut.io.control.scanEnable) {
+        scanOutData := Cat(scanOutData(dut.length - 2, 0), dut.io.control.scanOut)
     }
 
     switch (state) {
