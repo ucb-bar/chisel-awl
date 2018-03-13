@@ -7,55 +7,84 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config._
 
-class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn, val configEdge: TLEdgeOut)(implicit val c: SerDesGeneratorConfig) extends Lane
+class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn, val configEdge: TLEdgeOut)(implicit val c: SerDesConfig, implicit val b: BertConfig) extends Lane
     with HasEncoding8b10b
     with HasBertDebug
     with HasTLBidirectionalPacketizer
     with HasTLController
 
+class HbwifModule(implicit p: Parameters) extends LazyModule {
 
-// cake stuff
-class HbwifModule(id: Int, managerParams: Seq[TLManagerPortParameters])(implicit p: Parameters) extends LazyModule {
+    val lanes = p(HbwifTLKey).numLanes
+    val beatBytes = p(HbwifTLKey).beatBytes
+    val numXact = p(HbwifTLKey).numXact
+    val managerAddressSet = p(HbwifTLKey).managerAddressSet
+    require(managerAddressSet.length == lanes)
 
-    val clientNode = TLClientNode(Seq(TLClientPortParameters(
+    val clientNodes = (0 until lanes).map { id => TLClientNode(Seq(TLClientPortParameters(
         Seq(TLClientParameters(
-            name = s"HbwifClient$id",
-            sourceId = IdRange(0,32) // TODO
-        ))
-    )))
-    val managerNode = TLManagerNode(managerParams) // TODO
-    val configNode = TLClientNode(Seq(TLClientPortParameters(
+            name               = s"HbwifClient$id",
+            sourceId           = IdRange(0,numXact),
+            supportsProbe      = TransferSizes(1, beatBytes),
+            supportsArithmetic = TransferSizes(1, beatBytes),
+            supportsLogical    = TransferSizes(1, beatBytes),
+            supportsGet        = TransferSizes(1, beatBytes),
+            supportsPutFull    = TransferSizes(1, beatBytes),
+            supportsPutPartial = TransferSizes(1, beatBytes),
+            supportsHint       = TransferSizes(1, beatBytes)
+        )),
+        minLatency = 1
+    ))) }
+    val managerNodes = (0 until lanes).map { id => TLManagerNode(Seq(TLManagerPortParameters(
+        Seq(TLManagerParameters(
+            address            = List(managerAddressSet(id)),
+            resources          = (new SimpleDevice(s"HbwifManager$id",Seq())).reg("mem"),
+            regionType         = RegionType.CACHED,
+            executable         = true,
+            supportsAcquireT   = TransferSizes(1, beatBytes),
+            supportsAcquireB   = TransferSizes(1, beatBytes),
+            supportsArithmetic = TransferSizes(1, beatBytes),
+            supportsLogical    = TransferSizes(1, beatBytes),
+            supportsGet        = TransferSizes(1, beatBytes),
+            supportsPutFull    = TransferSizes(1, beatBytes),
+            supportsPutPartial = TransferSizes(1, beatBytes),
+            supportsHint       = TransferSizes(1, beatBytes),
+            fifoId             = None)),
+        beatBytes = beatBytes,
+        minLatency = 1
+    ))) }
+    val configNodes = (0 until lanes).map { id => TLClientNode(Seq(TLClientPortParameters(
         Seq(TLClientParameters(
             name = s"HbwifConfig$id",
-            sourceId = IdRange(0,32) // TODO
+            sourceId = IdRange(0,1)
         ))
-    )))
-
-    val c = new DefaultConfig() // TODO
+    ))) }
 
     lazy val module = new LazyModuleImp(this) {
-        val (clientOut, clientEdge) = clientNode.out(0)
-        val (managerIn, managerEdge) = managerNode.in(0)
-        val (configOut, configEdge) = configNode.out(0)
-        val lane = Module(new TLLane8b10b(clientEdge, managerEdge, configEdge)(c))
+        val lanes = p(HbwifTLKey).numLanes
+        val banks = p(HbwifTLKey).numBanks
+        require(lanes % banks == 0)
 
-        lane.io.data.client <> clientOut
-        lane.io.data.manager <> managerIn
-        lane.io.control <> configOut
-        /*
-        lane.io.clock_ref <> TODO
-        lane.io.async_reset_in <> TODO
-        lane.io.bias <> TODO
-        lane.io.rx <> io.rx(id) TODO
-        lane.io.tx <> io.tx(id) TODO
-        */
+        // These go to clock receivers
+        val hbwifRefClock = Wire(Vec(lanes/banks, Bool()))
+        // These go to mmio registers
+        val hbwifReset = Wire(Vec(lanes, Bool()))
 
+        val tx = IO(Vec(lanes, new Differential()))
+        val rx = IO(Vec(lanes, Flipped(new Differential())))
+
+        (0 until lanes).foreach { id =>
+            val (clientOut, clientEdge) = clientNodes(id).out(0)
+            val (managerIn, managerEdge) = managerNodes(id).in(0)
+            val (configOut, configEdge) = configNodes(id).out(0)
+            val lane = Module(new TLLane8b10b(clientEdge, managerEdge, configEdge)(p(HbwifSerDesKey), p(HbwifBertKey)))
+            lane.io.data.client <> clientOut
+            lane.io.data.manager <> managerIn
+            lane.io.control <> configOut
+            lane.io.tx <> tx(id)
+            lane.io.rx <> rx(id)
+            lane.io.clock_ref <> hbwifRefClock(id/banks)
+            lane.io.async_reset_in <> hbwifReset(id)
+        }
     }
 }
-
-class HbwifBundle extends Bundle {
-    val numLanes = 8 // TODO
-    val tx = Vec(numLanes, new Differential())
-    val rx = Vec(numLanes, Flipped(new Differential()))
-}
-

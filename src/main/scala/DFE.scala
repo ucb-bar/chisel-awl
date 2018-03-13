@@ -3,7 +3,7 @@ package hbwif2
 import chisel3._
 import chisel3.experimental._
 
-class DFEIO()(implicit val c: SerDesGeneratorConfig) extends Bundle {
+class DFEIO()(implicit val c: SerDesConfig) extends Bundle {
 
   val taps = Output(Vec(c.dfeNumTaps, UInt(c.dfeTapWidth.W)))
   val data_dlev = Input(UInt(c.dataWidth.W))
@@ -11,7 +11,7 @@ class DFEIO()(implicit val c: SerDesGeneratorConfig) extends Bundle {
 
 }
 
-class DFE()(implicit val c: SerDesGeneratorConfig) extends Module {
+class DFE()(implicit val c: SerDesConfig) extends Module {
 
   val io = IO(new DFEIO)
 

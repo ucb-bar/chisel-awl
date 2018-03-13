@@ -8,7 +8,7 @@ class Encoding8b10bTest(val decodedSymbolsPerCycle: Int, val performanceEffort: 
 
     val str = s"{decodedSymbolsPerCycle: $decodedSymbolsPerCycle, performanceEffort: $performanceEffort, offset: $offset}"
     val encoder = Module(new Encoder8b10b(decodedSymbolsPerCycle, performanceEffort))
-    val decoder = Module(new Decoder8b10b(decodedSymbolsPerCycle, performanceEffort))
+    val decoder = Module(new Decoder8b10b(decodedSymbolsPerCycle))
     val builder = new SymbolGeneratorCheckerBuilder8b10b(decodedSymbolsPerCycle)
     val generator = builder.generator()
     val checker = builder.checker(str)

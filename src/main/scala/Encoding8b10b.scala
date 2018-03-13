@@ -207,7 +207,7 @@ object Decoded8b10bSymbol {
 // TODO right now this ignores RD altogether
 // TODO need a flag to alert the user when lock or idx changes
 // See Encoder8b10b notes below for symbol and bit ordering
-class Decoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Decoder(decodedSymbolsPerCycle) {
+class Decoder8b10b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbolsPerCycle) {
 
     type S = Decoded8b10bSymbol
     def symbolFactory = Decoded8b10bSymbol.apply
@@ -298,9 +298,17 @@ class Encoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
 }
 
 trait HasEncoding8b10b {
-    implicit val c: SerDesGeneratorConfig
+    implicit val c: SerDesConfig
     // we want the encoded width to be >= the bit width but as small as possible
     final def decodedSymbolsPerCycle = (c.dataWidth + 9)/10
-    final def genEncoder() = new Encoder8b10b(decodedSymbolsPerCycle, c.performanceEffort)
-    final def genDecoder() = new Decoder8b10b(decodedSymbolsPerCycle, c.performanceEffort)
+    final def genEncoder() = new Encoder8b10b(decodedSymbolsPerCycle, 0)
+    final def genDecoder() = new Decoder8b10b(decodedSymbolsPerCycle)
+}
+
+trait HasEncoding8b10bHighPerformance {
+    implicit val c: SerDesConfig
+    // we want the encoded width to be >= the bit width but as small as possible
+    final def decodedSymbolsPerCycle = (c.dataWidth + 9)/10
+    final def genEncoder() = new Encoder8b10b(decodedSymbolsPerCycle, 1)
+    final def genDecoder() = new Decoder8b10b(decodedSymbolsPerCycle)
 }

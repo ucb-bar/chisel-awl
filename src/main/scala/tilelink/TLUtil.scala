@@ -161,6 +161,8 @@ trait TLPacketizerLike {
     }
 }
 
+/* NOT TESTED
+
 // pack all valid bytes into the lowest-indexed slots available
 // e.g.
 //
@@ -262,3 +264,4 @@ class MultiQueue[T <: Data](gen: T, depth: Int, numEnqPorts: Int) extends Module
         enq.ready := (free > i.U)
     }
 }
+*/

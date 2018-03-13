@@ -3,7 +3,16 @@ package hbwif2
 import chisel3._
 import chisel3.util._
 
-class BertDebugIO(prbs: Seq[(Int, Int)])(implicit val c: SerDesGeneratorConfig) extends DebugIO(c.dataWidth) {
+case class BertConfig(
+    bertSampleCounterWidth: Int = 32,
+    bertErrorCounterWidth: Int = 32
+)
+
+object BertConfigs {
+    def apply(): Seq[BertConfig] = Seq(BertConfig())
+}
+
+class BertDebugIO(prbs: Seq[(Int, Int)])(implicit val c: SerDesConfig, implicit val b: BertConfig) extends DebugIO(c.dataWidth) {
     val enable = Input(Bool())
     val clear = Input(Bool())
     val prbsLoad = Input(UInt(prbs.map(_._1).max.W))
@@ -11,13 +20,13 @@ class BertDebugIO(prbs: Seq[(Int, Int)])(implicit val c: SerDesGeneratorConfig) 
     val prbsModeRx = Input(Vec(c.numWays, UInt(2.W)))
     val prbsSelect = Input(UInt(log2Ceil(prbs.length).W))
     val prbsSeedGoods = Output(Vec(c.numWays, Bool()))
-    val sampleCount = Input(UInt(c.bertSampleCounterWidth.W))
-    val sampleCountOut = Output(UInt(c.bertSampleCounterWidth.W))
-    val errorCounts = Output(Vec(c.numWays, UInt(c.bertErrorCounterWidth.W)))
+    val sampleCount = Input(UInt(b.bertSampleCounterWidth.W))
+    val sampleCountOut = Output(UInt(b.bertSampleCounterWidth.W))
+    val errorCounts = Output(Vec(c.numWays, UInt(b.bertErrorCounterWidth.W)))
     val berMode = Input(Bool()) // 1 = track BER, 0 = track 1s
 }
 
-class BertDebug(implicit val c: SerDesGeneratorConfig) extends Debug(c.dataWidth) with HasPRBS {
+class BertDebug()(implicit val c: SerDesConfig, implicit val b: BertConfig) extends Debug(c.dataWidth) with HasPRBS {
 
     require((c.dataWidth % c.numWays) == 0)
 
@@ -25,8 +34,8 @@ class BertDebug(implicit val c: SerDesGeneratorConfig) extends Debug(c.dataWidth
 
     val prbsModulesRx = Seq.fill(c.numWays) { prbs().map(PRBS(_, c.dataWidth/c.numWays)) }
     val prbsModulesTx = prbs().map(PRBS(_, c.dataWidth))
-    val errorCounts = RegInit(Vec(c.numWays, 0.U(c.bertErrorCounterWidth.W)))
-    val sampleCount = RegInit(0.U(c.bertSampleCounterWidth.W))
+    val errorCounts = RegInit(Vec(c.numWays, 0.U(b.bertErrorCounterWidth.W)))
+    val sampleCount = RegInit(0.U(b.bertSampleCounterWidth.W))
     val wayData = Seq.fill(c.numWays) { Wire(Vec(c.dataWidth/c.numWays, Bool())) }
 
     (0 until c.dataWidth) foreach { i => wayData(i % c.numWays)(i / c.numWays) := io.rxIn(i) }
@@ -131,6 +140,7 @@ trait HasPRBS31 extends HasPRBS {
 trait HasAllPRBS extends HasPRBS7 with HasPRBS15 with HasPRBS31
 
 trait HasBertDebug extends HasDebug {
-    implicit val c: SerDesGeneratorConfig
+    implicit val c: SerDesConfig
+    implicit val b: BertConfig
     abstract override def genDebug() = Seq(new BertDebug with HasAllPRBS) ++ super.genDebug()
 }

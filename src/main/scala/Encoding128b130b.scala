@@ -33,7 +33,7 @@ object Decoded128b130bSymbol {
 
 }
 
-class Encoder128b130b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Encoder(decodedSymbolsPerCycle) {
+class Encoder128b130b(decodedSymbolsPerCycle: Int) extends Encoder(decodedSymbolsPerCycle) {
 
     type S = Decoded128b130bSymbol
     def symbolFactory = Decoded128b130bSymbol.apply
@@ -45,7 +45,7 @@ class Encoder128b130b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 
 
 }
 
-class Decoder128b130b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) extends Decoder(decodedSymbolsPerCycle) {
+class Decoder128b130b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbolsPerCycle) {
 
     type S = Decoded128b130bSymbol
     def symbolFactory = Decoded128b130bSymbol.apply
@@ -59,10 +59,10 @@ class Decoder128b130b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 
 
 
 trait HasEncoding128b130b {
-    implicit val c: SerDesGeneratorConfig
+    implicit val c: SerDesConfig
     // This basically treats the output bitwidth as if it has 0% overhead,
     // but compensates for the two extra bits per 128 with the c.dataWidth/65 term (2/130 = 1/65)
     def decodedSymbolsPerCycle = (c.dataWidth + 7 - c.dataWidth/65) / 8
-    final def denEncoder() = new Encoder128b130b(decodedSymbolsPerCycle, c.performanceEffort)
-    final def genDecoder() = new Decoder128b130b(decodedSymbolsPerCycle, c.performanceEffort)
+    final def denEncoder() = new Encoder128b130b(decodedSymbolsPerCycle)
+    final def genDecoder() = new Decoder128b130b(decodedSymbolsPerCycle)
 }

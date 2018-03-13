@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import chisel3.experimental._
 
-final class LaneIO[P <: Bundle, T <: Data](portFactory: () => P, dataFactory: () => T)(implicit val c: SerDesGeneratorConfig)
+final class LaneIO[P <: Bundle, T <: Data](portFactory: () => P, dataFactory: () => T)(implicit val c: SerDesConfig)
     extends Bundle with TransceiverOuterIF {
     val control = portFactory()
     val data = dataFactory()
@@ -17,7 +17,7 @@ abstract class Lane extends Module with HasDebug {
     type C <: Controller
     type T <: Data
 
-    implicit val c: SerDesGeneratorConfig
+    implicit val c: SerDesConfig
 
     def genEncoder(): Encoder
     def genDecoder(): Decoder

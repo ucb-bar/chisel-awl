@@ -3,7 +3,7 @@ package hbwif2
 import chisel3._
 import chisel3.experimental._
 
-class CDRIO()(implicit c: SerDesGeneratorConfig) extends Bundle {
+class CDRIO()(implicit c: SerDesConfig) extends Bundle {
 
   val i = Output(UInt(c.cdrIWidth.W))
   val p = Output(UInt(c.cdrPWidth.W))
@@ -13,7 +13,7 @@ class CDRIO()(implicit c: SerDesGeneratorConfig) extends Bundle {
 
 }
 
-class CDR()(implicit val c: SerDesGeneratorConfig) extends Module {
+class CDR()(implicit val c: SerDesConfig) extends Module {
 
   val io = IO(new CDRIO)
 

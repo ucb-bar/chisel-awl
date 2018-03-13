@@ -4,7 +4,7 @@ import hbwif2._
 import chisel3._
 import freechips.rocketchip.unittest._
 
-class TransceiverNearFarIF()(implicit val c: SerDesGeneratorConfig) extends Bundle {
+class TransceiverNearFarIF()(implicit val c: SerDesConfig) extends Bundle {
 
   val overrides = new TransceiverOverrideIF
   val data = new TransceiverDataIF
@@ -12,14 +12,14 @@ class TransceiverNearFarIF()(implicit val c: SerDesGeneratorConfig) extends Bund
 }
 
 
-class TransceiverPairIO()(implicit val c: SerDesGeneratorConfig) extends Bundle {
+class TransceiverPairIO()(implicit val c: SerDesConfig) extends Bundle {
 
   val near = new TransceiverNearFarIF
   val far = new TransceiverNearFarIF
 
 }
 
-class TransceiverPair()(implicit val c: SerDesGeneratorConfig) extends Module {
+class TransceiverPair()(implicit val c: SerDesConfig) extends Module {
 
   val io = IO(new TransceiverPairIO)
 

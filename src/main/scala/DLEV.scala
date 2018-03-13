@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util.PopCount
 import chisel3.experimental._
 
-class DLEVIO()(implicit val c: SerDesGeneratorConfig) extends Bundle {
+class DLEVIO()(implicit val c: SerDesConfig) extends Bundle {
 
   val code = Output(UInt(c.dlevDACWidth.W))
   val data_rx = Input(UInt(c.dataWidth.W))
@@ -12,7 +12,7 @@ class DLEVIO()(implicit val c: SerDesGeneratorConfig) extends Bundle {
 
 }
 
-class DLEV()(implicit val c: SerDesGeneratorConfig) extends Module {
+class DLEV()(implicit val c: SerDesConfig) extends Module {
 
   val io = IO(new DLEVIO)
 

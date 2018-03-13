@@ -3,7 +3,7 @@ package hbwif2
 import chisel3._
 import chisel3.experimental._
 
-class TransceiverOverrideIF()(implicit val c: SerDesGeneratorConfig) extends Bundle {
+class TransceiverOverrideIF()(implicit val c: SerDesConfig) extends Bundle {
 
   // CDR override
   val cdriValue = Input(UInt((if (c.cdrHasOverride) c.cdrIWidth else 0).W))
@@ -27,7 +27,7 @@ class TransceiverOverrideIF()(implicit val c: SerDesGeneratorConfig) extends Bun
 
 }
 
-class TransceiverSubsystemIO()(implicit val c: SerDesGeneratorConfig) extends Bundle with TransceiverSharedIF {
+class TransceiverSubsystemIO()(implicit val c: SerDesConfig) extends Bundle with TransceiverSharedIF {
 
   val overrides = new TransceiverOverrideIF
 
@@ -35,7 +35,7 @@ class TransceiverSubsystemIO()(implicit val c: SerDesGeneratorConfig) extends Bu
 
 }
 
-class TransceiverSubsystem()(implicit val c: SerDesGeneratorConfig) extends Module with HasControllerConnector {
+class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with HasControllerConnector {
 
   val io = IO(new TransceiverSubsystemIO)
 
