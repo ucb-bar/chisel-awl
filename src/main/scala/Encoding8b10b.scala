@@ -264,7 +264,7 @@ class Encoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
     val rd = RegInit(false.B)
 
     // ready to encode when next is high
-    io.decodedReady := io.next
+    io.decodedReady := io.encoded.ready
 
     val (e,r) = io.decoded.foldRight((Option.empty[UInt],rd)) { case (decoded,(prevEncoded,prevRd)) =>
         val nextEncoded = Wire(UInt())
@@ -291,8 +291,8 @@ class Encoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
         }
         (Some(nextEncoded),nextRd)
     }
-    io.encoded := e.get
-    when (io.next) {       rd := r
+    io.encoded.bits := e.get
+    when (io.encoded.ready) {
         rd := r
     }
 

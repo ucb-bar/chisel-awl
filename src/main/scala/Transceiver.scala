@@ -17,12 +17,8 @@ case class SerDesConfig(
     dfeHasOverride: Boolean = true,
     dlevDACWidth: Int = 4,
     dlevHasOverride: Boolean = true,
-    hasDigitalLoopback: Boolean = true
+    bitStuffModes: Int = 3
 )
-
-object SerDesConfigs {
-    def apply(): Seq[SerDesConfig] = Seq(SerDesConfig())
-}
 
 class Differential extends Bundle {
   val p = Analog(1.W)

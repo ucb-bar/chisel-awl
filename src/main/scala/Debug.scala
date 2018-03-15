@@ -6,9 +6,10 @@ import scala.collection.mutable.ArraySeq
 
 
 class DebugIO()(implicit val c: SerDesConfig) extends Bundle {
-    val txIn = Input(UInt(c.dataWidth.W))
-    val txOut = Output(UInt(c.dataWidth.W))
-    val rxIn = Input(UInt(c.dataWidth.W))
+    val txIn = Flipped(Ready(UInt(c.dataWidth.W)))
+    val txOut = Ready(UInt(c.dataWidth.W))
+    val rxIn = Flipped(Valid(UInt(c.dataWidth.W)))
+    val rxOut = Valid(UInt(c.dataWidth.W))
 }
 
 abstract class Debug()(implicit val c: SerDesConfig) extends Module with HasControllerConnector {

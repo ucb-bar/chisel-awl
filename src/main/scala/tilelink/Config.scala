@@ -15,5 +15,5 @@ case class HbwifTLConfig(
 case object HbwifSerDesKey extends Field[SerDesConfig]
 case object HbwifBertKey extends Field[BertConfig]
 case object HbwifTLKey extends Field[HbwifTLConfig]
-
+case object HbwifPatternMemKey extends Field[PatternMemConfig]
 

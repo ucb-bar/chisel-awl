@@ -1,6 +1,7 @@
 package hbwif2
 
 import chisel3._
+import chisel3.util._
 import chisel3.experimental._
 
 class TransceiverOverrideIF()(implicit val c: SerDesConfig) extends Bundle {
@@ -46,17 +47,28 @@ trait TransceiverOuterIF extends Bundle {
 
 }
 
+class TransceiverSubsystemDataIF()(implicit val c: SerDesConfig) extends Bundle {
+
+    val rx = Valid(UInt(c.dataWidth.W))
+    val tx = Input(UInt(c.dataWidth.W))
+    val txReady = Output(Bool())
+
+}
+
 class TransceiverSubsystemIO()(implicit val c: SerDesConfig) extends Bundle with TransceiverOuterIF {
 
   // override interface
   val overrides = new TransceiverOverrideIF
 
   // data interface
-  val data = new TransceiverDataIF
+  val data = new TransceiverSubsystemDataIF
 
   // clock and reset for the rest of the digital
   val slowClock = Output(Clock())
   val syncReset = Output(Bool())
+
+  // bit stuff mode (can be 0 width)
+  val bitStuffMode = Input(UInt(log2Ceil(c.bitStuffModes).W))
 
 }
 
@@ -73,18 +85,31 @@ class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with H
   io.tx <> txrx.io.tx
   io.rx <> txrx.io.rx
 
-  io.data.dlev := txrx.io.data.dlev // TODO do we want to be able to observe this?
-  io.data.rx := txrx.io.data.rx    // XXX TODO retime and add plesiochronous buffer
-
-  txrx.io.data.tx := io.data.tx
+  // TODO do we want observability on dlev
+  // TODO do we need to do anything special re: bit stuffing
+  // io.dlev := txrx.io.data.dlev
 
   val txSyncReset = AsyncResetSynchronizer(txrx.io.clock_tx, io.asyncResetIn)
   val rxSyncReset = AsyncResetSynchronizer(txrx.io.clock_rx, io.asyncResetIn)
 
+  val rxBitStuffer = withClockAndReset(txrx.io.clock_rx, rxSyncReset) { Module(new RxBitStuffer) }
+  val txBitStuffer = withClockAndReset(txrx.io.clock_tx, txSyncReset) { Module(new TxBitStuffer) }
+  rxBitStuffer.io.raw := txrx.io.data.rx
+  txrx.io.data.tx := txBitStuffer.io.raw
+  txBitStuffer.io.enq <> io.data.tx
+  rxBitStuffer.io.mode := io.bitStuffMode
+  txBitStuffer.io.mode := io.bitStuffMode
+
+  val rxRetimer = Module(new RxRetimer)
+  rxRetimer.io.dataIn <> rxBitStuffer.io.deq
+  rxRetimer.io.clockIn := txrx.io.clock_rx
+  io.data.rx <> rxRetimer.io.dataOut
+  rxRetimer.io.clockOut := txrx.io.clock_tx
+
   io.slowClock := txrx.io.clock_tx
   io.syncReset := txSyncReset
 
-  withClockAndReset(txrx.io.clock_rx, rxSyncReset) {
+  withClockAndReset(txrx.io.clock_rx, txSyncReset) {
 
     // Transceiver <> CDR Loop
     val cdr = Module(new CDR)
@@ -112,7 +137,109 @@ class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with H
   }
 
   def connectController(builder: ControllerBuilder) {
-    //TODO
+    //TODO more signals need to go here
+    builder.w("bit_stuff_mode", io.bitStuffMode)
   }
+
+}
+
+class TxBitStuffer()(implicit val c: SerDesConfig) extends Module {
+
+    val io = IO(new Bundle {
+        val enq = Flipped(Ready(UInt(c.dataWidth.W)))
+        val raw = Output(UInt(c.dataWidth.W))
+        val mode = Input(UInt(log2Ceil(c.bitStuffModes).W))
+    })
+
+    require(c.bitStuffModes > 0)
+    require(c.dataWidth % (1 << (c.bitStuffModes - 1)) == 0)
+
+    if (c.bitStuffModes == 1) {
+        io.raw := io.enq.bits
+        io.enq.ready := true.B
+    } else {
+        val buf = Reg(UInt(c.dataWidth.W))
+        val count = RegInit(0.U((c.bitStuffModes - 1).W))
+        (0 until c.bitStuffModes).foldLeft(when(false.B) { io.raw := buf } ) { (w, i) =>
+            w.elsewhen (io.mode === i.U) {
+                io.raw := FillInterleaved(i, buf(c.dataWidth - 1, c.dataWidth - (c.dataWidth/(1 << i))))
+            }
+        } .otherwise {
+            io.raw := buf
+        }
+        when ((count +& 1.U)(io.mode) === true.B) {
+            count := 0.U
+            io.enq.ready := true.B
+            buf := io.enq.bits
+        } .otherwise {
+            count := count + 1.U
+            io.enq.ready := false.B
+            (0 until c.bitStuffModes).foreach { i =>
+                when(io.mode === i.U) {
+                    if (i > 0) {
+                        buf := Cat(buf(c.dataWidth - 1 - (c.dataWidth/(1 << i)), 0), buf((c.dataWidth/(1 << i)) - 1, 0))
+                    } else {
+                        // but we shouldn't get here
+                        buf := io.enq.bits
+                    }
+                }
+            }
+        }
+    }
+
+}
+
+class RxBitStuffer()(implicit val c: SerDesConfig) extends Module {
+
+    val io = IO(new Bundle {
+        val raw = Input(UInt(c.dataWidth.W))
+        val deq = Valid(UInt(c.dataWidth.W))
+        val mode = Input(UInt((c.bitStuffModes - 1).W))
+    })
+
+    // TODO implement this so that we don't incur a register delay in mode 0
+    require(c.bitStuffModes > 0)
+    require(c.dataWidth % (1 << (c.bitStuffModes - 1)) == 0)
+
+    if (c.bitStuffModes == 1) {
+        io.deq.bits := io.raw
+        io.deq.valid := true.B
+    } else {
+        val buf = Reg(UInt(c.dataWidth.W))
+        val count = RegInit(0.U(log2Ceil(c.bitStuffModes).W))
+        (0 until c.bitStuffModes).foreach { i =>
+            when(io.mode === i.U) {
+                val tmp = Wire(UInt((c.dataWidth / (1 << i)).W))
+                tmp := io.raw.toBools.zipWithIndex.filter(_._2 % (1 << i) == 0).map(_._1.asUInt).reduceLeft(Cat(_,_))
+                if (i > 0) {
+                    buf := Cat(buf(c.dataWidth - 1 - (c.dataWidth/(1 << i)),0), tmp)
+                } else {
+                    buf := tmp
+                }
+            }
+        }
+        when ((count +& 1.U)(io.mode) === true.B) {
+            count := 0.U
+            io.deq.valid := true.B
+        } .otherwise {
+            count := count + 1.U
+            io.deq.valid := false.B
+        }
+    }
+
+}
+
+class RxRetimer()(implicit val c: SerDesConfig) extends Module {
+
+    val io = IO(new Bundle {
+        val dataIn = Flipped(Valid(UInt(c.dataWidth.W)))
+        val clockIn = Input(Clock())
+        val dataOut = Valid(UInt(c.dataWidth.W))
+        val clockOut = Input(Clock())
+        val asyncReset = Input(Bool())
+    })
+
+    // TODO
+
 
 }

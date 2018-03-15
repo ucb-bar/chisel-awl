@@ -8,10 +8,6 @@ case class BertConfig(
     bertErrorCounterWidth: Int = 32
 )
 
-object BertConfigs {
-    def apply(): Seq[BertConfig] = Seq(BertConfig())
-}
-
 class BertDebugIO(prbs: Seq[(Int, Int)])(implicit c: SerDesConfig, implicit val b: BertConfig) extends DebugIO {
     val enable = Input(Bool())
     val clear = Input(Bool())
@@ -32,13 +28,15 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
 
     val io = IO(new BertDebugIO(prbs()))
 
+    // TODO deal with rx valid and tx ready
+
     val prbsModulesRx = Seq.fill(c.numWays) { prbs().map(PRBS(_, c.dataWidth/c.numWays)) }
     val prbsModulesTx = prbs().map(PRBS(_, c.dataWidth))
     val errorCounts = RegInit(Vec(c.numWays, 0.U(b.bertErrorCounterWidth.W)))
     val sampleCount = RegInit(0.U(b.bertSampleCounterWidth.W))
     val wayData = Seq.fill(c.numWays) { Wire(Vec(c.dataWidth/c.numWays, Bool())) }
 
-    (0 until c.dataWidth) foreach { i => wayData(i % c.numWays)(i / c.numWays) := io.rxIn(i) }
+    (0 until c.dataWidth) foreach { i => wayData(i % c.numWays)(i / c.numWays) := io.rxIn.bits(i) }
 
     io.sampleCountOut := sampleCount
     val done = io.sampleCount === io.sampleCountOut
@@ -62,7 +60,9 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
 
     val wayErrors = prbsRxData.zip(wayData).map { case (p, d) => PopCount(Mux(io.berMode, p ^ d.asUInt, d.asUInt)) }
 
-    io.txOut := Mux(io.enable, MuxLookup(io.prbsSelect, 0.U, prbsModulesTx.zipWithIndex.map { x => (x._2.U, x._1.io.out.asUInt) }), io.txIn)
+    io.txOut.bits := Mux(io.enable, MuxLookup(io.prbsSelect, 0.U, prbsModulesTx.zipWithIndex.map { x => (x._2.U, x._1.io.out.asUInt) }), io.txIn.bits)
+    io.txIn.ready := Mux(io.enable, false.B, io.txOut.ready)
+    io.rxOut <> io.rxIn
 
     when (io.clear) {
         sampleCount := 0.U

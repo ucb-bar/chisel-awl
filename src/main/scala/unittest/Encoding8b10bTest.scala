@@ -15,9 +15,9 @@ class Encoding8b10bTest(val decodedSymbolsPerCycle: Int, val performanceEffort: 
 
     val buf = RegInit(0.U((decodedSymbolsPerCycle*20 - 1).W))
 
-    buf := Cat(buf(decodedSymbolsPerCycle*10-2,0),encoder.io.encoded)
+    buf := Cat(buf(decodedSymbolsPerCycle*10-2,0),encoder.io.encoded.bits)
 
-    encoder.io.next := true.B
+    encoder.io.encoded.ready := true.B
     encoder.io.decoded <> generator.io.decoded
     generator.io.decodedReady := encoder.io.decodedReady
     decoder.io.decoded <> checker.io.decoded

@@ -19,8 +19,10 @@ abstract class ControllerBuilder {
     def w(name: String, signal: UInt) { this.w(name, signal, None) }
 
     def w(name: String, signal: UInt, init: Option[UInt]) {
-        if (init != None) require(init.get.isLit, s"Initial value for $signal must be a Chisel literal.")
-        ws.append((name, signal, init))
+        if (signal.getWidth > 0) {
+            if (init != None) require(init.get.isLit, s"Initial value for $signal must be a Chisel literal.")
+            ws.append((name, signal, init))
+        }
     }
 
     def w(name: String, signal: Seq[UInt]) { this.w(name, signal, None) }
@@ -30,7 +32,9 @@ abstract class ControllerBuilder {
     }
 
     def r(name: String, signal: UInt) {
-        rs.append((name, signal))
+        if (signal.getWidth > 0) {
+            rs.append((name, signal))
+        }
     }
 
     def r(name: String, signal: Seq[UInt]) {

@@ -47,8 +47,7 @@ trait HasEncodedWidth[S <: DecodedSymbol] {
 }
 
 class EncoderIO[S <: DecodedSymbol](val symbolFactory: () => S, val decodedSymbolsPerCycle: Int) extends Bundle with HasEncodedWidth[S] {
-    final val encoded = Output(UInt(encodedWidth.W))
-    final val next = Input(Bool())
+    final val encoded = Ready(UInt(encodedWidth.W))
     final val decoded = Input(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())))
     final val decodedReady = Output(Bool())
 }
@@ -80,33 +79,35 @@ class EncoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Module {
 
     // Assume that ENQ always has valid data we can consume
     val io = IO(new Bundle {
-        val enq = Input(UInt(enqBits.W))
-        val next = Output(Bool())
-        val deq = Output(UInt(deqBits.W))
+        val enq = Flipped(Ready(UInt(enqBits.W)))
+        val deq = Ready(UInt(deqBits.W))
     })
 
     if (enqBits == deqBits) {
-        io.deq := io.enq
-        io.next := true.B
+        io.deq <> io.enq
     } else {
         require(enqBits > deqBits, "Cannot have more deqBits than enqBits for the Encoder")
         val state = RegInit(0.U(log2Ceil(numStates).W))
         val buf = Reg(UInt((2*enqBits - 1).W)) // This can be reduced in some cases, but it should get optimized away
-        io.deq := buf(deqBits - 1, 0)
+        io.deq.bits := buf(deqBits - 1, 0)
         var rem = 0
         (0 until numStates) foreach { x =>
-            when (state === x.U) {
-                rem = rem + enqBits - deqBits
-                if (rem >= deqBits) {
-                    rem = rem - enqBits
-                    io.next := false.B
-                    buf := Cat(buf(2*enqBits-2, deqBits), buf(2*deqBits-1, deqBits))
-                } else {
-                    io.next := true.B
-                    buf := Cat(buf(2*enqBits-2, enqBits-1-rem-deqBits), io.enq,buf(deqBits+rem-1, deqBits))
+            when (io.deq.ready) {
+                when (state === x.U) {
+                    rem = rem + enqBits - deqBits
+                    if (rem >= deqBits) {
+                        rem = rem - enqBits
+                        io.enq.ready := false.B
+                        buf := Cat(buf(2*enqBits-2, deqBits), buf(2*deqBits-1, deqBits))
+                    } else {
+                        io.enq.ready := true.B
+                        buf := Cat(buf(2*enqBits-2, enqBits-1-rem-deqBits), io.enq.bits, buf(deqBits+rem-1, deqBits))
 
+                    }
+                    state := ((x+1) % numStates).U
                 }
-                state := ((x+1) % numStates).U
+            } .otherwise {
+                io.enq.ready := false.B
             }
         }
     }
@@ -117,30 +118,35 @@ class DecoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Module {
     val numStates = Encoding.lcm(enqBits, deqBits) / enqBits
 
     val io = IO(new Bundle {
-        val enq = Input(UInt(enqBits.W))
+        val enq = Flipped(Valid(UInt(enqBits.W)))
         val deq = Valid(UInt(deqBits.W))
     })
 
     if (enqBits == deqBits) {
-        io.deq.bits := io.enq
-        io.deq.valid := true.B
+        io.deq <> io.enq
     } else {
         require(deqBits > enqBits, "Cannot have more enqBits than deqBits for the Decoder")
-        val state = RegInit(0.U(log2Ceil(numStates).W)) // TODO see note below
+        val state = RegInit(0.U(log2Ceil(numStates).W))
         val buf = Reg(UInt((deqBits + enqBits - 1).W)) // This can be reduced in some cases, but it should get optimized away
-        buf := Cat(buf(deqBits - 2, 0), io.enq)
+        when (io.enq.valid) {
+            buf := Cat(buf(deqBits - 2, 0), io.enq.bits)
+        }
         io.deq.bits := buf(deqBits - 1, 0)
         var filled = 0
         (0 until numStates) foreach { x =>
-            when (state === x.U) {
-                filled = filled + enqBits
-                if (filled >= deqBits) {
-                    filled = filled - deqBits
-                    io.deq.valid := true.B
-                } else {
-                    io.deq.valid := false.B
+            when (io.enq.valid) {
+                when (state === x.U) {
+                    filled = filled + enqBits
+                    if (filled >= deqBits) {
+                        filled = filled - deqBits
+                        io.deq.valid := true.B
+                    } else {
+                        io.deq.valid := false.B
+                    }
+                    state := ((x+1) % numStates).U
                 }
-                state := ((x+1) % numStates).U // TODO this is redundant with the EncoderWidthAdapter one, may be able to optimize this out
+            } .otherwise {
+                io.deq.valid := false.B
             }
         }
     }

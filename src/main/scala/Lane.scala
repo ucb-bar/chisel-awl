@@ -44,15 +44,16 @@ abstract class Lane extends Module with HasDebug {
 
     withClockAndReset(slowClock, syncReset) {
 
-        encoderAdapter.io.enq := encoder.io.encoded
-        encoder.io.next := encoderAdapter.io.next
-        txrxss.io.data.tx := debugBus.foldLeft(encoderAdapter.io.deq) { (in, debug) =>
-            debug.io.txIn := in
-            debug.io.rxIn := txrxss.io.data.rx
-            debug.io.txOut
+        encoderAdapter.io.enq <> encoder.io.encoded
+        val (tx, rx) = debugBus.foldLeft((encoderAdapter.io.deq, decoderAdapter.io.enq)) { case ((tx, rx), debug) =>
+            debug.io.txIn <> tx
+            rx <> debug.io.rxOut
+            (debug.io.txOut, debug.io.rxIn)
         }
+        txrxss.io.tx <> tx
+        rx <> txrxss.io.rx
 
-        decoder.io.encoded := decoderAdapter.io.deq
+        decoder.io.encoded <> decoderAdapter.io.deq
         decoderAdapter.io.enq := txrxss.io.data.rx
 
         encoder.io.decoded <> packetizer.io.symbolsTx

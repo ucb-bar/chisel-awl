@@ -7,9 +7,12 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config._
 
-class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn, val configEdge: TLEdgeOut)(implicit val c: SerDesConfig, implicit val b: BertConfig) extends Lane
+class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn, val configEdge: TLEdgeOut)
+    (implicit val c: SerDesConfig, implicit val b: BertConfig, implicit val m: PatternMemConfig) extends Lane
     with HasEncoding8b10b
     with HasBertDebug
+    with HasPatternMemDebug
+    with HasLoopbackDebug
     with HasTLBidirectionalPacketizer
     with HasTLController
 
@@ -77,7 +80,7 @@ class HbwifModule(implicit p: Parameters) extends LazyModule {
             val (clientOut, clientEdge) = clientNodes(id).out(0)
             val (managerIn, managerEdge) = managerNodes(id).in(0)
             val (configOut, configEdge) = configNodes(id).out(0)
-            val lane = Module(new TLLane8b10b(clientEdge, managerEdge, configEdge)(p(HbwifSerDesKey), p(HbwifBertKey)))
+            val lane = Module(new TLLane8b10b(clientEdge, managerEdge, configEdge)(p(HbwifSerDesKey), p(HbwifBertKey), p(HbwifPatternMemKey)))
             lane.io.data.client <> clientOut
             lane.io.data.manager <> managerIn
             lane.io.control <> configOut
