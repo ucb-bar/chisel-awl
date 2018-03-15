@@ -5,25 +5,18 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.tilelink._
 
-object TLControllerPort {
-    def apply(edge: TLEdgeOut)(): TLBundle = TLBundle(edge.bundle)
-}
-
-class TLController(spec: ControlSpec, edge: TLEdgeOut) extends Controller(spec) {
+class TLControllerBuilder(edge: TLEdgeOut) extends ControllerBuilder {
 
     type P = TLBundle
-    def portFactory = TLControllerPort.apply(edge)
+    def createPort = TLBundle(edge.bundle)
 
     // TODO implement register router
 
-}
+    def generate(laneClock: Clock, laneReset: Bool): P = { ??? }
 
-object TLController {
-    def apply(edge: TLEdgeOut)(spec: ControlSpec): TLController = new TLController(spec, edge)
 }
 
 trait HasTLController {
-    type C = TLController
-    val configEdge: TLEdgeOut // TODO
-    def genBuilder() = new ControllerBuilder(TLController.apply(configEdge))
+    val configEdge: TLEdgeOut
+    def genBuilder() = new TLControllerBuilder(configEdge)
 }

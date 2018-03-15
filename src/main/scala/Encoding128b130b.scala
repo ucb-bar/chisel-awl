@@ -43,6 +43,7 @@ class Encoder128b130b(decodedSymbolsPerCycle: Int) extends Encoder(decodedSymbol
     val io = IO(new EncoderIO(symbolFactory, decodedSymbolsPerCycle))
     // TODO
 
+    def connectController(builder: ControllerBuilder) { ??? }
 }
 
 class Decoder128b130b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbolsPerCycle) {
@@ -54,6 +55,8 @@ class Decoder128b130b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbol
 
     val io = IO(new DecoderIO(symbolFactory, decodedSymbolsPerCycle))
     // TODO
+
+    def connectController(builder: ControllerBuilder) { ??? }
 }
 
 

@@ -42,7 +42,7 @@ class ScanChainControllerTest(timeout: Int = 50000) extends UnitTest(timeout) {
 
     val widget = Module(new ScanChainControllerTestWidget)
 
-    val builder = new ControllerBuilder[ScanChainController]({ (spec:ControlSpec) => new ScanChainController(spec) })
+    val builder = new ScanChainControllerBuilder
 
     builder.w("A", ctrlA)
     builder.w("B", ctrlB)
@@ -53,17 +53,17 @@ class ScanChainControllerTest(timeout: Int = 50000) extends UnitTest(timeout) {
     builder.w("WidgetIn", widget.io.in)
     builder.r("WidgetOut", widget.io.out)
 
-    val dut = builder.generate()
-    val addressMap = dut.getAddressMap()
+    val port = builder.generate(clock, reset.toBool)
+    val addressMap = builder.getAddressMap()
 
-    val rLength = statC.getWidth + statBaz.getWidth + widget.io.out.getWidth
-    val wLength = ctrlA.getWidth + ctrlB.getWidth + ctrlFoo.getWidth + ctrlBar.getWidth + widget.io.in.getWidth
-    require(dut.rLength == rLength, s"Expected ${rLength} for scan chain read length, got ${dut.rLength}")
-    require(dut.wLength == wLength, s"Expected ${wLength} for scan chain write length, got ${dut.wLength}")
-    require(dut.length == rLength + wLength, s"Expected ${rLength + wLength} for scan chain total length, got ${dut.length}")
+    val readLength = statC.getWidth + statBaz.getWidth + widget.io.out.getWidth
+    val writeLength = ctrlA.getWidth + ctrlB.getWidth + ctrlFoo.getWidth + ctrlBar.getWidth + widget.io.in.getWidth
+    require(builder.readLength == readLength, s"Expected ${readLength} for scan chain read length, got ${builder.readLength}")
+    require(builder.writeLength == writeLength, s"Expected ${writeLength} for scan chain write length, got ${builder.writeLength}")
+    require(builder.length == readLength + writeLength, s"Expected ${readLength + writeLength} for scan chain total length, got ${builder.length}")
 
-    val scanInData = Wire(Vec(dut.wLength, Bool()))
-    val scanOutData = Reg(UInt(dut.length.W))
+    val scanInData = Wire(Vec(builder.writeLength, Bool()))
+    val scanOutData = Reg(UInt(builder.length.W))
 
     set foreach { case ((name, value)) =>
         val (hi,lo) = addressMap(name)
@@ -73,15 +73,16 @@ class ScanChainControllerTest(timeout: Int = 50000) extends UnitTest(timeout) {
     val sScanIn :: sUpdate :: sWait :: sScanOut :: sCheck :: sDone :: Nil = Enum(6)
     val state = RegInit(sScanIn)
     io.finished := state === sDone
-    dut.io.control.scanEnable := state === sScanIn || state === sScanOut
-    dut.io.control.scanCommit := state === sUpdate
-    val wCounter = Counter(dut.wLength)
-    val counter = Counter(dut.length)
-    dut.io.control.scanIn := scanInData((wLength-1).U - wCounter.value)
-    dut.io.control.scanClock := clock
+    port.scanEnable := state === sScanIn || state === sScanOut
+    port.scanCommit := state === sUpdate
+    val wCounter = Counter(builder.writeLength)
+    val counter = Counter(builder.length)
+    val uCounter = Counter(4) // for commit synchronization
+    port.scanIn := scanInData((writeLength-1).U - wCounter.value)
+    port.scanClock := clock
 
-    when (dut.io.control.scanEnable) {
-        scanOutData := Cat(scanOutData(dut.length - 2, 0), dut.io.control.scanOut)
+    when (port.scanEnable) {
+        scanOutData := Cat(scanOutData(builder.length - 2, 0), port.scanOut)
     }
 
     switch (state) {
@@ -93,7 +94,9 @@ class ScanChainControllerTest(timeout: Int = 50000) extends UnitTest(timeout) {
         }
 
         is (sUpdate) {
-            state := sWait
+            when (uCounter.inc()) {
+                state := sWait
+            }
         }
 
         is (sWait) {

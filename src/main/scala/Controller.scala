@@ -5,6 +5,7 @@ import chisel3.util._
 import chisel3.experimental.{DataMirror, requireIsChiselType}
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.immutable.ListMap
+/*
 
 final class CustomBundle(elts: (String, Data)*) extends Record {
   val elements = ListMap(elts map { case (field, elt) =>
@@ -18,14 +19,17 @@ final class CustomBundle(elts: (String, Data)*) extends Record {
   }
 }
 
+// TODO refactor this as an object
 class ControllerIO[P <: Bundle](val portFactory: () => P, val spec: ControlSpec) extends Bundle {
 
     val w = Output(new CustomBundle(spec.w map {case (n,v,i) => (n,chiselTypeOf(v))}: _*))
     val r = Input(new CustomBundle(spec.r map {case (n,v) => (n,chiselTypeOf(v))}: _*))
+    //val wSeqMem = Output(new CustomBundle())
+    //val rSeqMem = Input(new CustomBundle())
     val control = portFactory()
 }
 
-abstract class Controller(val spec: ControlSpec) extends Module {
+sealed abstract class Controller(val spec: ControlSpec) extends Module {
 
     type P <: Bundle
     def portFactory(): P
@@ -33,40 +37,44 @@ abstract class Controller(val spec: ControlSpec) extends Module {
     final val io = IO(new ControllerIO(portFactory, spec))
 
 }
+*/
 
-class ControllerBuilder[C <: Controller](val controllerFactory: (ControlSpec) => C) {
+abstract class ControllerBuilder {
 
-    private val wSeq = new ArrayBuffer[(String,UInt,Option[UInt])]
-    private val rSeq = new ArrayBuffer[(String,UInt)]
+    type P <: Bundle
+    def createPort(): P
+
+    protected val ws = new ArrayBuffer[(String,UInt,Option[UInt])]
+    protected val rs = new ArrayBuffer[(String,UInt)]
+    protected val wSeqMems = new ArrayBuffer[(String,Vec[UInt])]
+    protected val rSeqMems = new ArrayBuffer[(String,Vec[UInt])]
 
     def w(name: String, signal: UInt, init: Option[UInt] = None) {
         if (init != None) require(init.get.isLit, s"Initial value for $signal must be a Chisel literal.")
-        wSeq.append((name, signal, init))
+        ws.append((name, signal, init))
     }
 
     def r(name: String, signal: UInt) {
-        rSeq.append((name, signal))
+        rs.append((name, signal))
     }
 
-    def generate(): C = {
-        val c = Module(controllerFactory(ControlSpec(wSeq,rSeq)))
-        wSeq foreach { case (name, node, init) => node := c.io.w(name) }
-        rSeq foreach { case (name, node) => c.io.r(name) := node }
-        c
+/*
+    def wSeqMem(name: String, signal: SeqMem[UInt]) {
+        wSeqMems.append((name, seqmem))
     }
+
+    def rSeqMem(name: String, seqmem: SeqMem[UInt]) {
+        rSeqMems.append((name, seqmem))
+    }
+*/
+    // This function MUST implement any clock crossings into the implicit (clock, reset) domain from the (laneClock, laneReset) domain
+    def generate(laneClock: Clock, laneReset: Bool): P
 
 }
-
-case class ControlSpec(
-    val w: Seq[(String, UInt, Option[UInt])],
-    val r: Seq[(String, UInt)]
-)
-
 
 trait HasControllerConnector {
 
     // Override this to connect your signals to the controller
-    def connectController[C <: Controller](builder: ControllerBuilder[C]) {
-    }
+    def connectController(builder: ControllerBuilder)
 
 }

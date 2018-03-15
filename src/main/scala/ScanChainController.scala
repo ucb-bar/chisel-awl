@@ -2,7 +2,7 @@ package hbwif2
 
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.withClock
+import chisel3.experimental.{withClock,withClockAndReset}
 import scala.collection.mutable.HashMap
 
 
@@ -14,86 +14,98 @@ class ScanChainPort extends Bundle {
     val scanClock = Input(Clock())
 }
 
-object ScanChainPort {
-    def apply(): ScanChainPort = new ScanChainPort
-}
-
-object ScanChainController {
-    def apply(spec: ControlSpec) = new ScanChainController(spec)
-}
-
-class ScanChainController(spec: ControlSpec) extends Controller(spec) {
+class ScanChainControllerBuilder extends ControllerBuilder {
 
     type P = ScanChainPort
-    def portFactory = ScanChainPort.apply
+    def createPort = new ScanChainPort
 
-    private val addressMap = new HashMap[String, (Int, Int)]
-    private var index = 0
+    private var wLength = 0
+    private var rLength = 0
+    val addressMap = new HashMap[String, (Int, Int)]
 
-    private val wScanOut = spec.w.foldLeft(io.control.scanIn) { case (scanIn, (name, node, init)) =>
-        val w = node.getWidth
+    def generate(laneClock: Clock, laneReset: Bool): P = {
+        var index = 0
 
-        addressMap += (name -> (index + w - 1, index))
-        index += w
+        val port = Wire(createPort)
 
-        val shift = Wire(UInt(w.W))
-        withClock (io.control.scanClock) {
-            val shiftReg = Reg(UInt(w.W))
-            when (io.control.scanEnable) {
-                if (w == 1) {
-                    shiftReg := scanIn
-                } else {
-                    shiftReg := Cat(shiftReg(w-2,0),scanIn)
+        require(wSeqMems.length == 0, "ScanChainController does not support Mems")
+        require(rSeqMems.length == 0, "ScanChainController does not support Mems")
+
+        val syncCommit = Synchronizer(port.scanCommit, laneClock)
+
+        val wScanOut = ws.foldLeft(port.scanIn) { case (scanIn, (name, node, init)) =>
+            val w = node.getWidth
+
+            addressMap += (name -> (index + w - 1, index))
+            index += w
+
+            val shift = Wire(UInt(w.W))
+            withClock (port.scanClock) {
+                val shiftReg = Reg(UInt(w.W))
+                shiftReg.suggestName(name + "_reg")
+                when (port.scanEnable) {
+                    if (w == 1) {
+                        shiftReg := scanIn
+                    } else {
+                        shiftReg := Cat(shiftReg(w-2,0),scanIn)
+                    }
                 }
+                shift := shiftReg
             }
-            shift := shiftReg
-        }
+            withClockAndReset (laneClock, laneReset) {
+                val shadow = RegInit(init.getOrElse(0.U))
+                shadow.suggestName(name + "_shadow")
 
-        val shadow = RegInit(init.getOrElse(0.U))
+                node := shadow
 
-        io.w(name) := shadow
-
-        when (io.control.scanCommit) {
-            shadow := shift
-        }
-
-        shift(w-1)
-    }
-
-    val wLength = index
-
-    io.control.scanOut := spec.r.foldLeft(wScanOut) { case (scanIn, (name, node)) =>
-        val w = node.getWidth
-
-        addressMap += (name -> (index + w - 1, index))
-        index += w
-
-        val shift = Wire(UInt(w.W))
-        withClock (io.control.scanClock) {
-            val shiftReg = Reg(UInt(w.W))
-            when (io.control.scanEnable) {
-                if (w == 1) {
-                    shiftReg := scanIn
-                } else {
-                    shiftReg := Cat(shiftReg(w-2,0),scanIn)
+                when (syncCommit) {
+                    shadow := shift
                 }
-            } .otherwise {
-                shiftReg := io.r(name)
+
             }
-            shift := shiftReg
+            shift(w-1)
         }
 
-        shift(w-1)
+        wLength = index
+
+        port.scanOut := rs.foldLeft(wScanOut) { case (scanIn, (name, node)) =>
+            val w = node.getWidth
+
+            addressMap += (name -> (index + w - 1, index))
+            index += w
+
+            val shift = Wire(UInt(w.W))
+            withClock (port.scanClock) {
+                val shiftReg = Reg(UInt(w.W))
+                shiftReg.suggestName(name + "_reg")
+                when (port.scanEnable) {
+                    if (w == 1) {
+                        shiftReg := scanIn
+                    } else {
+                        shiftReg := Cat(shiftReg(w-2,0),scanIn)
+                    }
+                } .otherwise {
+                    shiftReg := node
+                }
+                shift := shiftReg
+            }
+
+            shift(w-1)
+        }
+
+        rLength = index - wLength
+
+        port
     }
 
     def getAddressMap(): Map[String, (Int, Int)] = addressMap.toMap
 
-    val rLength = index - wLength
+    def readLength = rLength
+    def writeLength = wLength
     def length = rLength + wLength
 
 }
 
 trait HasScanChainController {
-    type C = ScanChainController
-    def genBuilder() = new ControllerBuilder(ScanChainController.apply)
+    def genBuilder() = new ScanChainControllerBuilder
 }

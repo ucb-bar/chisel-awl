@@ -5,6 +5,8 @@ import chisel3.experimental._
 
 class TransceiverOverrideIF()(implicit val c: SerDesConfig) extends Bundle {
 
+  // Note that these all have an "unsafe" crossing from the TX into RX domain
+
   // CDR override
   val cdriValue = Input(UInt((if (c.cdrHasOverride) c.cdrIWidth else 0).W))
   val cdrpValue = Input(UInt((if (c.cdrHasOverride) c.cdrPWidth else 0).W))
@@ -27,11 +29,34 @@ class TransceiverOverrideIF()(implicit val c: SerDesConfig) extends Bundle {
 
 }
 
-class TransceiverSubsystemIO()(implicit val c: SerDesConfig) extends Bundle with TransceiverSharedIF {
+trait TransceiverOuterIF extends Bundle {
+  implicit val c: SerDesConfig
 
+  // asynchronous reset
+  val asyncResetIn = Input(Bool())
+
+  // reference clock
+  val clockRef = Input(Clock())
+
+  // RX pad inputs
+  val rx = Flipped(new Differential)
+
+  // TX pad outputs
+  val tx = new Differential
+
+}
+
+class TransceiverSubsystemIO()(implicit val c: SerDesConfig) extends Bundle with TransceiverOuterIF {
+
+  // override interface
   val overrides = new TransceiverOverrideIF
 
-  val loopbackMode = Input(UInt((if (c.hasDigitalLoopback) 1 else 0).W))
+  // data interface
+  val data = new TransceiverDataIF
+
+  // clock and reset for the rest of the digital
+  val slowClock = Output(Clock())
+  val syncReset = Output(Bool())
 
 }
 
@@ -42,20 +67,24 @@ class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with H
   // Transceiver <> top level connections
   val txrx = Module(new Transceiver)
 
-  txrx.io.clock_ref := io.clock_ref
-  txrx.io.async_reset_in := io.async_reset_in
+  txrx.io.clock_ref := io.clockRef
+  txrx.io.async_reset_in := io.asyncResetIn
 
   io.tx <> txrx.io.tx
   io.rx <> txrx.io.rx
 
-  io.data.dlev := txrx.io.data.dlev
-  io.data.rx := txrx.io.data.rx
+  io.data.dlev := txrx.io.data.dlev // TODO do we want to be able to observe this?
+  io.data.rx := txrx.io.data.rx    // XXX TODO retime and add plesiochronous buffer
 
-  txrx.io.data.tx := (if (c.hasDigitalLoopback) Mux(io.loopbackMode === 1.U, io.data.tx, txrx.io.data.rx) else io.data.tx)
+  txrx.io.data.tx := io.data.tx
 
-  io.bias <> txrx.io.bias
+  val txSyncReset = AsyncResetSynchronizer(txrx.io.clock_tx, io.asyncResetIn)
+  val rxSyncReset = AsyncResetSynchronizer(txrx.io.clock_rx, io.asyncResetIn)
 
-  withClockAndReset(txrx.io.clock_digital, txrx.io.reset_out) {
+  io.slowClock := txrx.io.clock_tx
+  io.syncReset := txSyncReset
+
+  withClockAndReset(txrx.io.clock_rx, rxSyncReset) {
 
     // Transceiver <> CDR Loop
     val cdr = Module(new CDR)
@@ -80,6 +109,10 @@ class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with H
     dlev.io.data_rx := txrx.io.data.rx
     dlev.io.data_dlev := txrx.io.data.dlev
 
+  }
+
+  def connectController(builder: ControllerBuilder) {
+    //TODO
   }
 
 }

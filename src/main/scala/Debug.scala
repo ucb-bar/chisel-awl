@@ -5,13 +5,13 @@ import chisel3.util._
 import scala.collection.mutable.ArraySeq
 
 
-class DebugIO(val dataWidth: Int) extends Bundle {
-    val txIn = Input(UInt(dataWidth.W))
-    val txOut = Output(UInt(dataWidth.W))
-    val rxIn = Input(UInt(dataWidth.W))
+class DebugIO()(implicit val c: SerDesConfig) extends Bundle {
+    val txIn = Input(UInt(c.dataWidth.W))
+    val txOut = Output(UInt(c.dataWidth.W))
+    val rxIn = Input(UInt(c.dataWidth.W))
 }
 
-abstract class Debug(val dataWidth: Int) extends Module with HasControllerConnector {
+abstract class Debug()(implicit val c: SerDesConfig) extends Module with HasControllerConnector {
 
     val io: DebugIO
 

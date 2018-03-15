@@ -12,7 +12,7 @@ object BertConfigs {
     def apply(): Seq[BertConfig] = Seq(BertConfig())
 }
 
-class BertDebugIO(prbs: Seq[(Int, Int)])(implicit val c: SerDesConfig, implicit val b: BertConfig) extends DebugIO(c.dataWidth) {
+class BertDebugIO(prbs: Seq[(Int, Int)])(implicit c: SerDesConfig, implicit val b: BertConfig) extends DebugIO {
     val enable = Input(Bool())
     val clear = Input(Bool())
     val prbsLoad = Input(UInt(prbs.map(_._1).max.W))
@@ -26,7 +26,7 @@ class BertDebugIO(prbs: Seq[(Int, Int)])(implicit val c: SerDesConfig, implicit 
     val berMode = Input(Bool()) // 1 = track BER, 0 = track 1s
 }
 
-class BertDebug()(implicit val c: SerDesConfig, implicit val b: BertConfig) extends Debug(c.dataWidth) with HasPRBS {
+class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends Debug with HasPRBS {
 
     require((c.dataWidth % c.numWays) == 0)
 
@@ -73,6 +73,8 @@ class BertDebug()(implicit val c: SerDesConfig, implicit val b: BertConfig) exte
             errorCounts.zip(wayErrors).foreach { case (e, w) => e := e + w }
         }
     }
+
+    def connectController(builder: ControllerBuilder) { ??? }
 
 }
 
@@ -126,15 +128,15 @@ trait HasPRBS {
 }
 
 trait HasPRBS7 extends HasPRBS {
-    abstract override def prbs() = Seq((7, 0x60))
+    abstract override def prbs() = Seq((7, 0x60)) ++ super.prbs()
 }
 
 trait HasPRBS15 extends HasPRBS {
-    abstract override def prbs() = Seq((15, 0x6000))
+    abstract override def prbs() = Seq((15, 0x6000)) ++ super.prbs()
 }
 
 trait HasPRBS31 extends HasPRBS {
-    abstract override def prbs() = Seq((31, 0x48000000))
+    abstract override def prbs() = Seq((31, 0x48000000)) ++ super.prbs()
 }
 
 trait HasAllPRBS extends HasPRBS7 with HasPRBS15 with HasPRBS31

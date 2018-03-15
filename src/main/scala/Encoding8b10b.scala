@@ -240,7 +240,7 @@ class Decoder8b10b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbolsPe
     error := (!(io.decoded.map(_.valid).reduce(_&&_)) && io.encoded.valid) || error
     io.error := error
 
-    override def connectController[C <: Controller](builder: ControllerBuilder[C]) {
+    override def connectController(builder: ControllerBuilder) {
         builder.r("decoder_error", io.error)
     }
 
@@ -295,6 +295,8 @@ class Encoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
     when (io.next) {       rd := r
         rd := r
     }
+
+    def connectController(builder: ControllerBuilder) { }
 }
 
 trait HasEncoding8b10b {

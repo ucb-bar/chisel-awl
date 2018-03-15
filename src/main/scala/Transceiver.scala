@@ -9,7 +9,6 @@ case class SerDesConfig(
     numWays: Int = 2,
     transceiverName: String = "generic_transceiver",
     transceiverResource: String = "/generic_transceiver.sv",
-    transceiverNumIrefs: Int = 1,
     cdrHasOverride: Boolean = true,
     cdrIWidth: Int = 8,
     cdrPWidth: Int = 8,
@@ -39,48 +38,7 @@ class TransceiverDataIF()(implicit val c: SerDesConfig) extends Bundle {
 
 }
 
-// This is a container for all the things that are shared with the Lane
-trait TransceiverOuterIF {
-  implicit val c: SerDesConfig
-
-  // reference clock input
-  val clock_ref = Input(Clock())
-
-  // async reset input
-  val async_reset_in = Input(Bool())
-
-  // reference current (if any)
-  val bias = Analog(c.transceiverNumIrefs.W)
-
-  // RX pad inputs
-  val rx = Flipped(new Differential)
-
-  // TX pad outputs
-  val tx = new Differential
-
-}
-
-// This is a container for the stuff that is shared between the TransceiverIO and TransceiverSubsystemIO
-// i.e. not the dlev, dfe, and cdr override stuff
-trait TransceiverSharedIF extends TransceiverOuterIF {
-  implicit val c: SerDesConfig
-
-  // low speed clock output
-  val clock_digital = Output(Clock())
-
-  // reset
-  val reset_out = Output(Bool())
-
-  // Data
-  val data = new TransceiverDataIF
-
-  //val config = TODO
-
-  //val debug = TODO
-
-}
-
-class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle with TransceiverSharedIF {
+class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle {
 
   // CDR stuff
   val cdri = Input(UInt(c.cdrIWidth.W))
@@ -89,9 +47,30 @@ class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle with Transcei
   // Clock dither for CDR
   val dither_clock = Input(Bool())
 
+  // Data
+  val data = new TransceiverDataIF
+
   // DFE stuff
   val dfe_taps = Input(Vec(c.dfeNumTaps, UInt(c.dfeTapWidth.W)))
   val dlev_dac = Input(UInt(c.dlevDACWidth.W))
+
+  // low speed clock output
+  val clock_rx = Output(Clock())
+
+  // low speed clock output
+  val clock_tx = Output(Clock())
+
+  // reference clock input
+  val clock_ref = Input(Clock())
+
+  // async reset input
+  val async_reset_in = Input(Bool())
+
+  // RX pad inputs
+  val rx = Flipped(new Differential)
+
+  // TX pad outputs
+  val tx = new Differential
 
 }
 
