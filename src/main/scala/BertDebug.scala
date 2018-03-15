@@ -74,7 +74,19 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
         }
     }
 
-    def connectController(builder: ControllerBuilder) { ??? }
+    def connectController(builder: ControllerBuilder) {
+        builder.w("bert_enable", io.enable)
+        builder.w("bert_clear", io.clear)
+        builder.w("bert_prbs_load", io.prbsLoad)
+        builder.w("bert_mode_tx", io.prbsModeTx)
+        builder.w("bert_prbs_mode_rx", io.prbsModeRx)
+        builder.w("bert_prbs_select", io.prbsSelect)
+        builder.w("bert_prbs_seed_goods", io.prbsSeedGoods.asUInt)
+        builder.w("bert_sample_count", io.sampleCount)
+        builder.r("bert_sample_count_out", io.sampleCountOut)
+        builder.r("bert_error_counts", io.errorCounts)
+        builder.w("bert_ber_mode", io.berMode)
+    }
 
 }
 

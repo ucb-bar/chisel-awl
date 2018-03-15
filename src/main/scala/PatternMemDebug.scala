@@ -2,21 +2,23 @@ package hbwif2
 
 import chisel3._
 import chisel3.util._
-/*
+
 case class PatternMemConfig(
     val patternDepth: Int = 16,
     val snapshotDepth: Int = 16,
-    val useSeqMem: Boolean = true
+    val patternUseSeqMem: Boolean = false,
+    val snapshotUseSeqMem: Boolean = true
 )
 
 class PatternMemDebugIO()(implicit c: SerDesConfig, implicit val m: PatternMemConfig) extends DebugIO {
     val patternEnable  = Input(Bool())
     val snapshotEnable = Input(Bool())
-    val pattern        = Input(Vec((if (m.useSeqMem) 1 else m.patternDepth), UInt(c.dataWidth.W)))
-    val snapshot       = Output(Vec((if (m.useSeqMem) 1 else m.snapshotDepth), UInt(c.dataWidth.W)))
-    val patternWrEn    = if (m.useSeqMem) Some(Input(Bool())) else None
-    val patternWrAddr  = if (m.useSeqMem) Some(Input(UInt(log2Ceil(m.patternDepth).W))) else None
-    val snapshotRdAddr = if (m.useSeqMem) Some(Input(UInt(log2Ceil(m.snapshotDepth).W))) else None
+    val pattern        = Input(Vec((if (m.patternUseSeqMem) 1 else m.patternDepth), UInt(c.dataWidth.W)))
+    val snapshot       = Output(Vec((if (m.snapshotUseSeqMem) 1 else m.snapshotDepth), UInt(c.dataWidth.W)))
+    val patternWrEn    = if (m.patternUseSeqMem) Some(Input(Bool())) else None
+    val patternWrAddr  = if (m.patternUseSeqMem) Some(Input(UInt(log2Ceil(m.patternDepth).W))) else None
+    val snapshotRdEn   = if (m.snapshotUseSeqMem) Some(Input(Bool())) else None
+    val snapshotRdAddr = if (m.snapshotUseSeqMem) Some(Input(UInt(log2Ceil(m.snapshotDepth).W))) else None
 }
 
 class PatternMemDebug()(implicit c: SerDesConfig, implicit val m: PatternMemConfig) extends Debug {
@@ -43,18 +45,27 @@ class PatternMemDebug()(implicit c: SerDesConfig, implicit val m: PatternMemConf
 
     val patternOut = Wire(UInt(c.dataWidth.W))
 
-    if (m.useSeqMem) {
-        io.snapshot(0) := io.rxIn
-        io.snapshotWrAddr.get := snapshotCounter.value
-        io.snapshotWrEn.get := io.snapshotEnable && !finished
-        patternOut := io.pattern(0)
-        io.patternRdAddr.get := patternCounter.value
+    if (m.snapshotUseSeqMem) {
+        val snapshotMem = SeqMem(m.snapshotDepth, UInt(c.dataWidth.W))
+        io.snapshot(0) := snapshotMem.read(io.snapshotRdAddr.get, io.snapshotRdEn.get)
+        when (io.snapshotEnable && !finished) {
+            snapshotMem.write(snapshotCounter.value, io.rxIn)
+        }
     } else {
         val snapshotData = Reg(Vec(m.snapshotDepth, UInt(c.dataWidth.W)))
         io.snapshot := snapshotData
         when (io.snapshotEnable && !finished) {
-            snapshotData(snapshotCounter.value)
+            snapshotData(snapshotCounter.value) := io.rxIn
         }
+    }
+
+    if (m.patternUseSeqMem) {
+        val patternMem = SeqMem(m.patternDepth, UInt(c.dataWidth.W))
+        patternOut := patternMem.read(patternCounter.value, io.patternEnable)
+        when (io.patternWrEn.get) {
+            patternMem.write(io.patternWrAddr.get, io.pattern(0))
+        }
+    } else {
         patternOut := io.pattern(patternCounter.value)
     }
 
@@ -62,20 +73,15 @@ class PatternMemDebug()(implicit c: SerDesConfig, implicit val m: PatternMemConf
 
     def connectController(builder: ControllerBuilder) {
         // Ideally we figure this out automatically but for now this works
-        if (m.useSeqMem) {
-            // Instead of wiring this to registers, add it to the memory map
-            //b.rSeqMem("snapshot", io.snapshot(0), m.snapshotDepth)
-            //b.wSeqMem("pattern", io.pattern(0), m.patternDepth)
-            ???
+        if (m.snapshotUseSeqMem) {
+            builder.rSeqMem("pattern_mem_snapshot", m.snapshotDepth, io.snapshot(0), io.snapshotRdAddr.get, io.snapshotRdEn.get)
         } else {
-            (0 until m.snapshotDepth).foreach { i =>
-                b.r(s"snapshot$i", io.snapshot(i))
-            }
-            (0 until m.patternDepth).foreach { i =>
-                b.w(s"pattern$i", io.pattern(i))
-            }
+            builder.r(s"pattern_mem_snapshot", io.snapshot)
+        }
+        if (m.patternUseSeqMem) {
+            builder.wSeqMem("pattern_mem_pattern", m.patternDepth, io.pattern(0), io.patternWrAddr.get, io.patternWrEn.get)
+        } else {
+            builder.w(s"pattern_mem_pattern", io.pattern)
         }
     }
 }
-
-*/
