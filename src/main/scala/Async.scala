@@ -40,3 +40,18 @@ class AsyncResetReg(init: Boolean = true) extends BlackBox with HasBlackBoxResou
 
     setResource("/async_reset_reg.v")
 }
+
+/*
+class AsyncCrossing[T <: Data](gen: T, depth: Int = 4) extends Module {
+    val io = IO(new Bundle {
+        val enqClock = Input(Clock())
+        val enqReset = Input(Bool())
+        val deqClock = Input(Clock())
+        val deqReset = Input(Bool())
+        val enq = Flipped(Decoupled(gen))
+        val deq = Decoupled(gen)
+    })
+
+
+}
+*/

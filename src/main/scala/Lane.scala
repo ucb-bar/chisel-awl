@@ -62,18 +62,18 @@ abstract class Lane extends Module with HasDebug {
     packetizer.io.symbolsTxReady := encoder.io.decodedReady
     packetizer.io.symbolsTx <> encoder.io.decoded
 
+    // RX into TX domain crossing
+    val decoderQueue = Module(new DecoderQueue(decodedSymbolsPerCycle, encoder.symbolFactory))
+    decoderQueue.io.enqClock := rxClock
+    decoderQueue.io.deqClock := txClock
+    decoderQueue.io.enqReset := rxReset
+    decoderQueue.io.deqReset := txReset
+
     // RX chain
     rxDebug <> txrxss.io.rx
     decoder.io.encoded <> decoderAdapter.io.deq
-    decoderFifo.io.enq <> decoder.io.decoded
-    packetizer.io.symbolsRx <> decoderFifo.io.deq
-
-    // RX into TX domain crossing
-    val decoderFifo = Module(new DecoderFifo(decodedSymbolsPerCycle, encoder.symbolFactory))
-    decoderFifo.io.enqClock := rxClock
-    decoderFifo.io.deqClock := txClock
-    decoderFifo.io.enqReset := rxReset
-    decoderFifo.io.deqReset := txReset
+    decoderQueue.io.enq <> decoder.io.decoded
+    packetizer.io.symbolsRx <> decoderQueue.io.deq
 
     // TODO clock crossings?
     withClockAndReset(txClock, txReset) {

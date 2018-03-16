@@ -2,7 +2,11 @@ package hbwif2
 
 import chisel3._
 import chisel3.util._
+import chisel3.experimental.withClockAndReset
 import scala.math.max
+
+// TODO get rid of this rocketchip dependency
+import freechips.rocketchip.util.AsyncQueue
 
 // rate is how many decoded symbols are there per encoded symbol
 abstract class DecodedSymbol(val decodedWidth: Int, val encodedWidth: Int, val rate: Int) extends Bundle {
@@ -152,7 +156,7 @@ final class DecoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Modu
     }
 }
 
-final class DecoderFifo[S <: DecodedSymbol](val decodedSymbolsPerCycle: Int,  val symbolFactory: () => S) extends Module {
+final class DecoderQueue[S <: DecodedSymbol](val decodedSymbolsPerCycle: Int,  val symbolFactory: () => S) extends Module {
 
     final val io = IO(new Bundle {
         val enqClock = Input(Clock())
@@ -162,6 +166,28 @@ final class DecoderFifo[S <: DecodedSymbol](val decodedSymbolsPerCycle: Int,  va
         val enq = Vec(decodedSymbolsPerCycle, Flipped(Valid(symbolFactory())))
         val deq = Vec(decodedSymbolsPerCycle, Valid(symbolFactory()))
     })
+
+    val multiQueue = withClockAndReset(io.enqClock, io.enqReset) {
+        Module(new MultiQueue(symbolFactory(), 1 << (log2Ceil(decodedSymbolsPerCycle) + 1), decodedSymbolsPerCycle, decodedSymbolsPerCycle))
+    }
+    multiQueue.io.enq.zip(io.enq).foreach { case (m,i) =>
+        m.bits := i.bits
+        m.valid := i.valid
+        assert(m.ready, "Buffer overrun")
+    }
+
+    val async = Module(new AsyncQueue(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())), 4, 3, true))
+    async.io.enq_clock := io.enqClock
+    async.io.enq_reset := io.enqReset
+    async.io.deq_clock := io.deqClock
+    async.io.deq_reset := io.deqReset
+    async.io.enq <> multiQueue.io.deq
+    async.io.deq.bits.zip(io.deq).foreach { case (a,i) =>
+        i.bits := a.bits
+        i.valid := a.valid && async.io.deq.valid
+    }
+    async.io.deq.ready := true.B
+
 
 
 }
