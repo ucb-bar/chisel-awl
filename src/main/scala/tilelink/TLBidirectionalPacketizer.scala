@@ -280,6 +280,8 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     // TODO need to not assume that the sender interface looks like ours, it's possible we get multiple E messages per cycle
 
     def connectController(builder: ControllerBuilder) { ??? }
+
+    def connectData(data: TLBidirectionalPacketizerIO) { ??? }
 }
 
 trait HasTLBidirectionalPacketizer {

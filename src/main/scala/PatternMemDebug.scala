@@ -9,7 +9,7 @@ case class PatternMemConfig(
     val patternUseSeqMem: Boolean = false,
     val snapshotUseSeqMem: Boolean = true
 )
-
+/*
 class PatternMemDebugIO()(implicit c: SerDesConfig, implicit val m: PatternMemConfig) extends DebugIO {
     val patternEnable  = Input(Bool())
     val snapshotEnable = Input(Bool())
@@ -95,3 +95,4 @@ trait HasPatternMemDebug extends HasDebug {
     implicit val m: PatternMemConfig
     abstract override def genDebug() = Seq(new PatternMemDebug) ++ super.genDebug()
 }
+*/

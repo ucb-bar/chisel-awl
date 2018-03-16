@@ -48,7 +48,7 @@ trait HasEncodedWidth[S <: DecodedSymbol] {
 
 class EncoderIO[S <: DecodedSymbol](val symbolFactory: () => S, val decodedSymbolsPerCycle: Int) extends Bundle with HasEncodedWidth[S] {
     final val encoded = Ready(UInt(encodedWidth.W))
-    final val decoded = Input(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())))
+    final val decoded = Vec(decodedSymbolsPerCycle, Flipped(Valid(symbolFactory())))
     final val decodedReady = Output(Bool())
 }
 
@@ -62,7 +62,7 @@ abstract class Encoder(val decodedSymbolsPerCycle: Int) extends Module with HasC
 
 class DecoderIO[S <: DecodedSymbol](val symbolFactory: () => S, val decodedSymbolsPerCycle: Int) extends Bundle with HasEncodedWidth[S] {
     final val encoded = Flipped(Valid(UInt(encodedWidth.W)))
-    final val decoded = Output(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())))
+    final val decoded = Vec(decodedSymbolsPerCycle, Valid(symbolFactory()))
 }
 
 abstract class Decoder(val decodedSymbolsPerCycle: Int) extends Module with HasControllerConnector with HasEncoderParams {
@@ -73,12 +73,12 @@ abstract class Decoder(val decodedSymbolsPerCycle: Int) extends Module with HasC
 
 }
 
-class EncoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Module {
+final class EncoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Module {
 
-    val numStates = Encoding.lcm(enqBits, deqBits) / deqBits
+    private val numStates = LCM(enqBits, deqBits) / deqBits
 
     // Assume that ENQ always has valid data we can consume
-    val io = IO(new Bundle {
+    final val io = IO(new Bundle {
         val enq = Flipped(Ready(UInt(enqBits.W)))
         val deq = Ready(UInt(deqBits.W))
     })
@@ -113,11 +113,11 @@ class EncoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Module {
     }
 }
 
-class DecoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Module {
+final class DecoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Module {
 
-    val numStates = Encoding.lcm(enqBits, deqBits) / enqBits
+    private val numStates = LCM(enqBits, deqBits) / enqBits
 
-    val io = IO(new Bundle {
+    final val io = IO(new Bundle {
         val enq = Flipped(Valid(UInt(enqBits.W)))
         val deq = Valid(UInt(deqBits.W))
     })
@@ -152,8 +152,16 @@ class DecoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Module {
     }
 }
 
-object Encoding {
-    def gcd(a: Int, b: Int): Int = if (b == 0) a else gcd(b, a%b)
-    def lcm(a: Int, b: Int): Int = a*b / gcd(a, b)
-}
+final class DecoderFifo[S <: DecodedSymbol](val decodedSymbolsPerCycle: Int,  val symbolFactory: () => S) extends Module {
 
+    final val io = IO(new Bundle {
+        val enqClock = Input(Clock())
+        val enqReset = Input(Bool())
+        val deqClock = Input(Clock())
+        val deqReset = Input(Bool())
+        val enq = Vec(decodedSymbolsPerCycle, Flipped(Valid(symbolFactory())))
+        val deq = Vec(decodedSymbolsPerCycle, Valid(symbolFactory()))
+    })
+
+
+}

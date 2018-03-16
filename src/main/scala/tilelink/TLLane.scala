@@ -11,8 +11,6 @@ class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn, val conf
     (implicit val c: SerDesConfig, implicit val b: BertConfig, implicit val m: PatternMemConfig) extends Lane
     with HasEncoding8b10b
     with HasBertDebug
-    with HasPatternMemDebug
-    with HasLoopbackDebug
     with HasTLBidirectionalPacketizer
     with HasTLController
 

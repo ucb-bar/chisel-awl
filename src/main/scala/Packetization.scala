@@ -14,5 +14,7 @@ abstract class Packetizer[S <: DecodedSymbol, T <: Data](val decodedSymbolsPerCy
         val symbolsRx = Vec(decodedSymbolsPerCycle, Flipped(Valid(symbolFactory())))
     })
 
+    def connectData(data: T)
+
 }
 

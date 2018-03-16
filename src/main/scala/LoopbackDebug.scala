@@ -3,7 +3,7 @@ package hbwif2
 import chisel3._
 import chisel3.util._
 
-
+/*
 class LoopbackDebugIO()(implicit c: SerDesConfig) extends DebugIO {
     val enable = Input(Bool())
 }
@@ -28,3 +28,4 @@ trait HasLoopbackDebug extends HasDebug {
     implicit val c: SerDesConfig
     abstract override def genDebug() = Seq(new LoopbackDebug) ++ super.genDebug()
 }
+*/

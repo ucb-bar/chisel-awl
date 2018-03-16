@@ -12,3 +12,12 @@ class Ready[+T <: Data](gen: T) extends Bundle {
     val bits = Output(gen)
     def fire: Bool = ready
 }
+
+
+object GCD {
+    def apply(a: Int, b: Int): Int = if (b == 0) a else GCD(b, a%b)
+}
+
+object LCM {
+    def apply(a: Int, b: Int): Int = a*b / GCD(a, b)
+}

@@ -64,8 +64,10 @@ class TransceiverSubsystemIO()(implicit val c: SerDesConfig) extends Bundle with
   val data = new TransceiverSubsystemDataIF
 
   // clock and reset for the rest of the digital
-  val slowClock = Output(Clock())
-  val syncReset = Output(Bool())
+  val txClock = Output(Clock())
+  val txReset = Output(Bool())
+  val rxClock = Output(Clock())
+  val rxReset = Output(Bool())
 
   // bit stuff mode (can be 0 width)
   val bitStuffMode = Input(UInt(log2Ceil(c.bitStuffModes).W))
@@ -97,19 +99,16 @@ class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with H
   rxBitStuffer.io.raw := txrx.io.data.rx
   txrx.io.data.tx := txBitStuffer.io.raw
   txBitStuffer.io.enq <> io.data.tx
+  io.data.rx <> rxBitStuffer.io.deq
   rxBitStuffer.io.mode := io.bitStuffMode
   txBitStuffer.io.mode := io.bitStuffMode
 
-  val rxRetimer = Module(new RxRetimer)
-  rxRetimer.io.dataIn <> rxBitStuffer.io.deq
-  rxRetimer.io.clockIn := txrx.io.clock_rx
-  io.data.rx <> rxRetimer.io.dataOut
-  rxRetimer.io.clockOut := txrx.io.clock_tx
+  io.txClock := txrx.io.clock_tx
+  io.txReset := txSyncReset
+  io.rxClock := txrx.io.clock_rx
+  io.rxReset := rxSyncReset
 
-  io.slowClock := txrx.io.clock_tx
-  io.syncReset := txSyncReset
-
-  withClockAndReset(txrx.io.clock_rx, txSyncReset) {
+  withClockAndReset(txrx.io.clock_rx, rxSyncReset) {
 
     // Transceiver <> CDR Loop
     val cdr = Module(new CDR)
@@ -226,20 +225,5 @@ class RxBitStuffer()(implicit val c: SerDesConfig) extends Module {
             io.deq.valid := false.B
         }
     }
-
-}
-
-class RxRetimer()(implicit val c: SerDesConfig) extends Module {
-
-    val io = IO(new Bundle {
-        val dataIn = Flipped(Valid(UInt(c.dataWidth.W)))
-        val clockIn = Input(Clock())
-        val dataOut = Valid(UInt(c.dataWidth.W))
-        val clockOut = Input(Clock())
-        val asyncReset = Input(Bool())
-    })
-
-    // TODO
-
 
 }

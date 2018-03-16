@@ -2,6 +2,7 @@ package hbwif2
 
 import chisel3._
 import chisel3.util._
+import chisel3.experimental.withClockAndReset
 
 case class BertConfig(
     bertSampleCounterWidth: Int = 32,
@@ -29,48 +30,55 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
     val io = IO(new BertDebugIO(prbs()))
 
     // TODO deal with rx valid and tx ready
+    withClockAndReset(io.txClock, io.txReset) {
+        val prbsModulesTx = prbs().map(PRBS(_, c.dataWidth))
 
-    val prbsModulesRx = Seq.fill(c.numWays) { prbs().map(PRBS(_, c.dataWidth/c.numWays)) }
-    val prbsModulesTx = prbs().map(PRBS(_, c.dataWidth))
-    val errorCounts = RegInit(Vec(c.numWays, 0.U(b.bertErrorCounterWidth.W)))
-    val sampleCount = RegInit(0.U(b.bertSampleCounterWidth.W))
-    val wayData = Seq.fill(c.numWays) { Wire(Vec(c.dataWidth/c.numWays, Bool())) }
+        io.txOut.bits := Mux(io.enable, MuxLookup(io.prbsSelect, 0.U, prbsModulesTx.zipWithIndex.map { x => (x._2.U, x._1.io.out.asUInt) }), io.txIn.bits)
+        io.txIn.ready := Mux(io.enable, false.B, io.txOut.ready)
 
-    (0 until c.dataWidth) foreach { i => wayData(i % c.numWays)(i / c.numWays) := io.rxIn.bits(i) }
-
-    io.sampleCountOut := sampleCount
-    val done = io.sampleCount === io.sampleCountOut
-
-    io.prbsSeedGoods.zip(prbsModulesRx).foreach { case (p, m) => p := MuxLookup(io.prbsSelect, false.B, m.zipWithIndex.map { x => (x._2.U, x._1.io.seedGood) }) }
-    io.errorCounts := errorCounts
-    prbsModulesTx.foreach { p =>
-        p.io.seed := 0.U
-        p.io.load := io.prbsLoad
-        p.io.mode := io.prbsModeTx
-    }
-
-    val prbsRxData = prbsModulesRx.zip(wayData).zip(io.prbsModeRx).map { case ((w, d), m) =>
-        w.foreach { p =>
-            p.io.seed := d.asUInt
+        prbsModulesTx.foreach { p =>
+            p.io.seed := 0.U
             p.io.load := io.prbsLoad
-            p.io.mode := m
+            p.io.mode := io.prbsModeTx
         }
-        MuxLookup(io.prbsSelect, 0.U, w.zipWithIndex.map { x => (x._2.U, x._1.io.out.asUInt ) })
     }
 
-    val wayErrors = prbsRxData.zip(wayData).map { case (p, d) => PopCount(Mux(io.berMode, p ^ d.asUInt, d.asUInt)) }
+    // XXX TODO clock crossings for controls here
+    withClockAndReset(io.rxClock, io.rxReset) {
+        val prbsModulesRx = Seq.fill(c.numWays) { prbs().map(PRBS(_, c.dataWidth/c.numWays)) }
+        val errorCounts = RegInit(Vec(c.numWays, 0.U(b.bertErrorCounterWidth.W)))
+        val sampleCount = RegInit(0.U(b.bertSampleCounterWidth.W))
+        val wayData = Seq.fill(c.numWays) { Wire(Vec(c.dataWidth/c.numWays, Bool())) }
 
-    io.txOut.bits := Mux(io.enable, MuxLookup(io.prbsSelect, 0.U, prbsModulesTx.zipWithIndex.map { x => (x._2.U, x._1.io.out.asUInt) }), io.txIn.bits)
-    io.txIn.ready := Mux(io.enable, false.B, io.txOut.ready)
-    io.rxOut <> io.rxIn
+        (0 until c.dataWidth) foreach { i => wayData(i % c.numWays)(i / c.numWays) := io.rxIn.bits(i) }
 
-    when (io.clear) {
-        sampleCount := 0.U
-        errorCounts.foreach(_ := 0.U)
-    } .otherwise {
-        when (!done && io.enable) {
-            sampleCount := sampleCount + 1.U
-            errorCounts.zip(wayErrors).foreach { case (e, w) => e := e + w }
+        io.sampleCountOut := sampleCount
+        val done = io.sampleCount === io.sampleCountOut
+
+        io.prbsSeedGoods.zip(prbsModulesRx).foreach { case (p, m) => p := MuxLookup(io.prbsSelect, false.B, m.zipWithIndex.map { x => (x._2.U, x._1.io.seedGood) }) }
+        io.errorCounts := errorCounts
+
+        val prbsRxData = prbsModulesRx.zip(wayData).zip(io.prbsModeRx).map { case ((w, d), m) =>
+            w.foreach { p =>
+                p.io.seed := d.asUInt
+                p.io.load := io.prbsLoad
+                p.io.mode := m
+            }
+            MuxLookup(io.prbsSelect, 0.U, w.zipWithIndex.map { x => (x._2.U, x._1.io.out.asUInt ) })
+        }
+
+        val wayErrors = prbsRxData.zip(wayData).map { case (p, d) => PopCount(Mux(io.berMode, p ^ d.asUInt, d.asUInt)) }
+
+        io.rxOut <> io.rxIn
+
+        when (io.clear) {
+            sampleCount := 0.U
+            errorCounts.foreach(_ := 0.U)
+        } .otherwise {
+            when (!done && io.enable) {
+                sampleCount := sampleCount + 1.U
+                errorCounts.zip(wayErrors).foreach { case (e, w) => e := e + w }
+            }
         }
     }
 
