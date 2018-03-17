@@ -119,3 +119,7 @@ class ScanChainControllerTest(timeout: Int = 50000) extends UnitTest(timeout) {
     }
 
 }
+
+object ScanChainTests {
+    def apply(timeout: Int = 50000):Seq[UnitTest] = Seq(Module(new ScanChainControllerTest(timeout)))
+}

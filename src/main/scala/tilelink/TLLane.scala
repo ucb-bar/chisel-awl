@@ -79,7 +79,7 @@ class HbwifModule(implicit p: Parameters) extends LazyModule {
             val (managerIn, managerEdge) = managerNodes(id).in(0)
             val (configOut, configEdge) = configNodes(id).out(0)
             val lane = Module(new TLLane8b10b(clientEdge, managerEdge, configEdge)(p(HbwifSerDesKey), p(HbwifBertKey), p(HbwifPatternMemKey)))
-            lane.io.data.client <> clientOut
+            clientOut <> lane.io.data.client
             lane.io.data.manager <> managerIn
             lane.io.control <> configOut
             lane.io.tx <> tx(id)

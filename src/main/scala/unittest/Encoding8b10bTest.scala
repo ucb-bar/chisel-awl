@@ -189,6 +189,6 @@ object Encoding8b10bTests {
     val performanceEffort = List(0,1)
     val offset = List(0,3,10,19)
 
-    def apply(timeout: Int = 50000) = for (x <- decodedSymbols; y <- performanceEffort; z <- offset) yield Module(new Encoding8b10bTest(x,y,z,timeout))
+    def apply(timeout: Int = 50000):Seq[UnitTest] = for (x <- decodedSymbols; y <- performanceEffort; z <- offset) yield Module(new Encoding8b10bTest(x,y,z,timeout))
 
 }
