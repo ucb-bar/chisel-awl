@@ -73,7 +73,7 @@ class TLBidirectionalPacketizerTestLazy[S <: DecodedSymbol](decodedSymbolsPerCyc
     }
 }
 
-class TLBidirectionalPacketizerTest[S <: DecodedSymbol](decodedSymbolsPerCycle: Int, symbolFactory: () => S, timeout: Int = 50000)(implicit p: Parameters)
+class TLBidirectionalPacketizerTest[S <: DecodedSymbol](decodedSymbolsPerCycle: Int, symbolFactory: () => S, timeout: Int = 500000)(implicit p: Parameters)
     extends UnitTest(timeout) {
 
     val dut = Module(LazyModule(new TLBidirectionalPacketizerTestLazy(decodedSymbolsPerCycle, symbolFactory)).module)
