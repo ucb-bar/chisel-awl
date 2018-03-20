@@ -30,11 +30,11 @@ abstract class Lane extends Module with HasDebug {
     val rxClock = txrxss.io.rxClock
     val rxReset = txrxss.io.rxReset
 
-    val decoderAdapter = withClockAndReset(rxClock, rxReset) { Module(new DecoderWidthAdapter(c.dataWidth, decoder.encodedWidth)) }
     val decoder        = withClockAndReset(rxClock, rxReset) { Module(genDecoder()) }
+    val decoderAdapter = withClockAndReset(rxClock, rxReset) { Module(new DecoderWidthAdapter(c.dataWidth, decoder.encodedWidth)) }
 
-    val encoderAdapter = withClockAndReset(txClock, txReset) { Module(new EncoderWidthAdapter(encoder.encodedWidth, c.dataWidth)) }
     val encoder        = withClockAndReset(txClock, txReset) { Module(genEncoder()) }
+    val encoderAdapter = withClockAndReset(txClock, txReset) { Module(new EncoderWidthAdapter(encoder.encodedWidth, c.dataWidth)) }
     val packetizer     = withClockAndReset(txClock, txReset) { Module(genPacketizer(encoder.symbolFactory)) }
 
     val builder        = genBuilder()
