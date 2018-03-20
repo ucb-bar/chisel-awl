@@ -57,7 +57,7 @@ abstract class Lane extends Module with HasDebug {
     }
 
     // TX chain
-    txDebug <> txrxss.io.tx
+    txDebug <> txrxss.io.data.tx
     encoder.io.encoded <> encoderAdapter.io.enq
     packetizer.io.symbolsTxReady := encoder.io.decodedReady
     packetizer.io.symbolsTx <> encoder.io.decoded
@@ -70,7 +70,7 @@ abstract class Lane extends Module with HasDebug {
     decoderQueue.io.deqReset := txReset
 
     // RX chain
-    rxDebug <> txrxss.io.rx
+    rxDebug <> txrxss.io.data.rx
     decoder.io.encoded <> decoderAdapter.io.deq
     decoderQueue.io.enq <> decoder.io.decoded
     packetizer.io.symbolsRx <> decoderQueue.io.deq
