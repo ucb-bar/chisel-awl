@@ -50,7 +50,7 @@ trait TransceiverOuterIF extends Bundle {
 class TransceiverSubsystemDataIF()(implicit val c: SerDesConfig) extends Bundle {
 
     val rx = Valid(UInt(c.dataWidth.W))
-    val tx = Input(UInt(c.dataWidth.W))
+    val tx = Flipped(Ready(UInt(c.dataWidth.W)))
     val txReady = Output(Bool())
 
 }
