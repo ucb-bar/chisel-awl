@@ -86,8 +86,7 @@ class TLBidirectionalPacketizerTest[S <: DecodedSymbol](decodedSymbolsPerCycle: 
 
 object TLPacketizerTests {
 
-    //val decodedSymbols = List(1,3,4,5)
-    val decodedSymbols = List(1)
+    val decodedSymbols = List(1,3,4,5)
     val factories = List(Decoded8b10bSymbol.apply _)
 
     def apply()(implicit p: Parameters):Seq[UnitTest] = for (x <- decodedSymbols; y <- factories) yield Module(new TLBidirectionalPacketizerTest(x, y))

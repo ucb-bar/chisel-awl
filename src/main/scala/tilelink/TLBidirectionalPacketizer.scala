@@ -141,7 +141,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
 
     // TODO can we process more than one request at a time (e + other?)
     // Assign priorities to the channels
-    val txReady = (((txCount < decodedSymbolsPerCycle.U) && io.symbolsTxReady) || (txCount === 0.U)) && txState === sTxReady
+    val txReady = (txCount === 0.U) && (txState === sTxReady)
     val aReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.a.bits)))
     val bReady = txReady && (cOutstanding < (cMaxOutstanding.U - tlResponseMap(tltx.b.bits)))
     val cReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.c.bits)))
@@ -255,8 +255,8 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
 
     val rxSymPopped = Wire(UInt(log2Ceil(rxBufferBytes + 1).W))
 
-    val rxNumSymbols = getNumSymbolsFromType(tlrx.aEdge, tlrx.bEdge, rxType, rxOpcode, true.B)
-    val rxNumSymbolsNotLast = getNumSymbolsFromType(tlrx.aEdge, tlrx.bEdge, rxType, rxOpcode, false.B)
+    val rxNumSymbols = Mux(rxTypeValid, getNumSymbolsFromType(tlrx.aEdge, tlrx.bEdge, rxType, rxOpcode, true.B), 0.U)
+    val rxNumSymbolsNotLast = Mux(rxTypeValid, getNumSymbolsFromType(tlrx.aEdge, tlrx.bEdge, rxType, rxOpcode, false.B), 0.U)
     val rxValid = (rxSymCount >= rxNumSymbols) && rxTypeValid
 
     rxTypeValid := (rxSymCount =/= rxNumSymbols) || io.symbolsRx.map(x => x.valid && x.bits.isData).reduce(_||_)
