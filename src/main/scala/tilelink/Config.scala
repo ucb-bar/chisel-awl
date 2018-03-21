@@ -5,7 +5,8 @@ import freechips.rocketchip.config._
 import freechips.rocketchip.diplomacy.AddressSet
 
 case class HbwifTLConfig(
-    managerAddressSet: Seq[AddressSet],
+    managerAddressSets: Seq[AddressSet],
+    configAddressSets: Seq[AddressSet],
     numLanes: Int = 8,
     numBanks: Int = 2,
     beatBytes: Int = 16,

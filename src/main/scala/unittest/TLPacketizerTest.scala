@@ -18,38 +18,10 @@ class TLBidirectionalPacketizerTestLazy[S <: DecodedSymbol](decodedSymbolsPerCyc
     val fuzz = LazyModule(new TLFuzzer(5000))
     val model = LazyModule(new TLRAMModel("SRAMSimple"))
     val ram = LazyModule(new TLRAM(managerAddressSet(0), beatBytes = beatBytes))
-/*
-    val lanes = 1
-    val clientNodes = (0 until lanes).map { id => TLClientNode(Seq(TLClientPortParameters(
-        Seq(TLClientParameters(
-            name               = s"HbwifClient$id",
-            sourceId           = IdRange(0,numXact)
-        )),
-        minLatency = 1
-    ))) }
-    val managerNodes = (0 until lanes).map { id => TLManagerNode(Seq(TLManagerPortParameters(
-        Seq(TLManagerParameters(
-            address            = List(managerAddressSet(id)),
-            resources          = (new SimpleDevice(s"HbwifManager$id",Seq())).reg("mem"),
-            regionType         = RegionType.UNCACHED,
-            executable         = true,
-            supportsGet        = TransferSizes(1, beatBytes),
-            supportsPutFull    = TransferSizes(1, beatBytes),
-            supportsPutPartial = TransferSizes(1, beatBytes),
-            fifoId             = None)),
-        beatBytes = beatBytes,
-        minLatency = 1
-    ))) }
-
-    ram.node := model.node := clientNodes(0)
-    managerNodes(0) := TLDelayer(0.25) := fuzz.node
-*/
     val adapter = TLAdapterNode()
     ram.node := adapter := TLDelayer(0.25) := model.node := fuzz.node
 
     lazy val module = new LazyModuleImp(this) with UnitTestModule {
-//        val (in, edgeIn) = managerNodes(0).in(0)
-//        val (out, edgeOut) = clientNodes(0).out(0)
         val (in, edgeIn) = adapter.in(0)
         val (out, edgeOut) = adapter.out(0)
 
@@ -82,7 +54,6 @@ class TLBidirectionalPacketizerTest[S <: DecodedSymbol](decodedSymbolsPerCycle: 
     dut.io.start := io.start
 
 }
-
 
 object TLPacketizerTests {
 

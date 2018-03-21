@@ -181,7 +181,13 @@ final class DecoderQueue[S <: DecodedSymbol](val decodedSymbolsPerCycle: Int,  v
     async.io.enq_reset := io.enqReset
     async.io.deq_clock := io.deqClock
     async.io.deq_reset := io.deqReset
-    async.io.enq <> multiQueue.io.deq
+    async.io.enq.bits.zip(multiQueue.io.deq).foreach { case (a,m) =>
+        a.valid := m.valid
+        a.bits := m.bits
+        m.ready := async.io.enq.ready
+    }
+    async.io.enq.valid := multiQueue.io.deq.map(_.valid).reduce(_||_)
+
     async.io.deq.bits.zip(io.deq).foreach { case (a,i) =>
         i.bits := a.bits
         i.valid := a.valid && async.io.deq.valid

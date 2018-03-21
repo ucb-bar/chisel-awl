@@ -84,13 +84,13 @@ abstract class Lane extends Module with HasDebug {
         debugBus.foreach(_.connectController(builder))
     }
 
-    // Any async crossings need to live in here
+    // XXX async crossings live outside of here!
     val port = builder.generate(txClock, txReset)
 
     val io = IO(new LaneIO[builder.P, T](builder.createPort _, packetizer.dataFactory))
 
     io.control <> port
-    // Any async crossings need to live in here
+    // XXX async crossings live outside of here!
     packetizer.connectData(io.data)
 
     txrxss.io.clockRef := io.clockRef

@@ -11,23 +11,22 @@ abstract class ControllerBuilder {
     type P <: Bundle
     def createPort(): P
 
-    protected val ws = new ArrayBuffer[(String,UInt,Option[UInt])]
+    protected val ws = new ArrayBuffer[(String,UInt,Option[BigInt])]
     protected val rs = new ArrayBuffer[(String,UInt)]
     protected val wSeqMems = new ArrayBuffer[(String,Int,UInt,UInt,Bool)]
     protected val rSeqMems = new ArrayBuffer[(String,Int,UInt,UInt,Bool)]
 
     def w(name: String, signal: UInt) { this.w(name, signal, None) }
 
-    def w(name: String, signal: UInt, init: Option[UInt]) {
+    def w(name: String, signal: UInt, init: Option[BigInt]) {
         if (signal.getWidth > 0) {
-            if (init != None) require(init.get.isLit, s"Initial value for $signal must be a Chisel literal.")
             ws.append((name, signal, init))
         }
     }
 
     def w(name: String, signal: Seq[UInt]) { this.w(name, signal, None) }
 
-    def w(name: String, signal: Seq[UInt], init: Option[Seq[UInt]]) {
+    def w(name: String, signal: Seq[UInt], init: Option[Seq[BigInt]]) {
         (0 until signal.length) foreach { i => this.w(name + s"_$i", signal(i), init.map(_(i))) }
     }
 

@@ -53,7 +53,7 @@ class ScanChainControllerBuilder extends ControllerBuilder {
                 shift := shiftReg
             }
             withClockAndReset (laneClock, laneReset) {
-                val shadow = RegInit(init.getOrElse(0.U))
+                val shadow = init.map(x => RegInit(x.U(w.W))).getOrElse(Reg(UInt(w.W)))
                 shadow.suggestName(name + "_shadow")
 
                 node := shadow
