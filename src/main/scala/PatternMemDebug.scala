@@ -93,6 +93,6 @@ class PatternMemDebug()(implicit c: SerDesConfig, implicit val m: PatternMemConf
 trait HasPatternMemDebug extends HasDebug {
     implicit val c: SerDesConfig
     implicit val m: PatternMemConfig
-    abstract override def genDebug() = Seq(new PatternMemDebug) ++ super.genDebug()
+    abstract override def genDebug() = Seq(Module(new PatternMemDebug)) ++ super.genDebug()
 }
 */

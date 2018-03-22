@@ -33,8 +33,10 @@ trait TLPacketizerLike {
             case a: TLBundleA => {
                 val out = Wire(Decoupled(new TLBundleA(edge.bundle)))
                 val bits = out.bits
-                val pad = Wire(UInt(((8 - (headerWidth(bits) % 8)) % 8).W))
-                List(bits.opcode, bits.param, bits.size, bits.source, bits.address, pad, bits.mask, bits.data).foldLeft(w) { (left, sig) =>
+                val padBits = (8 - (headerWidth(bits) % 8)) % 8
+                (List(bits.opcode, bits.param, bits.size, bits.source, bits.address) ++
+                    (if (padBits > 0) List(Wire(UInt(padBits.W))) else List()) ++
+                    List(bits.mask, bits.data)).foldLeft(w) { (left, sig) =>
                     if (sig.getWidth > 0) {
                         sig := buf(left - 1, left - sig.getWidth)
                         left - sig.getWidth
@@ -47,8 +49,10 @@ trait TLPacketizerLike {
             case b: TLBundleB => {
                 val out = Wire(Decoupled(new TLBundleB(edge.bundle)))
                 val bits = out.bits
-                val pad = Wire(UInt(((8 - (headerWidth(bits) % 8)) % 8).W))
-                List(bits.opcode, bits.param, bits.size, bits.source, bits.address, pad, bits.mask, bits.data).foldLeft(w) { (left, sig) =>
+                val padBits = (8 - (headerWidth(bits) % 8)) % 8
+                (List(bits.opcode, bits.param, bits.size, bits.source, bits.address) ++
+                    (if (padBits > 0) List(Wire(UInt(padBits.W))) else List()) ++
+                    List(bits.mask, bits.data)).foldLeft(w) { (left, sig) =>
                     if (sig.getWidth > 0) {
                         sig := buf(left - 1, left - sig.getWidth)
                         left - sig.getWidth
@@ -61,8 +65,10 @@ trait TLPacketizerLike {
             case c: TLBundleC => {
                 val out = Wire(Decoupled(new TLBundleC(edge.bundle)))
                 val bits = out.bits
-                val pad = Wire(UInt(((8 - (headerWidth(bits) % 8)) % 8).W))
-                List(bits.opcode, bits.param, bits.size, bits.source, bits.address, pad, bits.data).foldLeft(w) { (left, sig) =>
+                val padBits = (8 - (headerWidth(bits) % 8)) % 8
+                (List(bits.opcode, bits.param, bits.size, bits.source, bits.address) ++
+                    (if (padBits > 0) List(Wire(UInt(padBits.W))) else List()) ++
+                    List(bits.data)).foldLeft(w) { (left, sig) =>
                     if (sig.getWidth > 0) {
                         sig := buf(left - 1, left - sig.getWidth)
                         left - sig.getWidth
@@ -76,8 +82,10 @@ trait TLPacketizerLike {
             case d: TLBundleD => {
                 val out = Wire(Decoupled(new TLBundleD(edge.bundle)))
                 val bits = out.bits
-                val pad = Wire(UInt(((8 - (headerWidth(bits) % 8)) % 8).W))
-                List(bits.opcode, bits.param, bits.size, bits.source, bits.sink, pad, bits.data).foldLeft(w) { (left, sig) =>
+                val padBits = (8 - (headerWidth(bits) % 8)) % 8
+                (List(bits.opcode, bits.param, bits.size, bits.source, bits.sink) ++
+                    (if (padBits > 0) List(Wire(UInt(padBits.W))) else List()) ++
+                    List(bits.data)).foldLeft(w) { (left, sig) =>
                     if (sig.getWidth > 0) {
                         sig := buf(left - 1, left - sig.getWidth)
                         left - sig.getWidth

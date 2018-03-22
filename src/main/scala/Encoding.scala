@@ -92,27 +92,29 @@ final class EncoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Modu
     } else {
         require(enqBits > deqBits, "Cannot have more deqBits than enqBits for the Encoder")
         val state = RegInit(0.U(log2Ceil(numStates).W))
-        val buf = Reg(UInt((2*enqBits - 1).W)) // This can be reduced in some cases, but it should get optimized away
+        val bufWidth = 2*enqBits - 1
+        val buf = Reg(UInt(bufWidth.W))
         io.deq.bits := buf(deqBits - 1, 0)
-        var rem = 0
-        (0 until numStates) foreach { x =>
+        io.enq.ready := false.B
+        (0 until numStates).foldLeft(0) { case (empty, s) =>
+            val nextEmpty = empty + deqBits - (if ((empty + deqBits) < enqBits) 0 else enqBits)
             when (io.deq.ready) {
-                when (state === x.U) {
-                    rem = rem + enqBits - deqBits
-                    if (rem >= deqBits) {
-                        rem = rem - enqBits
+                when (state === s.U) {
+                    if (nextEmpty < enqBits) {
                         io.enq.ready := false.B
-                        buf := Cat(buf(2*enqBits-2, deqBits), buf(2*deqBits-1, deqBits))
+                        buf := buf >> deqBits
                     } else {
                         io.enq.ready := true.B
-                        buf := Cat(buf(2*enqBits-2, enqBits-1-rem-deqBits), io.enq.bits, buf(deqBits+rem-1, deqBits))
-
+                        val filled = bufWidth - empty
+                        require(filled >= 0)
+                        val mask = ((1 << (filled - deqBits)) - 1)
+                        require(filled >= deqBits, s"Should not get here, filled=$filled, deqBits=$deqBits")
+                        buf := ((buf >> deqBits) & mask.U) | (io.enq.bits << (filled - deqBits))
                     }
-                    state := ((x+1) % numStates).U
+                    state := ((s+1) % numStates).U
                 }
-            } .otherwise {
-                io.enq.ready := false.B
             }
+            nextEmpty
         }
     }
 }
@@ -131,27 +133,25 @@ final class DecoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Modu
     } else {
         require(deqBits > enqBits, "Cannot have more enqBits than deqBits for the Decoder")
         val state = RegInit(0.U(log2Ceil(numStates).W))
-        val buf = Reg(UInt((deqBits + enqBits - 1).W)) // This can be reduced in some cases, but it should get optimized away
+        val buf = Reg(UInt((2*deqBits - 1).W)) // This can be reduced in some cases, but it should get optimized away TODO
         when (io.enq.valid) {
-            buf := Cat(buf(deqBits - 2, 0), io.enq.bits)
+            buf := ((buf << enqBits) | io.enq.bits)
         }
-        io.deq.bits := buf(deqBits - 1, 0)
-        var filled = 0
-        (0 until numStates) foreach { x =>
+        io.deq.bits := buf(deqBits-1, 0)
+        io.deq.valid := false.B
+        (0 until numStates).foldLeft(0) { case (filled, s) =>
             when (io.enq.valid) {
-                when (state === x.U) {
-                    filled = filled + enqBits
+                when (state === s.U) {
                     if (filled >= deqBits) {
-                        filled = filled - deqBits
                         io.deq.valid := true.B
+                        io.deq.bits := buf(filled - 1, filled - deqBits)
                     } else {
                         io.deq.valid := false.B
                     }
-                    state := ((x+1) % numStates).U
+                    state := ((s+1) % numStates).U
                 }
-            } .otherwise {
-                io.deq.valid := false.B
             }
+            filled + enqBits - (if (filled < deqBits) 0 else deqBits)
         }
     }
 }
@@ -173,7 +173,7 @@ final class DecoderQueue[S <: DecodedSymbol](val decodedSymbolsPerCycle: Int,  v
     multiQueue.io.enq.zip(io.enq).foreach { case (m,i) =>
         m.bits := i.bits
         m.valid := i.valid
-        assert(m.ready, "Buffer overrun")
+        assert(m.ready || !m.valid, "Buffer overrun")
     }
 
     val async = Module(new AsyncQueue(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())), 4, 3, true))

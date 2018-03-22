@@ -17,6 +17,10 @@ object TLBidirectionalPacketizerIO {
 class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, managerEdge: TLEdgeIn, decodedSymbolsPerCycle: Int, symbolFactory: () => S)
     extends Packetizer(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIO.apply(clientEdge, managerEdge) _) with TLPacketizerLike {
 
+    val io = IO(new PacketizerIO(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIO.apply(clientEdge, managerEdge) _) {
+        val enable = Input(Bool())
+    })
+
     val tltx = new Object {
         val a = io.data.manager.a
         val b = io.data.client.b
@@ -141,7 +145,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
 
     // TODO can we process more than one request at a time (e + other?)
     // Assign priorities to the channels
-    val txReady = (txCount === 0.U) && (txState === sTxReady)
+    val txReady = io.enable && (txCount === 0.U) && (txState === sTxReady)
     val aReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.a.bits)))
     val bReady = txReady && (cOutstanding < (cMaxOutstanding.U - tlResponseMap(tltx.b.bits)))
     val cReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.c.bits)))
@@ -293,9 +297,14 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     // TODO can we add another symbol to NACK a transaction in progress (and set error)
     // TODO need to not assume that the sender interface looks like ours, it's possible we get multiple E messages per cycle
 
-    def connectController(builder: ControllerBuilder) { ??? }
+    def connectController(builder: ControllerBuilder) {
+        builder.w("mem_mode_enable", io.enable)
+    }
 
-    def connectData(data: TLBidirectionalPacketizerIO) { ??? }
+    def connectData(data: TLBidirectionalPacketizerIO) {
+        io.data.manager <> data.manager
+        data.client <> io.data.client
+    }
 }
 
 trait HasTLBidirectionalPacketizer {

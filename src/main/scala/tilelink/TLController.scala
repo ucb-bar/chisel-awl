@@ -10,10 +10,10 @@ import scala.collection.mutable.HashMap
 class TLControllerMapEntry(val address: BigInt, val size: Int, val writeable: Boolean) {
     def toWritePattern(data: BigInt) = {
         require(writeable, "Trying to write to unwriteable address")
-        WritePattern(address, size, data)
+        WritePattern(address, log2Ceil(size), data)
     }
-    def toReadPattern = ReadPattern(address, size)
-    def toReadExpectPattern(data: BigInt) = ReadExpectPattern(address, size, data)
+    def toReadPattern = ReadPattern(address, log2Ceil(size))
+    def toReadExpectPattern(data: BigInt) = ReadExpectPattern(address, log2Ceil(size), data)
 }
 
 class TLControllerMap extends HashMap[String, TLControllerMapEntry] {
@@ -45,12 +45,10 @@ class TLControllerBuilder(edge: TLEdgeIn) extends ControllerBuilder {
     private val beatBytes = edge.bundle.dataBits / 8
     private val maxAddress = (1 << edge.bundle.addressBits) - beatBytes // TODO is this safe
 
-    def generate(laneClock: Clock, laneReset: Bool): P = {
+    def generate(laneClock: Clock, laneReset: Bool, port: TLBundle) {
 
         require(wSeqMems.length == 0, "TODO")
         require(rSeqMems.length == 0, "TODO")
-
-        val port = Wire(createPort)
 
         withClockAndReset (laneClock, laneReset) {
 
@@ -85,7 +83,7 @@ class TLControllerBuilder(edge: TLEdgeIn) extends ControllerBuilder {
                 val w = node.getWidth
                 require(w <= maxSize, s"Port $name width ${node.getWidth} is too large (> $maxSize)")
                 require(address + beatBytes - 1 <= maxAddress, s"Ran out of address space! Allocate more to TLController.")
-                map.add(name, address, log2Ceil(beatBytes), true)
+                map.add(name, address, beatBytes, true)
 
                 val shadow = init.map(x => RegInit(x.U(w.W))).getOrElse(Reg(UInt(w.W)))
                 node := shadow
@@ -108,7 +106,7 @@ class TLControllerBuilder(edge: TLEdgeIn) extends ControllerBuilder {
 
             rs.foldLeft(rOffset) { case (address, (name, node)) =>
                 require(node.getWidth <= maxSize, s"FIXME, Port $name width ${node.getWidth} is too large (> $maxSize)")
-                map.add(name, address, log2Ceil(beatBytes), false)
+                map.add(name, address, beatBytes, false)
 
                 when (port.a.fire() && (port.a.bits.address === address.U)) {
                     when (edge.hasData(port.a.bits)) {
@@ -126,7 +124,6 @@ class TLControllerBuilder(edge: TLEdgeIn) extends ControllerBuilder {
                 address + beatBytes
             }
         }
-        port
     }
 
 }

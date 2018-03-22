@@ -22,11 +22,10 @@ class UnitTestConfig extends Config((site, here, up) => {
     case HbwifPatternMemKey => PatternMemConfig()
     case UnitTests => (q: Parameters) => {
         implicit val p = q
-        //ScanChainTests() ++
-        //Encoding8b10bTests() ++
-        //TLPacketizerTests()(p) ++
+        ScanChainTests() ++
+        Encoding8b10bTests() ++
+        TLPacketizerTests()(p) ++
         TLControllerTests()(p)
         //TLLaneTests()(p)
-        //Seq(Module(new freechips.rocketchip.tilelink.TLRAMSimpleTest(16)))
     }
 })

@@ -23,10 +23,8 @@ class ScanChainControllerBuilder extends ControllerBuilder {
     private var rLength = 0
     val addressMap = new HashMap[String, (Int, Int)]
 
-    def generate(laneClock: Clock, laneReset: Bool): P = {
+    def generate(laneClock: Clock, laneReset: Bool, port: ScanChainPort) {
         var index = 0
-
-        val port = Wire(createPort)
 
         require(wSeqMems.length == 0, "ScanChainController does not support Mems")
         require(rSeqMems.length == 0, "ScanChainController does not support Mems")
@@ -94,8 +92,6 @@ class ScanChainControllerBuilder extends ControllerBuilder {
         }
 
         rLength = index - wLength
-
-        port
     }
 
     def getAddressMap(): Map[String, (Int, Int)] = addressMap.toMap

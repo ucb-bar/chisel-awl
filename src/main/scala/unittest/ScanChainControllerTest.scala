@@ -53,7 +53,8 @@ class ScanChainControllerTest(timeout: Int = 50000) extends UnitTest(timeout) {
     builder.w("WidgetIn", widget.io.in)
     builder.r("WidgetOut", widget.io.out)
 
-    val port = builder.generate(clock, reset.toBool)
+    val port = Wire(new ScanChainPort)
+    builder.generate(clock, reset.toBool, port)
     val addressMap = builder.getAddressMap()
 
     val readLength = statC.getWidth + statBaz.getWidth + widget.io.out.getWidth

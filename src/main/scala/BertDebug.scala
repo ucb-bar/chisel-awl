@@ -46,7 +46,7 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
     // XXX TODO clock crossings for controls here
     withClockAndReset(io.rxClock, io.rxReset) {
         val prbsModulesRx = Seq.fill(c.numWays) { prbs().map(PRBS(_, c.dataWidth/c.numWays)) }
-        val errorCounts = RegInit(Vec(c.numWays, 0.U(b.bertErrorCounterWidth.W)))
+        val errorCounts = RegInit(VecInit(Seq.fill(c.numWays) {0.U(b.bertErrorCounterWidth.W)}))
         val sampleCount = RegInit(0.U(b.bertSampleCounterWidth.W))
         val wayData = Seq.fill(c.numWays) { Wire(Vec(c.dataWidth/c.numWays, Bool())) }
 
@@ -89,11 +89,11 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
         builder.w("bert_mode_tx", io.prbsModeTx)
         builder.w("bert_prbs_mode_rx", io.prbsModeRx)
         builder.w("bert_prbs_select", io.prbsSelect)
-        builder.w("bert_prbs_seed_goods", io.prbsSeedGoods.asUInt)
+        builder.r("bert_prbs_seed_goods", io.prbsSeedGoods.asUInt)
         builder.w("bert_sample_count", io.sampleCount)
+        builder.w("bert_ber_mode", io.berMode)
         builder.r("bert_sample_count_out", io.sampleCountOut)
         builder.r("bert_error_counts", io.errorCounts)
-        builder.w("bert_ber_mode", io.berMode)
     }
 
 }
@@ -164,5 +164,5 @@ trait HasAllPRBS extends HasPRBS7 with HasPRBS15 with HasPRBS31
 trait HasBertDebug extends HasDebug {
     implicit val c: SerDesConfig
     implicit val b: BertConfig
-    abstract override def genDebug() = Seq(new BertDebug with HasAllPRBS) ++ super.genDebug()
+    abstract override def genDebug() = Seq(Module(new BertDebug with HasAllPRBS)) ++ super.genDebug()
 }

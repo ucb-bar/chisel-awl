@@ -26,6 +26,6 @@ class LoopbackDebug()(implicit c: SerDesConfig) extends Debug {
 
 trait HasLoopbackDebug extends HasDebug {
     implicit val c: SerDesConfig
-    abstract override def genDebug() = Seq(new LoopbackDebug) ++ super.genDebug()
+    abstract override def genDebug() = Seq(Module(new LoopbackDebug)) ++ super.genDebug()
 }
 */

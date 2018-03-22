@@ -38,7 +38,7 @@ abstract class Lane extends Module with HasDebug {
     val packetizer     = withClockAndReset(txClock, txReset) { Module(genPacketizer(encoder.symbolFactory)) }
 
     val builder        = genBuilder()
-    val debugBus       = genDebug().map(Module(_)).map { x =>
+    val debugBus       = genDebug().map { x =>
         x.io.txClock := txClock
         x.io.txReset := txReset
         x.io.rxClock := rxClock
@@ -84,19 +84,18 @@ abstract class Lane extends Module with HasDebug {
         debugBus.foreach(_.connectController(builder))
     }
 
-    // XXX async crossings live outside of here!
-    val port = builder.generate(txClock, txReset)
-
     val io = IO(new LaneIO[builder.P, T](builder.createPort _, packetizer.dataFactory))
 
-    io.control <> port
+    // XXX async crossings live outside of here!
+    builder.generate(txClock, txReset, io.control)
+
     // XXX async crossings live outside of here!
     packetizer.connectData(io.data)
 
     txrxss.io.clockRef := io.clockRef
     txrxss.io.asyncResetIn := io.asyncResetIn
 
-    io.rx <> txrxss.io.rx
-    io.tx <> txrxss.io.rx
+    txrxss.io.rx <> io.rx
+    io.tx <> txrxss.io.tx
 
 }

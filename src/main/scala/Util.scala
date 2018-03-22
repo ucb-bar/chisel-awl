@@ -12,6 +12,7 @@ class Ready[+T <: Data](gen: T) extends Bundle {
     val ready = Input(Bool())
     val bits = Output(gen)
     def fire: Bool = ready
+    override def cloneType: this.type = Ready(gen).asInstanceOf[this.type]
 }
 
 
@@ -81,11 +82,9 @@ object Pack {
 
 class MultiQueue[T <: Data](gen: T, depth: Int, numEnqPorts: Int, numDeqPorts: Int) extends Module {
 
-    private val genType = chiselTypeOf(gen)
-
     val io = IO(new Bundle {
-        val enq = Vec(numEnqPorts, EnqIO(genType))
-        val deq = Vec(numDeqPorts, DeqIO(genType))
+        val enq = Flipped(Vec(numEnqPorts, Decoupled(gen)))
+        val deq = Vec(numDeqPorts, Decoupled(gen))
     })
     require(depth > numEnqPorts)
     require(depth > numDeqPorts)
@@ -93,7 +92,7 @@ class MultiQueue[T <: Data](gen: T, depth: Int, numEnqPorts: Int, numDeqPorts: I
 
     assert(io.deq.map(_.ready).reduce(_||_) === io.deq.map(_.ready).reduce(_&&_), "All deq signals must be ready, or none")
 
-    val entries = Mem(depth, genType)
+    val entries = Reg(Vec(depth, gen))
     val rptr = RegInit(0.U(log2Ceil(depth).W))
     val wptr = RegInit(0.U(log2Ceil(depth).W))
     val empty = RegInit(true.B)
@@ -102,6 +101,7 @@ class MultiQueue[T <: Data](gen: T, depth: Int, numEnqPorts: Int, numDeqPorts: I
     val valid = Mux(empty, 0.U(log2Ceil(depth+1).W), Mux(wptr > rptr, wptr - rptr, depth.U - rptr + wptr))
 
     io.deq.map(_.valid).zipWithIndex.foreach { case (v,i) => v := (valid > i.U) }
+    io.deq.map(_.bits).zipWithIndex.foreach { case (b,i) => b := entries(rptr + i.U) }
 
     val rptrNext = rptr + PopCount(io.deq.map(_.fire()))
     rptr := rptrNext
@@ -120,6 +120,9 @@ class MultiQueue[T <: Data](gen: T, depth: Int, numEnqPorts: Int, numDeqPorts: I
 
     io.enq.foldLeft(0.U(log2Ceil(depth+1).W)) { (cnt, enq) =>
         enq.ready := (free > cnt)
+        when (enq.fire()) {
+            entries(wptr + cnt) := enq.bits
+        }
         cnt + enq.valid
     }
 }

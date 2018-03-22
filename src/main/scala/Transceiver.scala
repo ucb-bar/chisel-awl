@@ -70,13 +70,14 @@ class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle {
 
 }
 
-class Transceiver()(implicit val c: SerDesConfig) extends BlackBox with HasBlackBoxResource {
+class Transceiver()(implicit val c: SerDesConfig) extends BlackBox {
+//with HasBlackBoxResource {
 
   val io = IO(new TransceiverIO)
 
   override def desiredName = c.transceiverName
 
-  setResource(c.transceiverResource)
+  //setResource(c.transceiverResource)
 
 }
 

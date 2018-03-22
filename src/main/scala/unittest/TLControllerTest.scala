@@ -102,7 +102,7 @@ class TLControllerTestLazy()(implicit p: Parameters) extends LazyModule {
         builder.w("f", f)
         builder.r("sumab", sumab)
         builder.r("sumde", sumde)
-        builder.generate(clock, reset.toBool) <> in
+        builder.generate(clock, reset.toBool, in)
 
         val pusher = Module(new TLControllerPusher(edgeOut, builder.map.toPattern(pattern)))
 

@@ -15,7 +15,7 @@ class TLBidirectionalPacketizerTestLazy[S <: DecodedSymbol](decodedSymbolsPerCyc
     val beatBytes = 16
     val managerAddressSet = Seq(AddressSet(0x0, 0x3ff))
 
-    val fuzz = LazyModule(new TLFuzzer(5000))
+    val fuzz = LazyModule(new TLFuzzer(1000))
     val model = LazyModule(new TLRAMModel("SRAMSimple"))
     val ram = LazyModule(new TLRAM(managerAddressSet(0), beatBytes = beatBytes))
     val adapter = TLAdapterNode()
@@ -27,6 +27,7 @@ class TLBidirectionalPacketizerTestLazy[S <: DecodedSymbol](decodedSymbolsPerCyc
 
         val packetizer = Module(new TLBidirectionalPacketizer(edgeOut, edgeIn, decodedSymbolsPerCycle, symbolFactory))
 
+        packetizer.io.enable := true.B
 
         out <> packetizer.io.data.client
         packetizer.io.data.manager <> in

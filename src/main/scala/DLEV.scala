@@ -17,6 +17,7 @@ class DLEV()(implicit val c: SerDesConfig) extends Module {
   val io = IO(new DLEVIO)
 
   val code = RegInit(0.U(c.dlevDACWidth.W))
+  io.code := code
 
   when (((PopCount(io.data_dlev) << 1) >= PopCount(io.data_rx)) & code.orR) {
     code := code - 1.U

@@ -18,6 +18,7 @@ abstract class ControllerBuilder {
 
     def w(name: String, signal: UInt) { this.w(name, signal, None) }
 
+    // TODO include some better error checking about trying to write to an unwriteable node
     def w(name: String, signal: UInt, init: Option[BigInt]) {
         if (signal.getWidth > 0) {
             ws.append((name, signal, init))
@@ -37,7 +38,7 @@ abstract class ControllerBuilder {
     }
 
     def r(name: String, signal: Seq[UInt]) {
-        (0 until signal.length) foreach { i => this.w(name + s"_$i", signal(i)) }
+        (0 until signal.length) foreach { i => this.r(name + s"_$i", signal(i)) }
     }
 
 
@@ -49,8 +50,8 @@ abstract class ControllerBuilder {
         rSeqMems.append((name, depth, signal, addr, en))
     }
 
-    // This function MUST implement any clock crossings into the implicit (clock, reset) domain from the (laneClock, laneReset) domain
-    def generate(laneClock: Clock, laneReset: Bool): P
+    // TODO deal with async crossings
+    def generate(laneClock: Clock, laneReset: Bool, port: P)
 
 }
 

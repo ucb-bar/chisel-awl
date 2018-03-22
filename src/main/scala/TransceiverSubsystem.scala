@@ -51,7 +51,6 @@ class TransceiverSubsystemDataIF()(implicit val c: SerDesConfig) extends Bundle 
 
     val rx = Valid(UInt(c.dataWidth.W))
     val tx = Flipped(Ready(UInt(c.dataWidth.W)))
-    val txReady = Output(Bool())
 
 }
 
@@ -136,8 +135,14 @@ class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with H
   }
 
   def connectController(builder: ControllerBuilder) {
-    //TODO more signals need to go here
     builder.w("bit_stuff_mode", io.bitStuffMode)
+    builder.w("cdr_i_value", io.overrides.cdriValue)
+    builder.w("cdr_p_value", io.overrides.cdrpValue)
+    builder.w("cdr_override", io.overrides.cdr)
+    builder.w("dfe_value", io.overrides.dfeTapsValue)
+    builder.w("dfe_override", io.overrides.dfe)
+    builder.w("dlev_dac_value", io.overrides.dlevDACValue)
+    builder.w("dlev_override", io.overrides.dlev)
   }
 
 }
@@ -159,12 +164,11 @@ class TxBitStuffer()(implicit val c: SerDesConfig) extends Module {
     } else {
         val buf = Reg(UInt(c.dataWidth.W))
         val count = RegInit(0.U((c.bitStuffModes - 1).W))
-        (0 until c.bitStuffModes).foldLeft(when(false.B) { io.raw := buf } ) { (w, i) =>
-            w.elsewhen (io.mode === i.U) {
-                io.raw := FillInterleaved(i, buf(c.dataWidth - 1, c.dataWidth - (c.dataWidth/(1 << i))))
+        io.raw := buf
+        (0 until c.bitStuffModes).foreach { i =>
+            when (io.mode === i.U) {
+                io.raw := FillInterleaved((1 << i), buf(c.dataWidth - 1, c.dataWidth - (c.dataWidth/(1 << i))))
             }
-        } .otherwise {
-            io.raw := buf
         }
         when ((count +& 1.U)(io.mode) === true.B) {
             count := 0.U
@@ -176,7 +180,7 @@ class TxBitStuffer()(implicit val c: SerDesConfig) extends Module {
             (0 until c.bitStuffModes).foreach { i =>
                 when(io.mode === i.U) {
                     if (i > 0) {
-                        buf := Cat(buf(c.dataWidth - 1 - (c.dataWidth/(1 << i)), 0), buf((c.dataWidth/(1 << i)) - 1, 0))
+                        buf := buf << (c.dataWidth/(1 << i))
                     } else {
                         // but we shouldn't get here
                         buf := io.enq.bits
@@ -206,6 +210,7 @@ class RxBitStuffer()(implicit val c: SerDesConfig) extends Module {
     } else {
         val buf = Reg(UInt(c.dataWidth.W))
         val count = RegInit(0.U(log2Ceil(c.bitStuffModes).W))
+        io.deq.bits := buf
         (0 until c.bitStuffModes).foreach { i =>
             when(io.mode === i.U) {
                 val tmp = Wire(UInt((c.dataWidth / (1 << i)).W))
