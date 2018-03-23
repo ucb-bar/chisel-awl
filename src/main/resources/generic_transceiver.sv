@@ -42,18 +42,17 @@ module generic_transceiver (
   //       Digital Clock Divider
   //***********************************
 
-  reg [`SERDES_LOGBITS-1:0] count;
-  reg clock_tx_reg;
+  reg [`SERDES_LOGBITS-1:0] count = 0;
+  reg clock_tx_reg = 0;
   assign clock_tx = clock_tx_reg;
+  assign clock_rx = clock_tx_reg;
 
-  always @(posedge clock_fast or negedge clock_fast or posedge async_reset_in) begin
-    if (async_reset_in) count <= 0;
-    else count <= count + 1;
+  always @(posedge clock_fast or negedge clock_fast) begin
+    count <= (count + 1) % `SERDES_BITS;
   end
 
-  always @(posedge clock_fast or negedge clock_fast or posedge async_reset_in) begin
-    if (async_reset_in) clock_tx_reg <= 1'b1;
-    else if (count == `SERDES_BITS/2-1) clock_tx_reg <= 1'b0;
+  always @(posedge clock_fast or negedge clock_fast) begin
+    if (count == `SERDES_BITS/2-1) clock_tx_reg <= 1'b0;
     else if (count == `SERDES_BITS-1) clock_tx_reg <= 1'b1;
   end
 
