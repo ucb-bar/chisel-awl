@@ -1,6 +1,6 @@
-package hbwif2.tilelink
+package hbwif.tilelink
 
-import hbwif2._
+import hbwif._
 import freechips.rocketchip.config._
 import freechips.rocketchip.diplomacy.AddressSet
 

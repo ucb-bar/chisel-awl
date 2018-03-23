@@ -1,6 +1,6 @@
-package hbwif2
+package hbwif
 
-import hbwif2._
+import hbwif._
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.unittest._

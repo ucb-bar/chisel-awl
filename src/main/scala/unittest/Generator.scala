@@ -1,4 +1,4 @@
-package hbwif2
+package hbwif
 
 import chisel3.{Module, Driver}
 import freechips.rocketchip.config.{Parameters, Config}

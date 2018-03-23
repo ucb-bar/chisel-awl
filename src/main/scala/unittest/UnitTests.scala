@@ -1,6 +1,6 @@
-package hbwif2
+package hbwif
 
-import hbwif2.tilelink._
+import hbwif.tilelink._
 import chisel3.Module
 import freechips.rocketchip.unittest._
 import freechips.rocketchip.config.{Config, Parameters}
