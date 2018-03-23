@@ -1,4 +1,4 @@
-package hbwif2
+package hbwif
 
 import chisel3._
 import chisel3.experimental.Analog
