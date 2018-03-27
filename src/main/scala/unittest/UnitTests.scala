@@ -11,8 +11,8 @@ class TestHarness(implicit p: Parameters)
 
 class UnitTestConfig extends Config((site, here, up) => {
     case HbwifTLKey => HbwifTLConfig(
-        managerAddressSets = Seq(AddressSet(0x00000, 0xffff)),
-        configAddressSets = Seq(AddressSet(0x10000, 0xffff)),
+        managerAddressSets = Seq(AddressSet(0x10000, 0xffff)),
+        configAddressSets = Seq(AddressSet(0x00000, 0xffff)),
         numLanes = 1,
         numBanks = 1,
         beatBytes = 16,
@@ -25,7 +25,7 @@ class UnitTestConfig extends Config((site, here, up) => {
         ScanChainTests() ++
         Encoding8b10bTests() ++
         TLPacketizerTests()(p) ++
-        TLControllerTests()(p)
-        //TLLaneTests()(p)
+        TLControllerTests()(p) ++
+        TLLaneTests()(p)
     }
 })

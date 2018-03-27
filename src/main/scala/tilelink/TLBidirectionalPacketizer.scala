@@ -4,6 +4,8 @@ import hbwif._
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.tilelink._
+import freechips.rocketchip.util.AsyncQueue
+import freechips.rocketchip.config._
 
 class TLBidirectionalPacketizerIO(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn) extends Bundle {
     val client = TLBundle(clientEdge.bundle)
@@ -14,7 +16,7 @@ object TLBidirectionalPacketizerIO {
     def apply(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn)() =  new TLBidirectionalPacketizerIO(clientEdge, managerEdge)
 }
 
-class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, managerEdge: TLEdgeIn, decodedSymbolsPerCycle: Int, symbolFactory: () => S)
+class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, managerEdge: TLEdgeIn, decodedSymbolsPerCycle: Int, symbolFactory: () => S)(implicit val p: Parameters)
     extends Packetizer(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIO.apply(clientEdge, managerEdge) _) with TLPacketizerLike {
 
     val io = IO(new PacketizerIO(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIO.apply(clientEdge, managerEdge) _) {
@@ -162,27 +164,31 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     val ack = io.symbolsRx map { x => x.valid && (x.bits === symbolFactory().ack) } reduce (_||_)
     val nack = io.symbolsRx map { x => x.valid && (x.bits === symbolFactory().nack) } reduce (_||_)
 
-    when (txState === sTxReset) {
-        txState := sTxSync
-    } .elsewhen(txState === sTxSync) {
-        when (ack) {
-            txState := sTxReady
-        } .otherwise {
-            txState := sTxAck
-        }
-    } .elsewhen(txState === sTxAck) {
-        when (nack) {
+    when (io.enable) {
+        when (txState === sTxReset) {
             txState := sTxSync
-        } .elsewhen(ack) {
-            txState := sTxReady
-        }
-    } .elsewhen(txState === sTxReady) {
-        when (nack) {
+        } .elsewhen(txState === sTxSync) {
+            when (ack) {
+                txState := sTxReady
+            } .otherwise {
+                txState := sTxAck
+            }
+        } .elsewhen(txState === sTxAck) {
+            when (nack) {
+                txState := sTxSync
+            } .elsewhen(ack) {
+                txState := sTxReady
+            }
+        } .elsewhen(txState === sTxReady) {
+            when (nack) {
+                txState := sTxSync
+            }
+        } .otherwise {
+            // shouldn't get here
             txState := sTxSync
         }
     } .otherwise {
-        // shouldn't get here
-        txState := sTxSync
+        txState := sTxReset
     }
 
     io.symbolsTx.reverse.zipWithIndex.foreach { case (s,i) =>
@@ -283,27 +289,128 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     assert(rxD.ready || !rxE.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
     assert(rxE.ready || !rxD.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
 
-    rxSymCount := io.symbolsRx.foldRight(rxSymCount) { (symbol, count) =>
+    rxSymCount := io.symbolsRx.foldRight(rxSymCount - Mux(rxFire, rxSymPopped, 0.U)) { (symbol, count) =>
         when (symbol.valid && symbol.bits.isData) {
-            when (count >= rxNumSymbols) {
-                rxBuffer((rxBufferBytes - 1).U - (count - rxNumSymbols)) := symbol.bits.bits
-            } .otherwise {
-                rxBuffer((rxBufferBytes - 1).U - count) := symbol.bits.bits
-            }
+            rxBuffer((rxBufferBytes - 1).U - count) := symbol.bits.bits
         }
-        count + (symbol.valid && symbol.bits.isData)
-    } - Mux(rxFire, rxSymPopped, 0.U)
+        count + (symbol.valid && symbol.bits.isData && (txState === sTxReady))
+    }
+
+/* TODO do we need this
+    (0 until decodedSymbolsPerCycle).foreach { i =>
+        when (rxFire && (rxSymCount > rxSymPopped + i.U)) {
+            rxBuffer((rxBufferBytes - i - 1).U) := rxBuffer((rxBufferBytes - i - 1).U - rxSymPopped)
+        }
+    }
+*/
+
 
     // TODO can we add another symbol to NACK a transaction in progress (and set error)
     // TODO need to not assume that the sender interface looks like ours, it's possible we get multiple E messages per cycle
 
     def connectController(builder: ControllerBuilder) {
-        builder.w("mem_mode_enable", io.enable)
+        builder.w("mem_mode_enable", io.enable, 0)
     }
 
-    def connectData(data: TLBidirectionalPacketizerIO) {
-        io.data.manager <> data.manager
-        data.client <> io.data.client
+    def connectData(dataClock: Clock, dataReset: Bool, data: TLBidirectionalPacketizerIO) {
+        val qDepth = p(HbwifTLKey).asyncQueueDepth
+        val qSync = p(HbwifTLKey).asyncQueueSync
+        val qSafe = p(HbwifTLKey).asyncQueueSafe
+        val qNarrow = p(HbwifTLKey).asyncQueueNarrow
+
+        val maq = Module(new AsyncQueue(io.data.manager.a.bits, qDepth, qSync, qSafe, qNarrow))
+        val mbq = Module(new AsyncQueue(io.data.manager.b.bits, qDepth, qSync, qSafe, qNarrow))
+        val mcq = Module(new AsyncQueue(io.data.manager.c.bits, qDepth, qSync, qSafe, qNarrow))
+        val mdq = Module(new AsyncQueue(io.data.manager.d.bits, qDepth, qSync, qSafe, qNarrow))
+        val meq = Module(new AsyncQueue(io.data.manager.e.bits, qDepth, qSync, qSafe, qNarrow))
+        val caq = Module(new AsyncQueue(io.data.client.a.bits, qDepth, qSync, qSafe, qNarrow))
+        val cbq = Module(new AsyncQueue(io.data.client.b.bits, qDepth, qSync, qSafe, qNarrow))
+        val ccq = Module(new AsyncQueue(io.data.client.c.bits, qDepth, qSync, qSafe, qNarrow))
+        val cdq = Module(new AsyncQueue(io.data.client.d.bits, qDepth, qSync, qSafe, qNarrow))
+        val ceq = Module(new AsyncQueue(io.data.client.e.bits, qDepth, qSync, qSafe, qNarrow))
+
+        maq.suggestName("AsyncQueueManagerA")
+        mbq.suggestName("AsyncQueueManagerB")
+        mcq.suggestName("AsyncQueueManagerC")
+        mdq.suggestName("AsyncQueueManagerD")
+        meq.suggestName("AsyncQueueManagerE")
+        caq.suggestName("AsyncQueueClientA")
+        cbq.suggestName("AsyncQueueClientB")
+        ccq.suggestName("AsyncQueueClientC")
+        cdq.suggestName("AsyncQueueClientD")
+        ceq.suggestName("AsyncQueueClientE")
+
+        maq.io.enq <> data.manager.a
+        data.manager.b <> mbq.io.deq
+        mcq.io.enq <> data.manager.c
+        data.manager.d <> mdq.io.deq
+        meq.io.enq <> data.manager.e
+
+        io.data.manager.a <> maq.io.deq
+        mbq.io.enq <> io.data.manager.b
+        io.data.manager.c <> mcq.io.deq
+        mdq.io.enq <> io.data.manager.d
+        io.data.manager.e <> meq.io.deq
+
+        caq.io.enq <> io.data.client.a
+        io.data.client.b <> cbq.io.deq
+        ccq.io.enq <> io.data.client.c
+        io.data.client.d <> cdq.io.deq
+        ceq.io.enq <> io.data.client.e
+
+        data.client.a <> caq.io.deq
+        cbq.io.enq <> data.client.b
+        data.client.c <> ccq.io.deq
+        cdq.io.enq <> data.client.d
+        data.client.e <> ceq.io.deq
+
+        maq.io.enq_clock := dataClock
+        mbq.io.deq_clock := dataClock
+        mcq.io.enq_clock := dataClock
+        mdq.io.deq_clock := dataClock
+        meq.io.enq_clock := dataClock
+
+        maq.io.deq_clock := this.clock
+        mbq.io.enq_clock := this.clock
+        mcq.io.deq_clock := this.clock
+        mdq.io.enq_clock := this.clock
+        meq.io.deq_clock := this.clock
+
+        caq.io.enq_clock := this.clock
+        cbq.io.deq_clock := this.clock
+        ccq.io.enq_clock := this.clock
+        cdq.io.deq_clock := this.clock
+        ceq.io.enq_clock := this.clock
+
+        caq.io.deq_clock := dataClock
+        cbq.io.enq_clock := dataClock
+        ccq.io.deq_clock := dataClock
+        cdq.io.enq_clock := dataClock
+        ceq.io.deq_clock := dataClock
+
+        maq.io.enq_reset := dataReset
+        mbq.io.deq_reset := dataReset
+        mcq.io.enq_reset := dataReset
+        mdq.io.deq_reset := dataReset
+        meq.io.enq_reset := dataReset
+
+        maq.io.deq_reset := this.reset.toBool
+        mbq.io.enq_reset := this.reset.toBool
+        mcq.io.deq_reset := this.reset.toBool
+        mdq.io.enq_reset := this.reset.toBool
+        meq.io.deq_reset := this.reset.toBool
+
+        caq.io.enq_reset := this.reset.toBool
+        cbq.io.deq_reset := this.reset.toBool
+        ccq.io.enq_reset := this.reset.toBool
+        cdq.io.deq_reset := this.reset.toBool
+        ceq.io.enq_reset := this.reset.toBool
+
+        caq.io.deq_reset := dataReset
+        cbq.io.enq_reset := dataReset
+        ccq.io.deq_reset := dataReset
+        cdq.io.enq_reset := dataReset
+        ceq.io.deq_reset := dataReset
     }
 }
 
@@ -314,6 +421,7 @@ trait HasTLBidirectionalPacketizer {
     def decodedSymbolsPerCycle: Int
     val clientEdge: TLEdgeOut
     val managerEdge: TLEdgeIn
+    implicit val p: Parameters
 
     def genPacketizer[S <: DecodedSymbol](symbolFactory: () => S) = new TLBidirectionalPacketizer[S](clientEdge, managerEdge, decodedSymbolsPerCycle, symbolFactory)
 }

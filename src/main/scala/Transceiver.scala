@@ -17,7 +17,7 @@ case class SerDesConfig(
     dfeHasOverride: Boolean = true,
     dlevDACWidth: Int = 4,
     dlevHasOverride: Boolean = true,
-    bitStuffModes: Int = 3
+    bitStuffModes: Int = 1 // TODO test more modes
 )
 
 class Differential extends Bundle {

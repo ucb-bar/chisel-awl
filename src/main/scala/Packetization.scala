@@ -16,7 +16,8 @@ abstract class Packetizer[S <: DecodedSymbol, T <: Data](val decodedSymbolsPerCy
 
     val io: PacketizerIO[S, T]
 
-    def connectData(data: T)
+    // This method must implement async crossings into the global "clock" domain
+    def connectData(dataClock: Clock, dataReset: Bool, data: T)
 
 }
 

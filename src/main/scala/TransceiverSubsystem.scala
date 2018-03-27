@@ -9,24 +9,24 @@ class TransceiverOverrideIF()(implicit val c: SerDesConfig) extends Bundle {
   // Note that these all have an "unsafe" crossing from the TX into RX domain
 
   // CDR override
-  val cdriValue = Input(UInt((if (c.cdrHasOverride) c.cdrIWidth else 0).W))
-  val cdrpValue = Input(UInt((if (c.cdrHasOverride) c.cdrPWidth else 0).W))
-  val cdr = Input(UInt((if (c.cdrHasOverride) 1 else 0).W))
+  val cdriValue = if (c.cdrHasOverride) Some(Input(UInt(c.cdrIWidth.W))) else None
+  val cdrpValue = if (c.cdrHasOverride) Some(Input(UInt(c.cdrPWidth.W))) else None
+  val cdr       = if (c.cdrHasOverride) Some(Input(Bool())) else None
 
-  def getCDRI(default: UInt): UInt = (if(c.cdrHasOverride) Mux(cdr === 1.U, cdriValue, default) else default)
-  def getCDRP(default: UInt): UInt = (if(c.cdrHasOverride) Mux(cdr === 1.U, cdrpValue, default) else default)
+  def getCDRI(default: UInt): UInt = (if(c.cdrHasOverride) Mux(cdr.get, cdriValue.get, default) else default)
+  def getCDRP(default: UInt): UInt = (if(c.cdrHasOverride) Mux(cdr.get, cdrpValue.get, default) else default)
 
   // DFE override
-  val dfeTapsValue = Input(Vec(if (c.dfeHasOverride) c.dfeNumTaps else 0, UInt(c.dfeTapWidth.W)))
-  val dfe = Input(UInt((if (c.dfeHasOverride) 1 else 0).W))
+  val dfeTapsValue = if (c.dfeHasOverride) Some(Input(Vec(c.dfeNumTaps, UInt(c.dfeTapWidth.W)))) else None
+  val dfe          = if (c.dfeHasOverride) Some(Input(Bool())) else None
 
-  def getDFETaps(default: Vec[UInt]): Vec[UInt] = (if(c.dfeHasOverride) Mux(dfe === 1.U, dfeTapsValue, default) else default)
+  def getDFETaps(default: Vec[UInt]): Vec[UInt] = (if(c.dfeHasOverride) Mux(dfe.get, dfeTapsValue.get, default) else default)
 
   // DLEV override
-  val dlevDACValue = Input(UInt((if (c.dlevHasOverride) c.dlevDACWidth else 0).W))
-  val dlev = Input(UInt((if (c.dlevHasOverride) 1 else 0).W))
+  val dlevDACValue = if (c.dlevHasOverride) Some(Input(UInt(c.dlevDACWidth.W))) else None
+  val dlev         = if (c.dlevHasOverride) Some(Input(Bool())) else None
 
-  def getDlevDAC(default: UInt): UInt = (if(c.dlevHasOverride) Mux(dlev === 1.U, dlevDACValue, default) else default)
+  def getDlevDAC(default: UInt): UInt = (if(c.dlevHasOverride) Mux(dlev.get, dlevDACValue.get, default) else default)
 
 }
 
@@ -68,8 +68,8 @@ class TransceiverSubsystemIO()(implicit val c: SerDesConfig) extends Bundle with
   val rxClock = Output(Clock())
   val rxReset = Output(Bool())
 
-  // bit stuff mode (can be 0 width)
-  val bitStuffMode = Input(UInt(log2Ceil(c.bitStuffModes).W))
+  // bit stuff mode
+  val bitStuffMode = if(c.bitStuffModes > 1) Some(Input(UInt(log2Ceil(c.bitStuffModes).W))) else None
 
 }
 
@@ -99,8 +99,8 @@ class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with H
   txrx.io.data.tx := txBitStuffer.io.raw
   txBitStuffer.io.enq <> io.data.tx
   io.data.rx <> rxBitStuffer.io.deq
-  rxBitStuffer.io.mode := io.bitStuffMode
-  txBitStuffer.io.mode := io.bitStuffMode
+  rxBitStuffer.io.mode.map(_ := io.bitStuffMode.get)
+  txBitStuffer.io.mode.map(_ := io.bitStuffMode.get)
 
   io.txClock := txrx.io.clock_tx
   io.txReset := txSyncReset
@@ -135,14 +135,14 @@ class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with H
   }
 
   def connectController(builder: ControllerBuilder) {
-    builder.w("bit_stuff_mode", io.bitStuffMode)
-    builder.w("cdr_i_value", io.overrides.cdriValue)
-    builder.w("cdr_p_value", io.overrides.cdrpValue)
-    builder.w("cdr_override", io.overrides.cdr)
-    builder.w("dfe_value", io.overrides.dfeTapsValue)
-    builder.w("dfe_override", io.overrides.dfe)
-    builder.w("dlev_dac_value", io.overrides.dlevDACValue)
-    builder.w("dlev_override", io.overrides.dlev)
+    io.bitStuffMode.map(x => builder.w("bit_stuff_mode", x))
+    io.overrides.cdriValue.map(x => builder.w("cdr_i_value", x))
+    io.overrides.cdrpValue.map(x => builder.w("cdr_p_value", x))
+    io.overrides.cdr.map(x => builder.w("cdr_override", x))
+    io.overrides.dfeTapsValue.map(x => builder.w("dfe_value", x))
+    io.overrides.dfe.map(x => builder.w("dfe_override", x))
+    io.overrides.dlevDACValue.map(x => builder.w("dlev_dac_value", x))
+    io.overrides.dlev.map(x => builder.w("dlev_override", x))
   }
 
 }
@@ -152,7 +152,7 @@ class TxBitStuffer()(implicit val c: SerDesConfig) extends Module {
     val io = IO(new Bundle {
         val enq = Flipped(Ready(UInt(c.dataWidth.W)))
         val raw = Output(UInt(c.dataWidth.W))
-        val mode = Input(UInt(log2Ceil(c.bitStuffModes).W))
+        val mode = if (c.bitStuffModes > 1) Some(Input(UInt(log2Ceil(c.bitStuffModes).W))) else None
     })
 
     require(c.bitStuffModes > 0)
@@ -166,11 +166,11 @@ class TxBitStuffer()(implicit val c: SerDesConfig) extends Module {
         val count = RegInit(0.U((c.bitStuffModes - 1).W))
         io.raw := buf
         (0 until c.bitStuffModes).foreach { i =>
-            when (io.mode === i.U) {
+            when (io.mode.get === i.U) {
                 io.raw := FillInterleaved((1 << i), buf(c.dataWidth - 1, c.dataWidth - (c.dataWidth/(1 << i))))
             }
         }
-        when ((count +& 1.U)(io.mode) === true.B) {
+        when ((count +& 1.U)(io.mode.get) === true.B) {
             count := 0.U
             io.enq.ready := true.B
             buf := io.enq.bits
@@ -178,7 +178,7 @@ class TxBitStuffer()(implicit val c: SerDesConfig) extends Module {
             count := count + 1.U
             io.enq.ready := false.B
             (0 until c.bitStuffModes).foreach { i =>
-                when(io.mode === i.U) {
+                when(io.mode.get === i.U) {
                     if (i > 0) {
                         buf := buf << (c.dataWidth/(1 << i))
                     } else {
@@ -197,7 +197,7 @@ class RxBitStuffer()(implicit val c: SerDesConfig) extends Module {
     val io = IO(new Bundle {
         val raw = Input(UInt(c.dataWidth.W))
         val deq = Valid(UInt(c.dataWidth.W))
-        val mode = Input(UInt((c.bitStuffModes - 1).W))
+        val mode = if (c.bitStuffModes > 1) Some(Input(UInt(log2Ceil(c.bitStuffModes).W))) else None
     })
 
     // TODO implement this so that we don't incur a register delay in mode 0
@@ -212,7 +212,7 @@ class RxBitStuffer()(implicit val c: SerDesConfig) extends Module {
         val count = RegInit(0.U(log2Ceil(c.bitStuffModes).W))
         io.deq.bits := buf
         (0 until c.bitStuffModes).foreach { i =>
-            when(io.mode === i.U) {
+            when(io.mode.get === i.U) {
                 val tmp = Wire(UInt((c.dataWidth / (1 << i)).W))
                 tmp := io.raw.toBools.zipWithIndex.filter(_._2 % (1 << i) == 0).map(_._1.asUInt).reduceLeft(Cat(_,_))
                 if (i > 0) {
@@ -222,7 +222,7 @@ class RxBitStuffer()(implicit val c: SerDesConfig) extends Module {
                 }
             }
         }
-        when ((count +& 1.U)(io.mode) === true.B) {
+        when ((count +& 1.U)(io.mode.get) === true.B) {
             count := 0.U
             io.deq.valid := true.B
         } .otherwise {

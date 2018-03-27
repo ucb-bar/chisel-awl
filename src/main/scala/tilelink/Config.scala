@@ -10,7 +10,11 @@ case class HbwifTLConfig(
     numLanes: Int = 8,
     numBanks: Int = 2,
     beatBytes: Int = 16,
-    numXact: Int = 32
+    numXact: Int = 32,
+    asyncQueueDepth: Int = 8,
+    asyncQueueSync: Int = 3,
+    asyncQueueSafe: Boolean = true,
+    asyncQueueNarrow: Boolean = true
 )
 
 case object HbwifSerDesKey extends Field[SerDesConfig]

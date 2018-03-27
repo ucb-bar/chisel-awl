@@ -8,7 +8,7 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config._
 
 class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn, val configEdge: TLEdgeIn)
-    (implicit val c: SerDesConfig, implicit val b: BertConfig, implicit val m: PatternMemConfig) extends Lane
+    (implicit val c: SerDesConfig, implicit val b: BertConfig, implicit val m: PatternMemConfig, implicit val p: Parameters) extends Lane
     with HasEncoding8b10b
     with HasBertDebug
     with HasTLBidirectionalPacketizer
@@ -23,6 +23,10 @@ class HbwifModule(implicit p: Parameters) extends LazyModule {
     val configAddressSets = p(HbwifTLKey).configAddressSets
     require(managerAddressSets.length == lanes)
 
+    val crossingDepth = 8 // TODO
+    val crossingSync = 3
+
+    /*
     val clientNodes = (0 until lanes).map { id => TLClientNode(Seq(TLClientPortParameters(
         Seq(TLClientParameters(
             name               = s"HbwifClient$id",
@@ -55,6 +59,8 @@ class HbwifModule(implicit p: Parameters) extends LazyModule {
         beatBytes = beatBytes,
         minLatency = 1
     ))) }
+    */
+    val adapterNodes = (0 until lanes).map { id => TLAdapterNode() }
     val configNodes = (0 until lanes).map { id => TLManagerNode(Seq(TLManagerPortParameters(
         Seq(TLManagerParameters(
             address            = List(configAddressSets(id)),
@@ -81,10 +87,10 @@ class HbwifModule(implicit p: Parameters) extends LazyModule {
         val rx = IO(Vec(lanes, Flipped(new Differential())))
 
         val laneModules = (0 until lanes).map { id =>
-            val (clientOut, clientEdge) = clientNodes(id).out(0)
-            val (managerIn, managerEdge) = managerNodes(id).in(0)
+            val (clientOut, clientEdge) = adapterNodes(id).out(0)
+            val (managerIn, managerEdge) = adapterNodes(id).in(0)
             val (configIn, configEdge) = configNodes(id).in(0)
-            val lane = Module(new TLLane8b10b(clientEdge, managerEdge, configEdge)(p(HbwifSerDesKey), p(HbwifBertKey), p(HbwifPatternMemKey)))
+            val lane = Module(new TLLane8b10b(clientEdge, managerEdge, configEdge)(p(HbwifSerDesKey), p(HbwifBertKey), p(HbwifPatternMemKey), p))
             clientOut <> lane.io.data.client
             lane.io.data.manager <> managerIn
             lane.io.control <> configIn

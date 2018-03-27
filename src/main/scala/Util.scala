@@ -95,8 +95,9 @@ class MultiQueue[T <: Data](gen: T, depth: Int, numEnqPorts: Int, numDeqPorts: I
     val entries = Reg(Vec(depth, gen))
     val rptr = RegInit(0.U(log2Ceil(depth).W))
     val wptr = RegInit(0.U(log2Ceil(depth).W))
-    val empty = RegInit(true.B)
-    val full = (rptr === wptr) && !empty
+    val maybeFull = RegInit(false.B)
+    val full = (rptr === wptr) && maybeFull
+    val empty = (rptr === wptr) && !maybeFull
     val free = Mux(full, 0.U(log2Ceil(depth+1).W), Mux(rptr > wptr, rptr - wptr, depth.U - wptr + rptr))
     val valid = Mux(empty, 0.U(log2Ceil(depth+1).W), Mux(wptr > rptr, wptr - rptr, depth.U - rptr + wptr))
 
@@ -112,10 +113,10 @@ class MultiQueue[T <: Data](gen: T, depth: Int, numEnqPorts: Int, numDeqPorts: I
     val enqueued = io.enq.map(_.fire()).reduce(_||_)
     val dequeued = io.deq.map(_.fire()).reduce(_||_)
 
-    when ((rptrNext === wptrNext) && dequeued) {
-        empty := true.B
-    } .elsewhen(rptrNext =/= wptrNext) {
-        empty := false.B
+    when (dequeued) {
+        maybeFull := false.B
+    } .elsewhen(enqueued && (rptrNext === wptrNext)) {
+        maybeFull := true.B
     }
 
     io.enq.foldLeft(0.U(log2Ceil(depth+1).W)) { (cnt, enq) =>

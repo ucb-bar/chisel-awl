@@ -60,7 +60,7 @@ module generic_transceiver (
   //            Serializer
   //***********************************
 
-  reg [`SERDES_BITS-1:0] data_tx_buf;
+  reg [`SERDES_BITS-1:0] data_tx_buf = 0;
   assign tx_p = data_tx_buf[`SERDES_BITS-1];
   assign tx_n = ~tx_p;
 
@@ -75,8 +75,8 @@ module generic_transceiver (
   //           Deserializer
   //***********************************
 
-  reg [`SERDES_BITS-1:0] data_rx_buf;
-  reg [`SERDES_BITS-1:0] data_rx_reg;
+  reg [`SERDES_BITS-1:0] data_rx_buf = 0;
+  reg [`SERDES_BITS-1:0] data_rx_reg = 0;
   assign data_rx = data_rx_reg;
 
   wire rx_p_val;
