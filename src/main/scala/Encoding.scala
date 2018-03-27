@@ -56,6 +56,14 @@ class EncoderIO[S <: DecodedSymbol](val symbolFactory: () => S, val decodedSymbo
     final val decodedReady = Output(Bool())
 }
 
+// io.decoded(MSB) is the LEAST recent time symbol
+// io.decoded(LSB) is the MOST recent time symbol
+// e.g. if we send A B C D E F G with decodedSymbolsPerCycle = 3,
+// io.decoded(2) = A
+// io.decoded(1) = B
+// io.decoded(0) = C
+//
+// Similarly, this expects the encoded interface to go MSB..LSB with MSB being sent over the line first
 abstract class Encoder(val decodedSymbolsPerCycle: Int) extends Module with HasControllerConnector with HasEncoderParams {
 
     val io: EncoderIO[S]
@@ -92,24 +100,24 @@ final class EncoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Modu
     } else {
         require(enqBits > deqBits, "Cannot have more deqBits than enqBits for the Encoder")
         val state = RegInit(0.U(log2Ceil(numStates).W))
-        val bufWidth = 2*enqBits - 1
+        val bufWidth = 2*enqBits - 1 // TODO this is too much, but does it get optimized away?
         val buf = Reg(UInt(bufWidth.W))
-        io.deq.bits := buf(deqBits - 1, 0)
+        io.deq.bits := buf(bufWidth - 1, bufWidth - deqBits)
         io.enq.ready := false.B
         (0 until numStates).foldLeft(0) { case (empty, s) =>
-            val nextEmpty = empty + deqBits - (if ((empty + deqBits) < enqBits) 0 else enqBits)
+            val canTake = empty + deqBits >= enqBits
+            val nextEmpty = empty + deqBits - (if (canTake) enqBits else 0)
             when (io.deq.ready) {
                 when (state === s.U) {
-                    if (nextEmpty < enqBits) {
-                        io.enq.ready := false.B
-                        buf := buf >> deqBits
-                    } else {
+                    if (canTake) {
                         io.enq.ready := true.B
                         val filled = bufWidth - empty
-                        require(filled >= 0)
-                        val mask = ((1 << (filled - deqBits)) - 1)
                         require(filled >= deqBits, s"Should not get here, filled=$filled, deqBits=$deqBits")
-                        buf := ((buf >> deqBits) & mask.U) | (io.enq.bits << (filled - deqBits))
+                        val mask = ((BigInt(1) << (filled - deqBits)) - 1) << (bufWidth - filled + deqBits)
+                        buf := ((buf << deqBits) & mask.U) | (io.enq.bits << (bufWidth - filled + deqBits - enqBits))
+                    } else {
+                        io.enq.ready := false.B
+                        buf := buf << deqBits
                     }
                     state := ((s+1) % numStates).U
                 }
@@ -133,31 +141,28 @@ final class DecoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Modu
     } else {
         require(deqBits > enqBits, "Cannot have more enqBits than deqBits for the Decoder")
         val state = RegInit(0.U(log2Ceil(numStates).W))
-        val buf = Reg(UInt((2*deqBits - 1).W)) // This can be reduced in some cases, but it should get optimized away TODO
-        when (io.enq.valid) {
-            buf := ((buf << enqBits) | io.enq.bits)
-        }
-        io.deq.bits := buf(deqBits-1, 0)
+        val bufWidth = 2*deqBits - 1 // TODO this is too much, but does it get optimized away?
+        val buf = Reg(UInt(bufWidth.W))
+        io.deq.bits := buf(bufWidth - 1, bufWidth - deqBits)
         io.deq.valid := false.B
-        (0 until numStates).foldLeft(0) { case (filled, s) =>
+        (0 until numStates).foldLeft(enqBits) { case (filled, s) =>
+            val canPut = filled >= deqBits
+            val nextFilled = filled + enqBits - (if (canPut) deqBits else 0)
             when (io.enq.valid) {
                 when (state === s.U) {
-                    if (filled >= deqBits) {
-                        io.deq.valid := true.B
-                        io.deq.bits := buf(filled - 1, filled - deqBits)
-                    } else {
-                        io.deq.valid := false.B
-                    }
+                    io.deq.valid := canPut.B
+                    val shiftBits = if (canPut) deqBits else 0
+                    val mask = ((BigInt(1) << (filled - shiftBits)) - 1) << (bufWidth - filled + shiftBits)
+                    buf := ((buf << shiftBits) & mask.U) | (io.enq.bits << (bufWidth - filled + shiftBits - enqBits))
                     state := ((s+1) % numStates).U
                 }
             }
-            filled + enqBits - (if (filled < deqBits) 0 else deqBits)
+            nextFilled
         }
     }
 }
 
 final class DecoderQueue[S <: DecodedSymbol](val decodedSymbolsPerCycle: Int,  val symbolFactory: () => S) extends Module {
-
     final val io = IO(new Bundle {
         val enqClock = Input(Clock())
         val enqReset = Input(Bool())
@@ -167,6 +172,10 @@ final class DecoderQueue[S <: DecodedSymbol](val decodedSymbolsPerCycle: Int,  v
         val deq = Vec(decodedSymbolsPerCycle, Valid(symbolFactory()))
     })
 
+    io.enq <> io.deq
+    // TODO FIXME
+}
+/*
     val multiQueue = withClockAndReset(io.enqClock, io.enqReset) {
         Module(new MultiQueue(symbolFactory(), 1 << (log2Ceil(decodedSymbolsPerCycle) + 1), decodedSymbolsPerCycle, decodedSymbolsPerCycle))
     }
@@ -176,7 +185,7 @@ final class DecoderQueue[S <: DecodedSymbol](val decodedSymbolsPerCycle: Int,  v
         assert(m.ready || !m.valid, "Buffer overrun")
     }
 
-    val async = Module(new AsyncQueue(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())), 4, 3, true))
+    val async = Module(new AsyncQueue(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())), 8, 3, true))
     async.io.enq_clock := io.enqClock
     async.io.enq_reset := io.enqReset
     async.io.deq_clock := io.deqClock
@@ -197,3 +206,5 @@ final class DecoderQueue[S <: DecodedSymbol](val decodedSymbolsPerCycle: Int,  v
 
 
 }
+*/
+

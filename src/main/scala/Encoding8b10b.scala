@@ -214,34 +214,40 @@ class Decoder8b10b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbolsPe
 
     val io = IO(new DecoderIO(symbolFactory, decodedSymbolsPerCycle) {
         val error = Output(Bool())
+        val clearError = Input(Bool())
     })
 
     val idx = RegInit(0.U(4.W))
     val lock = RegInit(false.B)
     val rd = RegInit(false.B)
 
-    val extended = Cat(RegNext(io.encoded.bits(8,0)),io.encoded.bits)
+    val prev = Reg(UInt(9.W))
+    val extended = Cat(prev, io.encoded.bits)
     val offsets = Vec( (0 to 9).map { i => extended(decodedSymbolsPerCycle*10+i-1, i) } )
     // Check that bits cdeif (7,3) are the same (this defines a comma)
     val commas = offsets.map { x => (x(9,3) === "b0011111".U) || (x(9,3) === "b1100000".U) }
     val found = commas.reduce(_||_)
     val nextIdx = MuxCase(0.U, commas.zipWithIndex.map { case (b, i) => (b, i.U) })
 
-    when (found) {
-        idx := nextIdx
-        lock := true.B
+    when (io.encoded.valid) {
+        when (found) {
+            idx := nextIdx
+            lock := true.B
+        }
+        prev := io.encoded.bits(8,0)
     }
 
     (0 until decodedSymbolsPerCycle).foreach { i =>
-        io.decoded(i) := Decoded8b10bSymbol.decode(offsets(Mux(found,nextIdx,idx))(i*10+9,i*10), rd, io.encoded.valid)
+        io.decoded(i) := Decoded8b10bSymbol.decode(offsets(idx)(i*10+9,i*10), rd, io.encoded.valid && lock)
     }
 
     val error = RegInit(false.B)
-    error := (!(io.decoded.map(_.valid).reduce(_&&_)) && io.encoded.valid) || error
+    error := ((!(io.decoded.map(_.valid).reduce(_&&_)) && io.encoded.valid) || error) && !io.clearError
     io.error := error
 
     override def connectController(builder: ControllerBuilder) {
         builder.r("decoder_error", io.error)
+        builder.w("decoder_error_clear", io.clearError)
     }
 
 }
