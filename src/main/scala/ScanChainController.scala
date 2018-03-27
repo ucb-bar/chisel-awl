@@ -23,7 +23,7 @@ class ScanChainControllerBuilder extends ControllerBuilder {
     private var rLength = 0
     val addressMap = new HashMap[String, (Int, Int)]
 
-    def generate(laneClock: Clock, laneReset: Bool, port: ScanChainPort) {
+    def generate(laneClock: Clock, laneReset: Bool, globalClock: Clock, globalReset: Bool, port: ScanChainPort) {
         var index = 0
 
         require(wSeqMems.length == 0, "ScanChainController does not support Mems")

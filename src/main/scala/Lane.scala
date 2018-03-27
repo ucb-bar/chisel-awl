@@ -8,6 +8,8 @@ final class LaneIO[P <: Bundle, T <: Data](portFactory: () => P, dataFactory: ()
     extends Bundle with TransceiverOuterIF {
     val control = portFactory()
     val data = dataFactory()
+    val laneClock = Output(Clock())
+    val laneReset = Output(Bool())
 }
 
 abstract class Lane extends Module with HasDebug {
@@ -58,9 +60,9 @@ abstract class Lane extends Module with HasDebug {
 
     // TX chain
     txDebug <> txrxss.io.data.tx
-    encoder.io.encoded <> encoderAdapter.io.enq
+    encoderAdapter.io.enq <> encoder.io.encoded
     packetizer.io.symbolsTxReady := encoder.io.decodedReady
-    packetizer.io.symbolsTx <> encoder.io.decoded
+    encoder.io.decoded <> packetizer.io.symbolsTx
 
     // RX into TX domain crossing
     val decoderQueue = Module(new DecoderQueue(decodedSymbolsPerCycle, encoder.symbolFactory))
@@ -86,16 +88,19 @@ abstract class Lane extends Module with HasDebug {
 
     val io = IO(new LaneIO[builder.P, T](builder.createPort _, packetizer.dataFactory))
 
-    // XXX async crossings live outside of here!
-    builder.generate(txClock, txReset, io.control)
+    // async crossings live in here
+    builder.generate(txClock, txReset, clock, reset.toBool, io.control)
 
-    // XXX async crossings live outside of here!
-    packetizer.connectData(io.data)
+    // async crossings live in here
+    packetizer.connectData(clock, reset.toBool, io.data)
 
     txrxss.io.clockRef := io.clockRef
     txrxss.io.asyncResetIn := io.asyncResetIn
 
     txrxss.io.rx <> io.rx
     io.tx <> txrxss.io.tx
+
+    io.laneClock := txClock
+    io.laneReset := txReset
 
 }

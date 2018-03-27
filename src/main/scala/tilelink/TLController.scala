@@ -5,6 +5,9 @@ import chisel3._
 import chisel3.util._
 import chisel3.experimental.withClockAndReset
 import freechips.rocketchip.tilelink._
+import freechips.rocketchip.util.AsyncQueue
+import freechips.rocketchip._
+import freechips.rocketchip.config._
 import scala.collection.mutable.HashMap
 
 class TLControllerMapEntry(val address: BigInt, val size: Int, val writeable: Boolean) {
@@ -34,7 +37,7 @@ class TLControllerMap extends HashMap[String, TLControllerMapEntry] {
     }
 }
 
-class TLControllerBuilder(edge: TLEdgeIn) extends ControllerBuilder {
+class TLControllerBuilder(edge: TLEdgeIn)(implicit val p: Parameters) extends ControllerBuilder {
 
     type P = TLBundle
     def createPort = Flipped(TLBundle(edge.bundle))
@@ -45,18 +48,42 @@ class TLControllerBuilder(edge: TLEdgeIn) extends ControllerBuilder {
     private val beatBytes = edge.bundle.dataBits / 8
     private val maxAddress = (1 << edge.bundle.addressBits) - beatBytes // TODO is this safe
 
-    def generate(laneClock: Clock, laneReset: Bool, port: TLBundle) {
+    def generate(laneClock: Clock, laneReset: Bool, globalClock: Clock, globalReset: Bool, port: TLBundle) {
 
         require(wSeqMems.length == 0, "TODO")
         require(rSeqMems.length == 0, "TODO")
 
+        val qDepth = p(HbwifTLKey).asyncQueueDepth
+        val qSync = p(HbwifTLKey).asyncQueueSync
+        val qSafe = p(HbwifTLKey).asyncQueueSafe
+        val qNarrow = p(HbwifTLKey).asyncQueueNarrow
+
+        val aq = Module(new AsyncQueue(port.a.bits, qDepth, qSync, qSafe, qNarrow))
+        val dq = Module(new AsyncQueue(port.d.bits, qDepth, qSync, qSafe, qNarrow))
+
+        aq.suggestName("AsyncQueueControllerA")
+        dq.suggestName("AsyncQueueControllerD")
+
+        // unused channels
+        port.b.valid := false.B
+        port.b.bits  := DontCare
+        port.c.ready := true.B
+        port.e.ready := true.B
+
+        aq.io.enq <> port.a
+        port.d <> dq.io.deq
+
+        aq.io.enq_clock := globalClock
+        aq.io.enq_reset := globalReset
+        aq.io.deq_clock := laneClock
+        aq.io.deq_reset := laneReset
+        dq.io.enq_clock := laneClock
+        dq.io.enq_reset := laneReset
+        dq.io.deq_clock := globalClock
+        dq.io.deq_reset := globalReset
+
         withClockAndReset (laneClock, laneReset) {
 
-            // unused channels
-            port.b.valid := false.B
-            port.b.bits := port.b.bits.fromBits(0.U)
-            port.c.ready := true.B
-            port.e.ready := true.B
 
             val dvalid = RegInit(false.B)
             val dopcode = Reg(UInt(3.W))
@@ -64,17 +91,17 @@ class TLControllerBuilder(edge: TLEdgeIn) extends ControllerBuilder {
             val dsize = Reg(UInt(edge.bundle.sizeBits.W))
             val dsource = Reg(UInt(edge.bundle.sourceBits.W))
             // always ready
-            port.a.ready := !dvalid
-            port.d.valid := dvalid
-            port.d.bits.data := ddata
-            port.d.bits.opcode := dopcode
-            port.d.bits.param := 0.U
-            port.d.bits.size := dsize
-            port.d.bits.source := dsource
-            port.d.bits.sink := 0.U
-            port.d.bits.error := false.B
+            aq.io.deq.ready := !dvalid
+            dq.io.enq.valid := dvalid
+            dq.io.enq.bits.data := ddata
+            dq.io.enq.bits.opcode := dopcode
+            dq.io.enq.bits.param := 0.U
+            dq.io.enq.bits.size := dsize
+            dq.io.enq.bits.source := dsource
+            dq.io.enq.bits.sink := 0.U
+            dq.io.enq.bits.error := false.B
 
-            when (port.d.fire()) {
+            when (dq.io.enq.fire()) {
                 dvalid := false.B
             }
 
@@ -87,10 +114,10 @@ class TLControllerBuilder(edge: TLEdgeIn) extends ControllerBuilder {
 
                 val shadow = init.map(x => RegInit(x.U(w.W))).getOrElse(Reg(UInt(w.W)))
                 node := shadow
-                when (port.a.fire() && (port.a.bits.address === address.U)) {
-                    when (edge.hasData(port.a.bits)) {
+                when (aq.io.deq.fire() && (aq.io.deq.bits.address === address.U)) {
+                    when (edge.hasData(aq.io.deq.bits)) {
                         // Put
-                        shadow := port.a.bits.data
+                        shadow := aq.io.deq.bits.data
                         dopcode := TLMessages.AccessAck
                     } .otherwise {
                         // Get
@@ -98,8 +125,8 @@ class TLControllerBuilder(edge: TLEdgeIn) extends ControllerBuilder {
                     }
                     dvalid := true.B
                     ddata := node
-                    dsize := port.a.bits.size
-                    dsource := port.a.bits.source
+                    dsize := aq.io.deq.bits.size
+                    dsource := aq.io.deq.bits.source
                 }
                 address + beatBytes
             }
@@ -108,8 +135,8 @@ class TLControllerBuilder(edge: TLEdgeIn) extends ControllerBuilder {
                 require(node.getWidth <= maxSize, s"FIXME, Port $name width ${node.getWidth} is too large (> $maxSize)")
                 map.add(name, address, beatBytes, false)
 
-                when (port.a.fire() && (port.a.bits.address === address.U)) {
-                    when (edge.hasData(port.a.bits)) {
+                when (aq.io.deq.fire() && (aq.io.deq.bits.address === address.U)) {
+                    when (edge.hasData(aq.io.deq.bits)) {
                         // Ignore Puts
                         dopcode := TLMessages.AccessAck
                     } .otherwise {
@@ -118,8 +145,8 @@ class TLControllerBuilder(edge: TLEdgeIn) extends ControllerBuilder {
                     }
                     dvalid := true.B
                     ddata := node
-                    dsize := port.a.bits.size
-                    dsource := port.a.bits.source
+                    dsize := aq.io.deq.bits.size
+                    dsource := aq.io.deq.bits.source
                 }
                 address + beatBytes
             }
@@ -130,5 +157,6 @@ class TLControllerBuilder(edge: TLEdgeIn) extends ControllerBuilder {
 
 trait HasTLController {
     val configEdge: TLEdgeIn
+    implicit val p: Parameters
     def genBuilder() = new TLControllerBuilder(configEdge)
 }

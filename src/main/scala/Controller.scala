@@ -18,6 +18,10 @@ abstract class ControllerBuilder {
 
     def w(name: String, signal: UInt) { this.w(name, signal, None) }
 
+    def w(name: String, signal: UInt, init: BigInt) { this.w(name, signal, Some(init)) }
+
+    def w(name: String, signal: Seq[UInt], init: Seq[BigInt]) { this.w(name, signal, Some(init)) }
+
     // TODO include some better error checking about trying to write to an unwriteable node
     def w(name: String, signal: UInt, init: Option[BigInt]) {
         if (signal.getWidth > 0) {
@@ -50,8 +54,8 @@ abstract class ControllerBuilder {
         rSeqMems.append((name, depth, signal, addr, en))
     }
 
-    // TODO deal with async crossings
-    def generate(laneClock: Clock, laneReset: Bool, port: P)
+    // This method must implement any asynchronous crossings if needed
+    def generate(laneClock: Clock, laneReset: Bool, globalClock: Clock, globalReset: Bool, port: P)
 
 }
 
