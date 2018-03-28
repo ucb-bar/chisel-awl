@@ -7,8 +7,6 @@ import chisel3.util.HasBlackBoxResource
 case class SerDesConfig(
     dataWidth: Int = 16,
     numWays: Int = 2,
-    transceiverName: String = "generic_transceiver",
-    transceiverResource: String = "/generic_transceiver.sv",
     cdrHasOverride: Boolean = true,
     cdrIWidth: Int = 8,
     cdrPWidth: Int = 8,
@@ -70,14 +68,28 @@ class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle {
 
 }
 
-class Transceiver()(implicit val c: SerDesConfig) extends BlackBox {
-//with HasBlackBoxResource {
+abstract class Transceiver()(implicit val c: SerDesConfig) extends BlackBox {
 
-  val io = IO(new TransceiverIO)
+  val io: TransceiverIO
 
-  override def desiredName = c.transceiverName
+  def transceiverName: String
 
-  //setResource(c.transceiverResource)
+  override def desiredName = transceiverName
 
 }
 
+class GenericTransceiver()(implicit c: SerDesConfig) extends Transceiver()(c) {
+
+  val io = IO(new TransceiverIO)
+
+  def transceiverName = "generic_transceiver"
+
+}
+
+trait HasGenericTransceiver {
+    this: TransceiverSubsystem =>
+    implicit val c: SerDesConfig
+
+    def genTransceiver() = new GenericTransceiver()(c)
+
+}

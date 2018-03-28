@@ -73,12 +73,20 @@ class TransceiverSubsystemIO()(implicit val c: SerDesConfig) extends Bundle with
 
 }
 
-class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with HasControllerConnector {
+abstract class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with HasControllerConnector {
 
-  val io = IO(new TransceiverSubsystemIO)
+  val io: TransceiverSubsystemIO
 
   // Transceiver <> top level connections
-  val txrx = Module(new Transceiver)
+  def genTransceiver(): Transceiver
+
+  val txrx = Module(genTransceiver())
+
+}
+
+class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends TransceiverSubsystem()(c) with HasGenericTransceiver {
+
+  val io = IO(new TransceiverSubsystemIO()(c))
 
   txrx.io.clock_ref := io.clockRef
   txrx.io.async_reset_in := io.asyncResetIn
@@ -144,9 +152,12 @@ class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with H
     io.overrides.dlevDACValue.map(x => builder.w("dlev_dac_value", x))
     io.overrides.dlev.map(x => builder.w("dlev_override", x))
   }
-
 }
 
+trait HasGenericTransceiverSubsystem {
+    this: Lane =>
+    implicit val c: SerDesConfig
 
+    def genTransceiverSubsystem() = new GenericTransceiverSubsystem()(c)
 
 }

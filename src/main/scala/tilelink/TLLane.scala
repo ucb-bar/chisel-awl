@@ -7,14 +7,19 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config._
 
-class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn, val configEdge: TLEdgeIn)
+abstract class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn, val configEdge: TLEdgeIn)
     (implicit val c: SerDesConfig, implicit val b: BertConfig, implicit val m: PatternMemConfig, implicit val p: Parameters) extends Lane
     with HasEncoding8b10b
     with HasBertDebug
     with HasTLBidirectionalPacketizer
     with HasTLController
 
-class HbwifModule(implicit p: Parameters) extends LazyModule {
+class GenericTLLane8b10b(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn, configEdge: TLEdgeIn)(implicit p: Parameters)
+    extends TLLane8b10b(clientEdge, managerEdge, configEdge)(p(HbwifSerDesKey), p(HbwifBertKey), p(HbwifPatternMemKey), p)
+    with HasGenericTransceiverSubsystem
+
+
+abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
 
     val lanes = p(HbwifTLKey).numLanes
     val beatBytes = p(HbwifTLKey).beatBytes
@@ -22,9 +27,6 @@ class HbwifModule(implicit p: Parameters) extends LazyModule {
     val managerAddressSets = p(HbwifTLKey).managerAddressSets
     val configAddressSets = p(HbwifTLKey).configAddressSets
     require(managerAddressSets.length == lanes)
-
-    val crossingDepth = 8 // TODO
-    val crossingSync = 3
 
     /*
     val clientNodes = (0 until lanes).map { id => TLClientNode(Seq(TLClientPortParameters(
@@ -90,7 +92,7 @@ class HbwifModule(implicit p: Parameters) extends LazyModule {
             val (clientOut, clientEdge) = adapterNodes(id).out(0)
             val (managerIn, managerEdge) = adapterNodes(id).in(0)
             val (configIn, configEdge) = configNodes(id).in(0)
-            val lane = Module(new TLLane8b10b(clientEdge, managerEdge, configEdge)(p(HbwifSerDesKey), p(HbwifBertKey), p(HbwifPatternMemKey), p))
+            val lane = Module(genLane(clientEdge, managerEdge, configEdge))
             clientOut <> lane.io.data.client
             lane.io.data.manager <> managerIn
             lane.io.control <> configIn
@@ -101,4 +103,14 @@ class HbwifModule(implicit p: Parameters) extends LazyModule {
             lane
         }
     }
+
+    def genLane(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn, configEdge: TLEdgeIn)(implicit p: Parameters): TLLane8b10b
+}
+
+class GenericHbwifModule()(implicit p: Parameters) extends HbwifModule()(p) {
+
+    def genLane(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn, configEdge: TLEdgeIn)(implicit p: Parameters) = {
+        new GenericTLLane8b10b(clientEdge, managerEdge, configEdge)(p)
+    }
+
 }

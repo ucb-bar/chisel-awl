@@ -24,8 +24,9 @@ abstract class Lane extends Module with HasDebug {
     def genDecoder(): Decoder
     def genPacketizer[S <: DecodedSymbol](symbolFactory: () => S): Packetizer[S, T]
     def genBuilder(): ControllerBuilder
+    def genTransceiverSubsystem(): TransceiverSubsystem
 
-    val txrxss = Module(new TransceiverSubsystem)
+    val txrxss = Module(genTransceiverSubsystem())
 
     val txClock = txrxss.io.txClock
     val txReset = txrxss.io.txReset

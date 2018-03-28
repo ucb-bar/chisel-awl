@@ -17,7 +17,7 @@ class TLLaneTestLazy(delay: Int)(implicit p: Parameters) extends LazyModule {
 
     val fuzz = LazyModule(new TLFuzzer(txns))
     val model = LazyModule(new TLRAMModel("SRAMSimple"))
-    val hbwif = LazyModule(new HbwifModule)
+    val hbwif = LazyModule(new GenericHbwifModule)
     val ram = LazyModule(new TLRAM(p(HbwifTLKey).managerAddressSets(0), beatBytes = p(HbwifTLKey).beatBytes))
     val configNode = TLClientNode(Seq(TLClientPortParameters(Seq(TLClientParameters(name = "LaneConfig")))))
 
