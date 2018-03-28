@@ -306,6 +306,7 @@ class Encoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
 }
 
 trait HasEncoding8b10b {
+    this: Lane =>
     implicit val c: SerDesConfig
     // we want the encoded width to be >= the bit width but as small as possible
     final def decodedSymbolsPerCycle = (c.dataWidth + 9)/10
@@ -314,6 +315,7 @@ trait HasEncoding8b10b {
 }
 
 trait HasEncoding8b10bHighPerformance {
+    this: Lane =>
     implicit val c: SerDesConfig
     // we want the encoded width to be >= the bit width but as small as possible
     final def decodedSymbolsPerCycle = (c.dataWidth + 9)/10

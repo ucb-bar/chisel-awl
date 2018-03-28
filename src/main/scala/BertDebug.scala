@@ -142,27 +142,32 @@ class PRBS(prbsWidth: Int, polynomial: Int, parallel: Int) extends Module {
 }
 
 trait HasPRBS {
+    this: BertDebug =>
     // each entry is a tuple containing (width, polynomial)
     def prbs(): Seq[(Int, Int)] = Seq()
     require(prbs.length > 0, "must override prbs!")
 }
 
 trait HasPRBS7 extends HasPRBS {
+    this: BertDebug =>
     abstract override def prbs() = Seq((7, 0x60)) ++ super.prbs()
 }
 
 trait HasPRBS15 extends HasPRBS {
+    this: BertDebug =>
     abstract override def prbs() = Seq((15, 0x6000)) ++ super.prbs()
 }
 
 trait HasPRBS31 extends HasPRBS {
+    this: BertDebug =>
     abstract override def prbs() = Seq((31, 0x48000000)) ++ super.prbs()
 }
 
-trait HasAllPRBS extends HasPRBS7 with HasPRBS15 with HasPRBS31
+trait HasAllPRBS extends HasPRBS7 with HasPRBS15 with HasPRBS31 { this: BertDebug => }
 
 trait HasBertDebug extends HasDebug {
+    this: Lane =>
     implicit val c: SerDesConfig
     implicit val b: BertConfig
-    abstract override def genDebug() = Seq(Module(new BertDebug with HasAllPRBS)) ++ super.genDebug()
+    abstract override def genDebug() = Seq(Module(new BertDebug()(c, b) with HasAllPRBS)) ++ super.genDebug()
 }

@@ -31,6 +31,7 @@ abstract class RxDebug()(implicit c: SerDesConfig) extends Debug()(c) {
 }
 
 trait HasDebug {
+    this: Lane =>
 
     def genDebug(): Seq[Debug] = Seq[Debug]()
 

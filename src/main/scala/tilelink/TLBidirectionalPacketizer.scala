@@ -415,6 +415,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
 }
 
 trait HasTLBidirectionalPacketizer {
+    this: Lane =>
 
     type T = TLBidirectionalPacketizerIO
 
