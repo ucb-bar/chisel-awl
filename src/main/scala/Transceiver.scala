@@ -19,70 +19,70 @@ case class SerDesConfig(
 )
 
 class Differential extends Bundle {
-  val p = Analog(1.W)
-  val n = Analog(1.W)
+    val p = Analog(1.W)
+    val n = Analog(1.W)
 }
 
 class TransceiverDataIF()(implicit val c: SerDesConfig) extends Bundle {
 
-  // internal data interface
-  val dlev = Output(UInt(c.dataWidth.W))
-  val rx = Output(UInt(c.dataWidth.W))
-  val tx = Input(UInt(c.dataWidth.W))
+    // internal data interface
+    val dlev = Output(UInt(c.dataWidth.W))
+    val rx = Output(UInt(c.dataWidth.W))
+    val tx = Input(UInt(c.dataWidth.W))
 
 }
 
 class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle {
 
-  // CDR stuff
-  val cdri = Input(UInt(c.cdrIWidth.W))
-  val cdrp = Input(UInt(c.cdrPWidth.W))
+    // CDR stuff
+    val cdri = Input(UInt(c.cdrIWidth.W))
+    val cdrp = Input(UInt(c.cdrPWidth.W))
 
-  // Clock dither for CDR
-  val dither_clock = Input(Bool())
+    // Clock dither for CDR
+    val dither_clock = Input(Bool())
 
-  // Data
-  val data = new TransceiverDataIF
+    // Data
+    val data = new TransceiverDataIF
 
-  // DFE stuff
-  val dfe_taps = Input(Vec(c.dfeNumTaps, UInt(c.dfeTapWidth.W)))
-  val dlev_dac = Input(UInt(c.dlevDACWidth.W))
+    // DFE stuff
+    val dfe_taps = Input(Vec(c.dfeNumTaps, UInt(c.dfeTapWidth.W)))
+    val dlev_dac = Input(UInt(c.dlevDACWidth.W))
 
-  // low speed clock output
-  val clock_rx = Output(Clock())
+    // low speed clock output
+    val clock_rx = Output(Clock())
 
-  // low speed clock output
-  val clock_tx = Output(Clock())
+    // low speed clock output
+    val clock_tx = Output(Clock())
 
-  // reference clock input
-  val clock_ref = Input(Clock())
+    // reference clock input
+    val clock_ref = Input(Clock())
 
-  // async reset input
-  val async_reset_in = Input(Bool())
+    // async reset input
+    val async_reset_in = Input(Bool())
 
-  // RX pad inputs
-  val rx = Flipped(new Differential)
+    // RX pad inputs
+    val rx = Flipped(new Differential)
 
-  // TX pad outputs
-  val tx = new Differential
+    // TX pad outputs
+    val tx = new Differential
 
 }
 
 abstract class Transceiver()(implicit val c: SerDesConfig) extends BlackBox {
 
-  val io: TransceiverIO
+    val io: TransceiverIO
 
-  def transceiverName: String
+    def transceiverName: String
 
-  override def desiredName = transceiverName
+    override def desiredName = transceiverName
 
 }
 
 class GenericTransceiver()(implicit c: SerDesConfig) extends Transceiver()(c) {
 
-  val io = IO(new TransceiverIO)
+    val io = IO(new TransceiverIO)
 
-  def transceiverName = "generic_transceiver"
+    def transceiverName = "generic_transceiver"
 
 }
 
