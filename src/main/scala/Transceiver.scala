@@ -83,11 +83,3 @@ class GenericTransceiver()(implicit c: SerDesConfig) extends Transceiver()(c) {
     def transceiverName = "generic_transceiver"
 
 }
-
-trait HasGenericTransceiver {
-    this: TransceiverSubsystem =>
-    implicit val c: SerDesConfig
-
-    def genTransceiver() = new GenericTransceiver()(c)
-
-}

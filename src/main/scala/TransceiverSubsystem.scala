@@ -7,6 +7,7 @@ import chisel3.experimental._
 class TransceiverOverrideIF()(implicit val c: SerDesConfig) extends Bundle {
 
     // Note that these all have an "unsafe" crossing from the TX into RX domain
+    // TODO this is broken when HasOverride is false, should switch to MultiIOModule
 
     // CDR override
     val cdrpValue = if (c.cdrHasOverride) Some(Input(UInt(c.cdrPWidth.W))) else None
@@ -42,6 +43,12 @@ trait TransceiverOuterIF extends Bundle {
 
     // TX pad outputs
     val tx = new Differential
+
+    // RX invert bit
+    val rxInvert = Input(Bool())
+
+    // TX invert bit
+    val txInvert = Input(Bool())
 }
 
 class TransceiverSubsystemDataIF()(implicit val c: SerDesConfig) extends Bundle {
@@ -74,16 +81,13 @@ abstract class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Modu
 
     val io: TransceiverSubsystemIO
 
-    // Transceiver <> top level connections
-    def genTransceiver(): Transceiver
-
-    val txrx = Module(genTransceiver())
-
 }
 
-class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends TransceiverSubsystem()(c) with HasGenericTransceiver {
+class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends TransceiverSubsystem()(c) {
 
     val io = IO(new TransceiverSubsystemIO()(c))
+
+    val txrx = Module(new GenericTransceiver)
 
     txrx.io.clock_ref := io.clockRef
     txrx.io.async_reset_in := io.asyncResetIn
@@ -101,7 +105,7 @@ class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends Transceive
     val rxBitStuffer = withClockAndReset(txrx.io.clock_rx, rxSyncReset) { Module(new RxBitStuffer) }
     val txBitStuffer = withClockAndReset(txrx.io.clock_tx, txSyncReset) { Module(new TxBitStuffer) }
     rxBitStuffer.io.raw := txrx.io.data.rx
-    txrx.io.data.tx := txBitStuffer.io.raw
+    txrx.io.data.tx := txBitStuffer.io.raw ^ Fill(c.dataWidth, io.txInvert)
     txBitStuffer.io.enq <> io.data.tx
     io.data.rx <> rxBitStuffer.io.deq
     rxBitStuffer.io.mode.map(_ := io.bitStuffMode.get)
@@ -120,7 +124,7 @@ class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends Transceive
     txrx.io.cdrp := io.overrides.getCDRP(cdr.io.p)
     txrx.io.dither_clock := cdr.io.dither_clock
     cdr.io.data_dlev := txrx.io.data.dlev
-    cdr.io.data_rx := txrx.io.data.rx
+    cdr.io.data_rx := txrx.io.data.rx ^ Fill(c.dataWidth, io.rxInvert)
 
     // Transceiver <> DFE Loop
     if (c.dfeNumTaps > 0) {
@@ -145,6 +149,8 @@ class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends Transceive
         io.overrides.dfe.map(x => builder.w("dfe_override", x))
         io.overrides.dlevDACValue.map(x => builder.w("dlev_dac_value", x))
         io.overrides.dlev.map(x => builder.w("dlev_override", x))
+        builder.w("tx_invert", io.txInvert)
+        builder.w("rx_invert", io.rxInvert)
     }
 }
 
