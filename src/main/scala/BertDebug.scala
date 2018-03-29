@@ -9,6 +9,16 @@ case class BertConfig(
     bertErrorCounterWidth: Int = 32
 )
 
+object BertConfig {
+
+    def fromBER(c: SerDesConfig, minBER: Double): BertConfig = {
+        val maxSamples = BigInt((math.ceil(1.0/minBER) / c.dataWidth).toLong)
+        val maxErrors = maxSamples * c.dataWidth
+        BertConfig(log2Ceil(maxSamples), log2Ceil(maxErrors))
+    }
+
+}
+
 class BertDebugIO(prbs: Seq[(Int, Int)])(implicit c: SerDesConfig, implicit val b: BertConfig) extends DebugIO {
     val enable = Input(Bool())
     val clear = Input(Bool())
