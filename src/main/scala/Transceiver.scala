@@ -8,7 +8,6 @@ case class SerDesConfig(
     dataWidth: Int = 16,
     numWays: Int = 2,
     cdrHasOverride: Boolean = true,
-    cdrIWidth: Int = 8,
     cdrPWidth: Int = 8,
     dfeNumTaps: Int = 4,
     dfeTapWidth: Int = 4,
@@ -35,7 +34,6 @@ class TransceiverDataIF()(implicit val c: SerDesConfig) extends Bundle {
 class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle {
 
     // CDR stuff
-    val cdri = Input(UInt(c.cdrIWidth.W))
     val cdrp = Input(UInt(c.cdrPWidth.W))
 
     // Clock dither for CDR

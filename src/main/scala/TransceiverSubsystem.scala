@@ -9,11 +9,9 @@ class TransceiverOverrideIF()(implicit val c: SerDesConfig) extends Bundle {
     // Note that these all have an "unsafe" crossing from the TX into RX domain
 
     // CDR override
-    val cdriValue = if (c.cdrHasOverride) Some(Input(UInt(c.cdrIWidth.W))) else None
     val cdrpValue = if (c.cdrHasOverride) Some(Input(UInt(c.cdrPWidth.W))) else None
     val cdr       = if (c.cdrHasOverride) Some(Input(Bool())) else None
 
-    def getCDRI(default: UInt): UInt = (if(c.cdrHasOverride) Mux(cdr.get, cdriValue.get, default) else default)
     def getCDRP(default: UInt): UInt = (if(c.cdrHasOverride) Mux(cdr.get, cdrpValue.get, default) else default)
 
     // DFE override
@@ -119,7 +117,6 @@ class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends Transceive
     // Transceiver <> CDR Loop
     val cdr = Module(new CDR)
 
-    txrx.io.cdri := io.overrides.getCDRI(cdr.io.i)
     txrx.io.cdrp := io.overrides.getCDRP(cdr.io.p)
     txrx.io.dither_clock := cdr.io.dither_clock
     cdr.io.data_dlev := txrx.io.data.dlev
@@ -142,7 +139,6 @@ class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends Transceive
 
     def connectController(builder: ControllerBuilder) {
         io.bitStuffMode.map(x => builder.w("bit_stuff_mode", x))
-        io.overrides.cdriValue.map(x => builder.w("cdr_i_value", x))
         io.overrides.cdrpValue.map(x => builder.w("cdr_p_value", x))
         io.overrides.cdr.map(x => builder.w("cdr_override", x))
         io.overrides.dfeTapsValue.map(x => builder.w("dfe_value", x))
