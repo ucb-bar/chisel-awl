@@ -32,3 +32,17 @@ module DifferentialDelayLine #(
     endgenerate
 
 endmodule
+
+module DifferentialToBool (
+    input in_p,
+    input in_n,
+    output outTee_p,
+    output outTee_n,
+    output outBool
+);
+
+    assign outBool = (in_p ^ in_n) ? in_p : 1'bx;
+    assign outTee_p = in_p;
+    assign outTee_n = in_n;
+
+endmodule

@@ -26,6 +26,7 @@ class UnitTestConfig extends Config((site, here, up) => {
         Encoding8b10bTests() ++
         TLPacketizerTests()(p) ++
         TLControllerTests()(p) ++
-        TLLaneTests()(p)
+        TLLaneTests()(p) ++
+        BitStufferTests()
     }
 })
