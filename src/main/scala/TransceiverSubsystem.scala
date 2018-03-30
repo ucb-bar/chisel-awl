@@ -44,11 +44,6 @@ trait TransceiverOuterIF extends Bundle {
     // TX pad outputs
     val tx = new Differential
 
-    // RX invert bit
-    val rxInvert = Input(Bool())
-
-    // TX invert bit
-    val txInvert = Input(Bool())
 }
 
 class TransceiverSubsystemDataIF()(implicit val c: SerDesConfig) extends Bundle {
@@ -75,6 +70,11 @@ class TransceiverSubsystemIO()(implicit val c: SerDesConfig) extends Bundle with
     // bit stuff mode
     val bitStuffMode = if(c.bitStuffModes > 1) Some(Input(UInt(log2Ceil(c.bitStuffModes).W))) else None
 
+    // RX invert bit
+    val rxInvert = Input(Bool())
+
+    // TX invert bit
+    val txInvert = Input(Bool())
 }
 
 abstract class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with HasControllerConnector {
