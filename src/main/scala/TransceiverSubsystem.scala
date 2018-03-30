@@ -149,8 +149,8 @@ class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends Transceive
         io.overrides.dfe.map(x => builder.w("dfe_override", x))
         io.overrides.dlevDACValue.map(x => builder.w("dlev_dac_value", x))
         io.overrides.dlev.map(x => builder.w("dlev_override", x))
-        builder.w("tx_invert", io.txInvert)
-        builder.w("rx_invert", io.rxInvert)
+        builder.w("tx_invert", io.txInvert, 0)
+        builder.w("rx_invert", io.rxInvert, 0)
     }
 }
 
