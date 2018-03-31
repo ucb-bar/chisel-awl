@@ -36,9 +36,6 @@ class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle {
     // CDR stuff
     val cdrp = Input(UInt(c.cdrPWidth.W))
 
-    // Clock dither for CDR
-    val dither_clock = Input(Bool())
-
     // Data
     val data = new TransceiverDataIF
 

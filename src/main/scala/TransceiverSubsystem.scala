@@ -122,7 +122,6 @@ class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends Transceive
     val cdr = Module(new CDR)
 
     txrx.io.cdrp := io.overrides.getCDRP(cdr.io.p)
-    txrx.io.dither_clock := cdr.io.dither_clock
     cdr.io.data_dlev := txrx.io.data.dlev
     cdr.io.data_rx := txrx.io.data.rx ^ Fill(c.dataWidth, io.rxInvert)
 

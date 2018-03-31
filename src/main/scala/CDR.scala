@@ -6,7 +6,6 @@ import chisel3.experimental._
 class CDRIO()(implicit c: SerDesConfig) extends Bundle {
 
     val p = Output(UInt(c.cdrPWidth.W))
-    val dither_clock = Output(Bool())
     val data_dlev = Input(UInt(c.dataWidth.W))
     val data_rx = Input(UInt(c.dataWidth.W))
 
@@ -18,6 +17,5 @@ class CDR()(implicit val c: SerDesConfig) extends Module {
 
     // TODO Placeholder
     io.p := 0.U(c.cdrPWidth.W)
-    io.dither_clock := false.B
 
 }
