@@ -104,7 +104,7 @@ class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends Transceive
 
     val rxBitStuffer = withClockAndReset(txrx.io.clock_rx, rxSyncReset) { Module(new RxBitStuffer) }
     val txBitStuffer = withClockAndReset(txrx.io.clock_tx, txSyncReset) { Module(new TxBitStuffer) }
-    rxBitStuffer.io.raw := txrx.io.data.rx
+    rxBitStuffer.io.raw := txrx.io.data.rx ^ Fill(c.dataWidth, io.rxInvert)
     txrx.io.data.tx := txBitStuffer.io.raw ^ Fill(c.dataWidth, io.txInvert)
     txBitStuffer.io.enq <> io.data.tx
     io.data.rx <> rxBitStuffer.io.deq
@@ -123,7 +123,7 @@ class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends Transceive
 
     txrx.io.cdrp := io.overrides.getCDRP(cdr.io.p)
     cdr.io.data_dlev := txrx.io.data.dlev
-    cdr.io.data_rx := txrx.io.data.rx ^ Fill(c.dataWidth, io.rxInvert)
+    cdr.io.data_rx := txrx.io.data.rx
 
     // Transceiver <> DFE Loop
     if (c.dfeNumTaps > 0) {
