@@ -53,10 +53,10 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     val cMaxOutstanding = 8
     val dMaxOutstanding = 8
     val eMaxOutstanding = 8
-    val aMaxBeats = (1 << ((1 << (tlrx.aEdge.bundle.sizeBits)) - 1)) / (tlrx.aEdge.bundle.dataBits / 8)
-    val bMaxBeats = (1 << ((1 << (tlrx.bEdge.bundle.sizeBits)) - 1)) / (tlrx.bEdge.bundle.dataBits / 8)
-    val cMaxBeats = (1 << ((1 << (tlrx.cEdge.bundle.sizeBits)) - 1)) / (tlrx.cEdge.bundle.dataBits / 8)
-    val dMaxBeats = (1 << ((1 << (tlrx.dEdge.bundle.sizeBits)) - 1)) / (tlrx.dEdge.bundle.dataBits / 8)
+    val aMaxBeats = divCeil(tlrx.aEdge.maxTransfer, (tlrx.aEdge.bundle.dataBits / 8))
+    val bMaxBeats = divCeil(tlrx.bEdge.maxTransfer, (tlrx.bEdge.bundle.dataBits / 8))
+    val cMaxBeats = divCeil(tlrx.cEdge.maxTransfer, (tlrx.cEdge.bundle.dataBits / 8))
+    val dMaxBeats = divCeil(tlrx.dEdge.maxTransfer, (tlrx.dEdge.bundle.dataBits / 8))
     val eMaxBeats = 1
 
     require(symbolFactory().decodedWidth == 8, "TLPacketizer* only supports 8-bit wide symbols")

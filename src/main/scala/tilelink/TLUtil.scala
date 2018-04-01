@@ -26,6 +26,7 @@ trait TLPacketizerLike {
     val typeE = 4.U(tlTypeWidth.W)
 
     def div8Ceil(x: Int): Int = (x + 7)/8
+    def divCeil(x: Int, y: Int): Int = (x + y - 1)/y
 
     def tlFromBuffer[T <: TLChannel](edge: TLEdge, x: T, buf: UInt, error: Bool): DecoupledIO[T] = {
         val w = buf.getWidth - tlTypeWidth
