@@ -78,7 +78,7 @@ abstract class Lane extends Module with HasDebug {
     decoderQueue.io.enq <> decoder.io.decoded
     packetizer.io.symbolsRx <> decoderQueue.io.deq
 
-    // TODO clock crossings?
+    // Be careful with clock crossings here
     withClockAndReset(txClock, txReset) {
         txrxss.connectController(builder)
         encoder.connectController(builder)

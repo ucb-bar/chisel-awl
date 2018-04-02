@@ -22,7 +22,6 @@ abstract class ControllerBuilder {
 
     def w(name: String, signal: Seq[UInt], init: Seq[BigInt]) { this.w(name, signal, Some(init)) }
 
-    // TODO include some better error checking about trying to write to an unwriteable node
     def w(name: String, signal: UInt, init: Option[BigInt]) {
         if (signal.getWidth > 0) {
             ws.append((name, signal, init))
@@ -44,7 +43,6 @@ abstract class ControllerBuilder {
     def r(name: String, signal: Seq[UInt]) {
         (0 until signal.length) foreach { i => this.r(name + s"_$i", signal(i)) }
     }
-
 
     def wSeqMem(name: String, depth: Int, signal: UInt, addr: UInt, en: Bool) {
         wSeqMems.append((name, depth, signal, addr, en))

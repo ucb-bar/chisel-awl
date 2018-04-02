@@ -100,7 +100,7 @@ final class EncoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Modu
     } else {
         require(enqBits > deqBits, "Cannot have more deqBits than enqBits for the Encoder")
         val state = RegInit(0.U(log2Ceil(numStates).W))
-        val bufWidth = 2*enqBits - 1 // TODO this is too much, but does it get optimized away?
+        val bufWidth = 2*enqBits - 1 // this is too much, but does it get optimized away?
         val buf = Reg(UInt(bufWidth.W))
         io.deq.bits := buf(bufWidth - 1, bufWidth - deqBits)
         io.enq.ready := false.B
@@ -141,7 +141,7 @@ final class DecoderWidthAdapter(val enqBits: Int, val deqBits: Int) extends Modu
     } else {
         require(deqBits > enqBits, "Cannot have more enqBits than deqBits for the Decoder")
         val state = RegInit(0.U(log2Ceil(numStates).W))
-        val bufWidth = 2*deqBits - 1 // TODO this is too much, but does it get optimized away?
+        val bufWidth = 2*deqBits - 1 // this is too much, but does it get optimized away?
         val buf = Reg(UInt(bufWidth.W))
         io.deq.bits := buf(bufWidth - 1, bufWidth - deqBits)
         io.deq.valid := false.B

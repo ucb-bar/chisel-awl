@@ -118,23 +118,23 @@ class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends Transceive
 
     withClockAndReset(txrx.io.clock_rx, rxSyncReset) {
 
-    // Transceiver <> CDR Loop
-    val cdr = Module(new CDR)
+        // Transceiver <> CDR Loop
+        val cdr = Module(new CDR)
 
-    txrx.io.cdrp := io.overrides.getCDRP(cdr.io.p)
-    cdr.io.data_dlev := txrx.io.data.dlev
-    cdr.io.data_rx := txrx.io.data.rx
+        txrx.io.cdrp := io.overrides.getCDRP(cdr.io.p)
+        cdr.io.data_dlev := txrx.io.data.dlev
+        cdr.io.data_rx := txrx.io.data.rx
 
-    // Transceiver <> DFE Loop
-    if (c.dfeNumTaps > 0) {
-        val dfe = Module(new DFE)
-        txrx.io.dfe_taps := io.overrides.getDFETaps(dfe.io.taps)
-        dfe.io.data_dlev := txrx.io.data.dlev
-        dfe.io.data_rx := txrx.io.data.rx
-    }
+        // Transceiver <> DFE Loop
+        if (c.dfeNumTaps > 0) {
+            val dfe = Module(new DFE)
+            txrx.io.dfe_taps := io.overrides.getDFETaps(dfe.io.taps)
+            dfe.io.data_dlev := txrx.io.data.dlev
+            dfe.io.data_rx := txrx.io.data.rx
+        }
 
-    // Transceiver <> DLEV Loop
-    val dlev = Module(new DLEV)
+        // Transceiver <> DLEV Loop
+        val dlev = Module(new DLEV)
         txrx.io.dlev_dac := io.overrides.getDlevDAC(dlev.io.code)
         dlev.io.data_rx := txrx.io.data.rx
         dlev.io.data_dlev := txrx.io.data.dlev
