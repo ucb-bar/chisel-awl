@@ -2,32 +2,60 @@ package hbwif
 
 import chisel3._
 import chisel3.util._
+import chisel3.experimental.withClockAndReset
 
 
-class TxBitStuffer()(implicit val c: SerDesConfig) extends Module {
+class BitStufferDebugIO(val numModes: Int)(implicit c: SerDesConfig) extends DebugIO()(c) {
+    val mode = Input(UInt(log2Ceil(numModes).W))
+}
+
+class BitStufferDebug(val numModes: Int)(implicit c: SerDesConfig) extends Debug()(c) {
+
+    require(numModes > 1)
+    require(c.dataWidth % (1 << (numModes - 1)) == 0)
+
+    val io = IO(new BitStufferDebugIO(numModes))
+
+    val txStuffer = withClockAndReset(io.txClock, io.txReset) { Module(new TxBitStuffer(numModes)) }
+    val rxStuffer = withClockAndReset(io.rxClock, io.rxReset) { Module(new RxBitStuffer(numModes)) }
+
+    txStuffer.io.mode := io.mode
+    rxStuffer.io.mode := io.mode
+
+    txStuffer.io.enq <> io.txIn
+    io.txOut <> txStuffer.io.deq
+    rxStuffer.io.enq <> io.rxIn
+    io.rxOut <> rxStuffer.io.deq
+
+    def connectController(builder: ControllerBuilder) {
+        builder.w("bit_stuff_mode", io.mode, 0)
+    }
+
+}
+
+
+class TxBitStuffer(val numModes: Int)(implicit val c: SerDesConfig) extends Module {
+
+    require(numModes > 1)
+    require(c.dataWidth % (1 << (numModes - 1)) == 0)
 
     val io = IO(new Bundle {
         val enq = Flipped(Ready(UInt(c.dataWidth.W)))
-        val raw = Output(UInt(c.dataWidth.W))
-        val mode = if (c.bitStuffModes > 1) Some(Input(UInt(log2Ceil(c.bitStuffModes).W))) else None
+        val deq = Ready(UInt(c.dataWidth.W))
+        val mode = Input(UInt(log2Ceil(numModes).W))
     })
 
-    require(c.bitStuffModes > 0)
-    require(c.dataWidth % (1 << (c.bitStuffModes - 1)) == 0)
+    io.deq.bits := io.enq.bits
+    io.enq.ready := io.deq.ready
 
-    io.raw := io.enq.bits
-    io.enq.ready := true.B
-
-    if (c.bitStuffModes > 1) {
-        val buf = Reg(UInt(c.dataWidth.W))
-        buf.suggestName("buf")
-        val count = RegInit(0.U((c.bitStuffModes - 1).W))
-        count.suggestName("count")
-        (1 until c.bitStuffModes).foreach { i =>
+    val buf = Reg(UInt(c.dataWidth.W))
+    val count = RegInit(0.U((numModes - 1).W))
+    when (io.deq.ready) {
+        (1 until numModes).foreach { i =>
             val divisor = 1 << i
             val divBitWidth = c.dataWidth/divisor
-            when (io.mode.get === i.U) {
-                io.raw := FillInterleaved(divisor, buf(c.dataWidth - 1, c.dataWidth - divBitWidth))
+            when (io.mode === i.U) {
+                io.deq.bits := FillInterleaved(divisor, buf(c.dataWidth - 1, c.dataWidth - divBitWidth))
                 when (count === (divisor - 1).U) {
                     count := 0.U
                     buf := io.enq.bits
@@ -38,35 +66,35 @@ class TxBitStuffer()(implicit val c: SerDesConfig) extends Module {
                 }
             }
         }
+    } .otherwise {
+        io.enq.ready := false.B
     }
 }
 
-class RxBitStuffer()(implicit val c: SerDesConfig) extends Module {
+class RxBitStuffer(val numModes: Int)(implicit val c: SerDesConfig) extends Module {
+
+    require(numModes > 1)
+    require(c.dataWidth % (1 << (numModes - 1)) == 0)
 
     val io = IO(new Bundle {
-        val raw = Input(UInt(c.dataWidth.W))
+        val enq = Flipped(Valid(UInt(c.dataWidth.W)))
         val deq = Valid(UInt(c.dataWidth.W))
-        val mode = if (c.bitStuffModes > 1) Some(Input(UInt(log2Ceil(c.bitStuffModes).W))) else None
+        val mode = Input(UInt(log2Ceil(numModes).W))
     })
 
-    require(c.bitStuffModes > 0)
-    require(c.dataWidth % (1 << (c.bitStuffModes - 1)) == 0)
+    io.deq.bits := io.enq.bits
+    io.deq.valid := io.enq.valid
 
-    io.deq.bits := io.raw
-    io.deq.valid := true.B
-
-    if (c.bitStuffModes > 1) {
-        val buf = Reg(UInt(c.dataWidth.W))
-        buf.suggestName("buf")
-        val count = RegInit(0.U((c.bitStuffModes - 1).W))
-        count.suggestName("count")
-        (1 until c.bitStuffModes).foreach { i =>
+    val buf = Reg(UInt(c.dataWidth.W))
+    val count = RegInit(0.U((numModes - 1).W))
+    when (io.enq.valid) {
+        (1 until numModes).foreach { i =>
             val divisor = 1 << i
             val divBitWidth = c.dataWidth/divisor
-            when(io.mode.get === i.U) {
+            when(io.mode === i.U) {
                 io.deq.bits := buf
                 buf := Cat(buf(c.dataWidth - divBitWidth - 1, 0),
-                    io.raw.toBools.reverse.zipWithIndex.filter(_._2 % divisor == (divisor - 1)).map(_._1.asUInt).reduceLeft(Cat(_,_)))
+                    io.enq.bits.toBools.reverse.zipWithIndex.filter(_._2 % divisor == (divisor - 1)).map(_._1.asUInt).reduceLeft(Cat(_,_)))
                 when (count === (divisor - 1).U) {
                     count := 0.U
                 } .otherwise {
@@ -75,6 +103,15 @@ class RxBitStuffer()(implicit val c: SerDesConfig) extends Module {
                 }
             }
         }
+    } .otherwise {
+        io.deq.valid := false.B
     }
 
+}
+
+trait HasBitStufferDebug4Modes extends HasDebug {
+    this: Lane =>
+    def numModes = 4
+    implicit val c: SerDesConfig
+    abstract override def genDebug() = Seq(Module(new BitStufferDebug(numModes)(c))) ++ super.genDebug()
 }

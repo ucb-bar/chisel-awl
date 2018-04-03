@@ -11,6 +11,7 @@ abstract class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn,
     (implicit val c: SerDesConfig, implicit val b: BertConfig, implicit val m: PatternMemConfig, implicit val p: Parameters) extends Lane
     with HasEncoding8b10b
     with HasBertDebug
+    with HasBitStufferDebug4Modes
     with HasTLBidirectionalPacketizer
     with HasTLController
 

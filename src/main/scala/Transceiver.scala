@@ -6,15 +6,7 @@ import chisel3.util.HasBlackBoxResource
 
 case class SerDesConfig(
     dataWidth: Int = 16,
-    numWays: Int = 2,
-    cdrHasOverride: Boolean = true,
-    cdrPWidth: Int = 8,
-    dfeNumTaps: Int = 4,
-    dfeTapWidth: Int = 4,
-    dfeHasOverride: Boolean = true,
-    dlevDACWidth: Int = 4,
-    dlevHasOverride: Boolean = true,
-    bitStuffModes: Int = 1 // TODO test more modes
+    numWays: Int = 2
 )
 
 class Differential extends Bundle {
@@ -25,7 +17,6 @@ class Differential extends Bundle {
 class TransceiverDataIF()(implicit val c: SerDesConfig) extends Bundle {
 
     // internal data interface
-    val dlev = Output(UInt(c.dataWidth.W))
     val rx = Output(UInt(c.dataWidth.W))
     val tx = Input(UInt(c.dataWidth.W))
 
@@ -33,15 +24,8 @@ class TransceiverDataIF()(implicit val c: SerDesConfig) extends Bundle {
 
 class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle {
 
-    // CDR stuff
-    val cdrp = Input(UInt(c.cdrPWidth.W))
-
     // Data
     val data = new TransceiverDataIF
-
-    // DFE stuff
-    val dfe_taps = Input(Vec(c.dfeNumTaps, UInt(c.dfeTapWidth.W)))
-    val dlev_dac = Input(UInt(c.dlevDACWidth.W))
 
     // low speed clock output
     val clock_rx = Output(Clock())

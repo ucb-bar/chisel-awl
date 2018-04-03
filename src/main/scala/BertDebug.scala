@@ -19,7 +19,7 @@ object BertConfig {
 
 }
 
-class BertDebugIO(prbs: Seq[(Int, Int)])(implicit c: SerDesConfig, implicit val b: BertConfig) extends DebugIO {
+class BertDebugIO(prbs: Seq[(Int, Int)])(implicit c: SerDesConfig, implicit val b: BertConfig) extends DebugIO()(c) {
     val enable = Input(Bool())
     val clear = Input(Bool())
     val prbsLoad = Input(UInt(prbs.map(_._1).max.W))
@@ -33,7 +33,7 @@ class BertDebugIO(prbs: Seq[(Int, Int)])(implicit c: SerDesConfig, implicit val 
     val berMode = Input(Bool()) // 1 = track BER, 0 = track 1s
 }
 
-class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends Debug with HasPRBS {
+class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends Debug()(c) with HasPRBS {
 
     require((c.dataWidth % c.numWays) == 0)
 

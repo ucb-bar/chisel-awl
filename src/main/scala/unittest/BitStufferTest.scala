@@ -7,7 +7,8 @@ import freechips.rocketchip.unittest._
 
 class BitStufferTest(val mode: Int, timeout: Int = 50000) extends UnitTest(timeout) {
 
-    implicit val c = SerDesConfig(bitStuffModes = 4)
+    val numModes = 4
+    implicit val c = SerDesConfig()
     val decodedSymbolsPerCycle = (c.dataWidth + 9)/10
 
     val str = s"BitStuffer mode=$mode"
@@ -18,27 +19,27 @@ class BitStufferTest(val mode: Int, timeout: Int = 50000) extends UnitTest(timeo
     val encoderAdapter = withClockAndReset(ss.io.txClock, ss.io.txReset) { Module(new EncoderWidthAdapter(encoder.encodedWidth, c.dataWidth)) }
     val decoderAdapter = withClockAndReset(ss.io.rxClock, ss.io.rxReset) { Module(new DecoderWidthAdapter(c.dataWidth, decoder.encodedWidth)) }
 
+    val txBitStuffer = withClockAndReset(ss.io.txClock, ss.io.txReset) { Module(new TxBitStuffer(numModes)) }
+    val rxBitStuffer = withClockAndReset(ss.io.rxClock, ss.io.rxReset) { Module(new RxBitStuffer(numModes)) }
+
+    txBitStuffer.io.mode := mode.U
+    rxBitStuffer.io.mode := mode.U
+
     val (txPBool, txPTee) = DifferentialToBool(ss.io.tx)
 
-    ss.io.bitStuffMode.get := mode.U
     ss.io.rx <> txPTee
     ss.io.rxInvert := false.B
     ss.io.txInvert := false.B
     ss.io.clockRef := clock
     ss.io.asyncResetIn := reset.toBool
-    ss.io.overrides.cdr.get := false.B
-    ss.io.overrides.cdrpValue.get := 0.U
-    ss.io.overrides.dlev.get := false.B
-    ss.io.overrides.dlevDACValue.get := 0.U
-    ss.io.overrides.dfe.get := false.B
-    ss.io.overrides.dfeTapsValue.get := VecInit(Seq.fill(c.dfeNumTaps) {0.U})
 
     encoderAdapter.io.enq <> encoder.io.encoded
-    ss.io.data.tx <> encoderAdapter.io.deq
-    decoderAdapter.io.enq <> ss.io.data.rx
+    txBitStuffer.io.enq <> encoderAdapter.io.deq
+    ss.io.data.tx <> txBitStuffer.io.deq
+    decoderAdapter.io.enq <> rxBitStuffer.io.deq
+    rxBitStuffer.io.enq <> ss.io.data.rx
     decoder.io.encoded <> decoderAdapter.io.deq
 
-    // The extra RegNext is a hack to coerce Analog to Bool
     val edge = txPBool ^ RegNext(txPBool)
     val safe = RegInit(true.B)
     val edgeCount = RegInit(0.U(mode.U))
