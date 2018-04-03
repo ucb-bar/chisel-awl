@@ -2,91 +2,68 @@ package hbwif
 
 import chisel3._
 import chisel3.util._
+import chisel3.experimental.withClockAndReset
 
 case class PatternMemConfig(
     val patternDepth: Int = 16,
-    val snapshotDepth: Int = 16,
-    val patternUseSeqMem: Boolean = false,
-    val snapshotUseSeqMem: Boolean = true
+    val snapshotDepth: Int = 16
 )
-/*
+
 class PatternMemDebugIO()(implicit c: SerDesConfig, implicit val m: PatternMemConfig) extends DebugIO {
     val patternEnable  = Input(Bool())
     val snapshotEnable = Input(Bool())
-    val pattern        = Input(Vec((if (m.patternUseSeqMem) 1 else m.patternDepth), UInt(c.dataWidth.W)))
-    val snapshot       = Output(Vec((if (m.snapshotUseSeqMem) 1 else m.snapshotDepth), UInt(c.dataWidth.W)))
-    val patternWrEn    = if (m.patternUseSeqMem) Some(Input(Bool())) else None
-    val patternWrAddr  = if (m.patternUseSeqMem) Some(Input(UInt(log2Ceil(m.patternDepth).W))) else None
-    val snapshotRdEn   = if (m.snapshotUseSeqMem) Some(Input(Bool())) else None
-    val snapshotRdAddr = if (m.snapshotUseSeqMem) Some(Input(UInt(log2Ceil(m.snapshotDepth).W))) else None
+    val pattern        = Input(Vec(m.patternDepth, UInt(c.dataWidth.W)))
+    val snapshot       = Output(Vec(m.snapshotDepth, UInt(c.dataWidth.W)))
+    val snapshotValid  = Output(Bool())
 }
 
 class PatternMemDebug()(implicit c: SerDesConfig, implicit val m: PatternMemConfig) extends Debug {
 
     val io = IO(new PatternMemDebugIO)
 
-    val snapshotCounter = Counter(m.snapshotDepth)
-    val patternCounter = Counter(m.patternDepth)
-    val finished = RegInit(false.B)
 
-    when (io.snapshotEnable) {
-        when (!finished) {
-            finished := snapshotCounter.inc()
-        }
-    } .otherwise {
-        finished := false.B
-    }
+    val snapshotValid   = withClockAndReset(io.rxClock, io.rxReset) { RegInit(false.B) }
+    val snapshotData    = Reg(Vec(m.snapshotDepth, UInt(c.dataWidth.W)))
+    val snapshotCounter = withClockAndReset(io.rxClock, io.rxReset) { Counter(m.snapshotDepth) }
+    val patternCounter  = withClockAndReset(io.txClock, io.txReset) { Counter(m.patternDepth) }
 
-    when (io.patternEnable) {
-        patternCounter.inc()
-    } .otherwise {
-        patternCounter.value := 0.U
-    }
+    io.snapshotValid := snapshotValid
+    io.snapshot := snapshotData
 
-    val patternOut = Wire(UInt(c.dataWidth.W))
-
-    // TODO deal with rx valid and tx ready
-
-    if (m.snapshotUseSeqMem) {
-        val snapshotMem = SeqMem(m.snapshotDepth, UInt(c.dataWidth.W))
-        io.snapshot(0) := snapshotMem.read(io.snapshotRdAddr.get, io.snapshotRdEn.get)
-        when (io.snapshotEnable && !finished) {
-            snapshotMem.write(snapshotCounter.value, io.rxIn.bits)
-        }
-    } else {
-        val snapshotData = Reg(Vec(m.snapshotDepth, UInt(c.dataWidth.W)))
-        io.snapshot := snapshotData
-        when (io.snapshotEnable && !finished) {
-            snapshotData(snapshotCounter.value) := io.rxIn.bits
+    withClockAndReset(io.rxClock, io.rxReset) {
+        when (io.snapshotEnable) {
+            when (!snapshotValid && io.rxIn.valid) {
+                snapshotValid := snapshotCounter.inc()
+                snapshotData(snapshotCounter.value) := io.rxIn.bits
+            }
+        } .otherwise {
+            snapshotValid := false.B
+            snapshotCounter.value := 0.U
         }
     }
 
-    if (m.patternUseSeqMem) {
-        val patternMem = SeqMem(m.patternDepth, UInt(c.dataWidth.W))
-        patternOut := patternMem.read(patternCounter.value, io.patternEnable)
-        when (io.patternWrEn.get) {
-            patternMem.write(io.patternWrAddr.get, io.pattern(0))
+    withClockAndReset(io.txClock, io.txReset) {
+        when (io.patternEnable) {
+            when (io.txOut.ready) {
+                patternCounter.inc()
+            }
+        } .otherwise {
+            patternCounter.value := 0.U
         }
-    } else {
-        patternOut := io.pattern(patternCounter.value)
     }
 
-    io.txOut.bits := Mux(io.patternEnable, patternOut, io.txIn.bits)
+    io.txOut.bits := Mux(io.patternEnable, io.pattern(patternCounter.value), io.txIn.bits)
     io.txIn.ready := Mux(io.patternEnable, false.B, io.txOut.ready)
-    io.rxOut <> io.rxIn
+
+    io.rxOut.bits := io.rxIn.bits
+    io.rxOut.valid := io.rxIn.valid
 
     def connectController(builder: ControllerBuilder) {
-        // Ideally we figure this out automatically but for now this works
-        if (m.snapshotUseSeqMem) {
-            builder.rSeqMem("pattern_mem_snapshot", m.snapshotDepth, io.snapshot(0), io.snapshotRdAddr.get, io.snapshotRdEn.get)
-        } else {
-            builder.r(s"pattern_mem_snapshot", io.snapshot)
-        }
-        if (m.patternUseSeqMem) {
-            builder.wSeqMem("pattern_mem_pattern", m.patternDepth, io.pattern(0), io.patternWrAddr.get, io.patternWrEn.get)
-        } else {
-            builder.w(s"pattern_mem_pattern", io.pattern)
-        }
+        builder.w("pattern_mem_snapshot_en", io.snapshotEnable, 0)
+        builder.w("pattern_mem_pattern_en", io.patternEnable, 0)
+        builder.r("pattern_mem_snapshot", io.snapshot)
+        builder.r("pattern_mem_snapshot_valid", io.snapshotValid)
+        builder.w("pattern_mem_pattern", io.pattern)
     }
 }
 
@@ -94,6 +71,6 @@ trait HasPatternMemDebug extends HasDebug {
     this: Lane =>
     implicit val c: SerDesConfig
     implicit val m: PatternMemConfig
-    abstract override def genDebug() = Seq(Module(new PatternMemDebug)) ++ super.genDebug()
+    abstract override def genDebug() = Seq(Module(new PatternMemDebug()(c, m))) ++ super.genDebug()
 }
-*/
+
