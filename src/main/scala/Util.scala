@@ -12,7 +12,7 @@ class Ready[+T <: Data](gen: T) extends Bundle {
     val ready = Input(Bool())
     val bits = Output(gen)
     def fire: Bool = ready
-    override def cloneType: this.type = Ready(gen).asInstanceOf[this.type]
+    override def cloneType(): this.type = new Ready(gen).asInstanceOf[this.type]
 }
 
 
