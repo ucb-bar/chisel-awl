@@ -10,6 +10,11 @@ import freechips.rocketchip._
 import freechips.rocketchip.config._
 import scala.collection.mutable.HashMap
 
+// Fix a bug in the version of rocket-chip we're using (it's fixed on master)
+case class WritePattern(address: BigInt, size: Int, data: BigInt) extends Pattern {
+    def bits(edge: TLEdgeOut) = edge.Put(UInt(0), UInt(address), UInt(size), UInt(data))
+}
+
 class TLControllerMapEntry(val address: BigInt, val size: Int, val writeable: Boolean) {
     def toWritePattern(data: BigInt) = {
         require(writeable, "Trying to write to unwriteable address")
