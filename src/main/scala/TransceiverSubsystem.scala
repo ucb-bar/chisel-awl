@@ -48,15 +48,31 @@ class TransceiverSubsystemIO()(implicit val c: SerDesConfig) extends Bundle with
 
 abstract class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with HasControllerConnector {
 
-    val io: TransceiverSubsystemIO
+
+    type T <: Transceiver
+    type I <: TransceiverSubsystemIO
+
+    def genTransceiver(): T
+    def genTransceiverSubsystemIO(): I
+
+    val txrx = Module(genTransceiver())
+    val io = IO(genTransceiverSubsystemIO())
 
 }
 
-class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends TransceiverSubsystem()(c) {
+class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends TransceiverSubsystem()(c) with HasTransceiverSubsystemConnections {
 
-    val io = IO(new TransceiverSubsystemIO()(c))
+    type T = GenericTransceiver
+    type I = TransceiverSubsystemIO
 
-    val txrx = Module(new GenericTransceiver)
+    def genTransceiver() = new GenericTransceiver
+    def genTransceiverSubsystemIO() = new TransceiverSubsystemIO
+
+}
+
+trait HasTransceiverSubsystemConnections {
+    this: TransceiverSubsystem =>
+    val txrx: Transceiver
 
     txrx.io.clock_ref := io.clockRef
     txrx.io.async_reset_in := io.asyncResetIn
@@ -81,6 +97,7 @@ class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends Transceive
         builder.w("tx_invert", io.txInvert, 0)
         builder.w("rx_invert", io.rxInvert, 0)
     }
+
 }
 
 trait HasGenericTransceiverSubsystem {
