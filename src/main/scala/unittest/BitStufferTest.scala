@@ -111,6 +111,6 @@ object BitStufferTests {
 
     val modes = List(0,1,2,3)
 
-    def apply(timeout: Int = 50000):Seq[UnitTest] = for (x <- modes) yield Module(new BitStufferTest(x))
+    def apply(timeout: Int = 50000):Seq[UnitTest] = for (x <- modes) yield Module(new BitStufferTest(x, timeout))
 
 }

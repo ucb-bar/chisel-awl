@@ -105,7 +105,6 @@ trait TLPacketizerLike {
         }).asInstanceOf[DecoupledIO[T]]
     }
 
-    // TODO write this more cleanly
     def tlToBuffer[T <: TLChannel](edge: TLEdge, x: T, padTo: Int): UInt = {
 
         x match {
@@ -189,7 +188,6 @@ trait TLPacketizerLike {
     }
 
     // Ignore error signals here, we'll generate our own
-    // TODO we can avoid sending mask in some cases
     def getNumSymbols(edge: TLEdge, x: TLChannel, first: Bool): UInt = {
         Mux(first, div8Ceil(headerWidth(x)).U, 0.U) + Mux(edge.hasData(x), (edge.bundle.dataBits/8).U, 0.U) + (x match {
             case a: TLBundleA => { div8Ceil(edge.bundle.dataBits/8).U }
@@ -198,54 +196,7 @@ trait TLPacketizerLike {
         })
     }
 
+    // For now, we reserve enough buffer space for the max number of beats per burst, and deallocate based on burst, not beat
     def tlResponseMap(x: TLChannel): UInt = 1.U
 
-    /*
-    def tlResponseMap(x: TLChannel): UInt = {
-        // TODO
-        assert(false)
-        x match {
-            case a: TLBundleA => {
-                MuxLookup(a.opcode, 0.U, Seq(
-                    (TLMessages.PutFullData,    1.U),
-                    (TLMessages.PutPartialData, 1.U),
-                    (TLMessages.ArithmeticData, X.U),
-                    (TLMessages.LogicalData,    X.U),
-                    (TLMessages.Get,            X.U),
-                    (TLMessages.Hint,           X.U),
-                    (TLMessages.AcquireBlock,   X.U),
-                    (TLMessages.AcquirePerm,    X.U)
-                ))
-            }
-            case b: TLBundleB => {
-                MuxLookup(a.opcode, 0.U, Seq(
-                    (TLMessages.PutFullData,    X.U),
-                    (TLMessages.PutPartialData, X.U),
-                    (TLMessages.ArithmeticData, X.U),
-                    (TLMessages.LogicalData,    X.U),
-                    (TLMessages.Get,            X.U),
-                    (TLMessages.Hint,           X.U),
-                    (TLMessages.Probe,          X.U)
-                ))
-            }
-            case c: TLBundleC => {
-                MuxLookup(a.opcode, 0.U, Seq(
-                    (TLMessages.AccessAck,      X.U),
-                    (TLMessages.AccessAckData,  X.U),
-                    (TLMessages.HintAck,        X.U),
-                    (TLMessages.ProbeAck,       X.U),
-                    (TLMessages.ProbeAckData,   X.U),
-                    (TLMessages.Hint,           X.U),
-                    (TLMessages.Probe,          X.U)
-                ))
-            }
-            case d: TLBundleD => {
-                0.U
-            }
-            case e: TLBundleE => {
-                0.U
-            }
-        }
-    }
-    */
 }

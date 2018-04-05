@@ -51,12 +51,11 @@ class TLControllerBuilder(edge: TLEdgeIn)(implicit val p: Parameters) extends Co
 
     private val maxSize = edge.bundle.dataBits
     private val beatBytes = edge.bundle.dataBits / 8
-    private val maxAddress = (1 << edge.bundle.addressBits) - beatBytes // TODO is this safe
+    private val maxAddress = (1 << edge.bundle.addressBits) - beatBytes
+
+    // TODO output address map
 
     def generate(laneClock: Clock, laneReset: Bool, globalClock: Clock, globalReset: Bool, port: TLBundle) {
-
-        require(wSeqMems.length == 0, "TODO")
-        require(rSeqMems.length == 0, "TODO")
 
         val qDepth = p(HbwifTLKey).asyncQueueDepth
         val qSync = p(HbwifTLKey).asyncQueueSync

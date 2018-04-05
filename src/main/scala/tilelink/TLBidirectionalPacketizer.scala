@@ -145,7 +145,6 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     val sTxReset :: sTxSync :: sTxAck :: sTxReady :: Nil = Enum(4)
     val txState = RegInit(sTxReset)
 
-    // TODO can we process more than one request at a time (e + other?)
     // Assign priorities to the channels
     val txReady = io.enable && (txCount === 0.U) && (txState === sTxReady)
     val aReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.a.bits)))
@@ -295,15 +294,6 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
         }
         count + (symbol.valid && symbol.bits.isData && (txState === sTxReady))
     }
-
-/* TODO do we need this
-    (0 until decodedSymbolsPerCycle).foreach { i =>
-        when (rxFire && (rxSymCount > rxSymPopped + i.U)) {
-            rxBuffer((rxBufferBytes - i - 1).U) := rxBuffer((rxBufferBytes - i - 1).U - rxSymPopped)
-        }
-    }
-*/
-
 
     // TODO can we add another symbol to NACK a transaction in progress (and set error)
     // TODO need to not assume that the sender interface looks like ours, it's possible we get multiple E messages per cycle

@@ -67,7 +67,7 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
     val configNodes = (0 until lanes).map { id => TLManagerNode(Seq(TLManagerPortParameters(
         Seq(TLManagerParameters(
             address            = List(configAddressSets(id)),
-            resources          = new SimpleDevice(s"HbwifConfig$id",Seq()).reg("mem"), //TODO ?
+            resources          = new SimpleDevice(s"HbwifConfig$id",Seq()).reg("control"),
             executable         = false,
             supportsGet        = TransferSizes(1, beatBytes),
             supportsPutFull    = TransferSizes(1, beatBytes),

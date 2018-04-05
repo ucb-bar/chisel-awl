@@ -204,8 +204,7 @@ object Decoded8b10bSymbol {
 
 // Note that this only checks for a comma in the 0th symbol position (if decodedSymbolsPerCycle > 1),
 // so at least decodedSymbolsPerCycle commas must be transmitted to lock
-// TODO right now this ignores RD altogether
-// TODO need a flag to alert the user when lock or idx changes
+// Right now this ignores RD altogether, but this is probably OK
 // See Encoder8b10b notes below for symbol and bit ordering
 class Decoder8b10b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbolsPerCycle) {
 

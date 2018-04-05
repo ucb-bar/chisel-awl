@@ -13,8 +13,6 @@ abstract class ControllerBuilder {
 
     protected val ws = new ArrayBuffer[(String,UInt,Option[BigInt])]
     protected val rs = new ArrayBuffer[(String,UInt)]
-    protected val wSeqMems = new ArrayBuffer[(String,Int,UInt,UInt,Bool)]
-    protected val rSeqMems = new ArrayBuffer[(String,Int,UInt,UInt,Bool)]
 
     def w(name: String, signal: UInt) { this.w(name, signal, None) }
 
@@ -42,14 +40,6 @@ abstract class ControllerBuilder {
 
     def r(name: String, signal: Seq[UInt]) {
         (0 until signal.length) foreach { i => this.r(name + s"_$i", signal(i)) }
-    }
-
-    def wSeqMem(name: String, depth: Int, signal: UInt, addr: UInt, en: Bool) {
-        wSeqMems.append((name, depth, signal, addr, en))
-    }
-
-    def rSeqMem(name: String, depth: Int, signal: UInt, addr: UInt, en: Bool) {
-        rSeqMems.append((name, depth, signal, addr, en))
     }
 
     // This method must implement any asynchronous crossings if needed

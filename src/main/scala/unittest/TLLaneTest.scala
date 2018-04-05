@@ -23,7 +23,6 @@ class TLLaneTestLazy(delay: Int)(implicit p: Parameters) extends LazyModule {
 
     ram.node := TLDelayer(0.25) := hbwif.clientNodes(0)
     hbwif.managerNodes(0) := model.node := fuzz.node
-    //ram.node := TLDelayer(0.25) := hbwif.adapterNodes(0) := model.node := fuzz.node
     hbwif.configNodes(0) := configNode
 
     lazy val module = new LazyModuleImp(this) with UnitTestModule {

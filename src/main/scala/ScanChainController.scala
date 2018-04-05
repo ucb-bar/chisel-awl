@@ -26,9 +26,6 @@ class ScanChainControllerBuilder extends ControllerBuilder {
     def generate(laneClock: Clock, laneReset: Bool, globalClock: Clock, globalReset: Bool, port: ScanChainPort) {
         var index = 0
 
-        require(wSeqMems.length == 0, "ScanChainController does not support Mems")
-        require(rSeqMems.length == 0, "ScanChainController does not support Mems")
-
         val syncCommit = Synchronizer(port.scanCommit, laneClock)
 
         val wScanOut = ws.foldLeft(port.scanIn) { case (scanIn, (name, node, init)) =>
