@@ -8,19 +8,13 @@
 `endif
 
 module generic_transceiver (
-  input [3:0] dlev_dac,
-  input [3:0] dfe_taps_0,
-  input [3:0] dfe_taps_1,
-  input [3:0] dfe_taps_2,
-  input [3:0] dfe_taps_3,
-  input [7:0] cdrp,
   input [`SERDES_BITS-1:0] data_tx,
   output [`SERDES_BITS-1:0] data_rx,
   output [`SERDES_BITS-1:0] data_dlev,
-  inout tx_p,
-  inout tx_n,
-  inout rx_p,
-  inout rx_n,
+  output tx_p,
+  output tx_n,
+  input rx_p,
+  input rx_n,
   input async_reset_in,
   output clock_tx,
   output clock_rx,
