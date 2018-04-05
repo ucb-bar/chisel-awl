@@ -7,6 +7,7 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config._
 import freechips.rocketchip.coreplex.CacheBlockBytes
+import freechips.rocketchip.tile.XLen
 
 abstract class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn, val configEdge: TLEdgeIn)
     (implicit val c: SerDesConfig, implicit val b: BertConfig, implicit val m: PatternMemConfig, implicit val p: Parameters) extends Lane
@@ -71,11 +72,11 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
             address            = List(configAddressSets(id)),
             resources          = new SimpleDevice(s"HbwifConfig$id",Seq()).reg("control"),
             executable         = false,
-            supportsGet        = TransferSizes(1, beatBytes),
-            supportsPutFull    = TransferSizes(1, beatBytes),
-            supportsPutPartial = TransferSizes(1, beatBytes),
+            supportsGet        = TransferSizes(1, p(XLen)/8),
+            supportsPutFull    = TransferSizes(1, p(XLen)/8),
+            supportsPutPartial = TransferSizes(1, p(XLen)/8),
             fifoId             = Some(0))),
-        beatBytes = beatBytes,
+        beatBytes = p(XLen)/8,
         minLatency = 1
     ))) }
 

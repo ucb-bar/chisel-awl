@@ -6,11 +6,13 @@ import freechips.rocketchip.unittest._
 import freechips.rocketchip.config.{Config, Parameters}
 import freechips.rocketchip.coreplex.CacheBlockBytes
 import freechips.rocketchip.diplomacy.AddressSet
+import freechips.rocketchip.tile.XLen
 
 class TestHarness(implicit p: Parameters)
     extends freechips.rocketchip.unittest.TestHarness
 
 class UnitTestConfig extends Config((site, here, up) => {
+    case XLen => 64
     case HbwifTLKey => HbwifTLConfig(
         managerAddressSets = Seq(AddressSet(0x10000, 0xffff)),
         configAddressSets = Seq(AddressSet(0x00000, 0xffff)),
@@ -30,8 +32,7 @@ class UnitTestConfig extends Config((site, here, up) => {
         Encoding8b10bTests() ++
         TLPacketizerTests()(p) ++
         TLControllerTests()(p) ++
-        TLLaneTests()(p) ++
-        BitStufferTests()
+        BitStufferTests() ++
         TLLaneTests()(p)
     }
 })

@@ -8,6 +8,7 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.unittest._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config._
+import freechips.rocketchip.coreplex.CacheBlockBytes
 
 class TLLaneTestLazy(delay: Int)(implicit p: Parameters) extends LazyModule {
 
@@ -18,7 +19,7 @@ class TLLaneTestLazy(delay: Int)(implicit p: Parameters) extends LazyModule {
     val fuzz = LazyModule(new TLFuzzer(txns))
     val model = LazyModule(new TLRAMModel("SRAMSimple"))
     val hbwif = LazyModule(new GenericHbwifModule)
-    val ram = LazyModule(new TLRAM(p(HbwifTLKey).managerAddressSets(0), beatBytes = p(HbwifTLKey).beatBytes))
+    val ram = LazyModule(new TLRAM(p(HbwifTLKey).managerAddressSets(0), beatBytes=p(CacheBlockBytes)))
     val configNode = TLClientNode(Seq(TLClientPortParameters(Seq(TLClientParameters(name = "LaneConfig")))))
 
     ram.node := TLDelayer(0.25) := hbwif.clientNodes(0)
