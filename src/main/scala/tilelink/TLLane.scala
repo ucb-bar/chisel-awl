@@ -29,19 +29,21 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
     val numXact = p(HbwifTLKey).numXact
     val managerAddressSets = p(HbwifTLKey).managerAddressSets
     val configAddressSets = p(HbwifTLKey).configAddressSets
+    val tlc = p(HbwifTLKey).tlc
+    val tluh = p(HbwifTLKey).tluh
     require(managerAddressSets.length == lanes)
 
     val clientNodes = (0 until lanes).map { id => TLClientNode(Seq(TLClientPortParameters(
         Seq(TLClientParameters(
             name               = s"HbwifClient$id",
             sourceId           = IdRange(0,numXact),
-            supportsProbe      = TransferSizes(1, beatBytes), //TODO I think this can be larger
-            supportsArithmetic = TransferSizes(1, beatBytes),
-            supportsLogical    = TransferSizes(1, beatBytes),
-            supportsGet        = TransferSizes(1, beatBytes),
-            supportsPutFull    = TransferSizes(1, beatBytes),
-            supportsPutPartial = TransferSizes(1, beatBytes),
-            supportsHint       = TransferSizes(1, beatBytes)
+            supportsGet        = TransferSizes(1, p(CacheBlockBytes)),
+            supportsPutFull    = TransferSizes(1, p(CacheBlockBytes)),
+            supportsPutPartial = TransferSizes(1, p(CacheBlockBytes)),
+            supportsArithmetic = TransferSizes(1, p(CacheBlockBytes)),
+            supportsLogical    = TransferSizes(1, p(CacheBlockBytes)),
+            supportsHint       = TransferSizes(1, p(CacheBlockBytes)),
+            supportsProbe      = TransferSizes(1, p(CacheBlockBytes))
         )),
         minLatency = 1
     ))) }
@@ -49,16 +51,16 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         Seq(TLManagerParameters(
             address            = List(managerAddressSets(id)),
             resources          = (new SimpleDevice(s"HbwifManager$id",Seq())).reg("mem"),
-            regionType         = RegionType.CACHED,
+            regionType         = if (tlc) RegionType.CACHED else RegionType.UNCACHED,
             executable         = true,
             supportsGet        = TransferSizes(1, p(CacheBlockBytes)),
             supportsPutFull    = TransferSizes(1, p(CacheBlockBytes)),
-            supportsAcquireT   = TransferSizes(1, p(CacheBlockBytes)), //TODO I think this can be larger
-            supportsAcquireB   = TransferSizes(1, p(CacheBlockBytes)),
-            supportsArithmetic = TransferSizes(1, p(CacheBlockBytes)),
-            supportsLogical    = TransferSizes(1, p(CacheBlockBytes)),
             supportsPutPartial = TransferSizes(1, p(CacheBlockBytes)),
-            supportsHint       = TransferSizes(1, p(CacheBlockBytes)),
+            supportsArithmetic = if (tluh) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
+            supportsLogical    = if (tluh) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
+            supportsHint       = if (tluh) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
+            supportsAcquireT   = if (tlc) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
+            supportsAcquireB   = if (tlc) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
             fifoId             = Some(0))),
         beatBytes = beatBytes,
         minLatency = 1

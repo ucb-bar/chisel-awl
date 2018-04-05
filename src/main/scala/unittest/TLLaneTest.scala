@@ -33,6 +33,27 @@ class TLLaneTestLazy(delay: Int)(implicit p: Parameters) extends LazyModule {
 
         val delayLine = Module(new DifferentialDelayLine(delay))
 
+        // Check that HBWIF parameters are configured correctly, since there is a break in the Diplomacy graph here
+        val m = hbwif.module.laneModules(0).io.data.manager
+        val c = hbwif.module.laneModules(0).io.data.client
+        val ma = m.a.bits
+        val md = m.d.bits
+        val ca = c.a.bits
+        val cd = c.d.bits
+        require(ma.opcode.getWidth == ca.opcode.getWidth, "HBWIF is misconfigured")
+        require(ma.param.getWidth == ca.param.getWidth, "HBWIF is misconfigured")
+        require(ma.size.getWidth == ca.size.getWidth, "HBWIF is misconfigured")
+        require(ma.source.getWidth == ca.source.getWidth, "HBWIF is misconfigured")
+        require(ma.address.getWidth == ca.address.getWidth, "HBWIF is misconfigured")
+        require(ma.mask.getWidth == ca.mask.getWidth, "HBWIF is misconfigured")
+        require(ma.data.getWidth == ca.data.getWidth, "HBWIF is misconfigured")
+        require(md.opcode.getWidth == cd.opcode.getWidth, "HBWIF is misconfigured")
+        require(md.param.getWidth == cd.param.getWidth, "HBWIF is misconfigured")
+        require(md.size.getWidth == cd.size.getWidth, "HBWIF is misconfigured")
+        require(md.source.getWidth == cd.source.getWidth, "HBWIF is misconfigured")
+        require(md.sink.getWidth == cd.sink.getWidth, "HBWIF is misconfigured")
+        require(md.data.getWidth == cd.data.getWidth, "HBWIF is misconfigured")
+
         hbwif.module.hbwifReset(0) := reset
         hbwif.module.hbwifRefClock(0) := clock
         hbwif.module.rx(0) <> delayLine.io.out

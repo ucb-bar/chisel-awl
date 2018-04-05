@@ -4,6 +4,7 @@ import hbwif.tilelink._
 import chisel3.Module
 import freechips.rocketchip.unittest._
 import freechips.rocketchip.config.{Config, Parameters}
+import freechips.rocketchip.coreplex.CacheBlockBytes
 import freechips.rocketchip.diplomacy.AddressSet
 
 class TestHarness(implicit p: Parameters)
@@ -16,10 +17,13 @@ class UnitTestConfig extends Config((site, here, up) => {
         numLanes = 1,
         numBanks = 1,
         beatBytes = 16,
-        numXact = 2)
+        numXact = 32,
+        tluh = false,
+        tlc = false)
     case HbwifSerDesKey => SerDesConfig()
     case HbwifBertKey => BertConfig()
     case HbwifPatternMemKey => PatternMemConfig()
+    case CacheBlockBytes => 16
     case UnitTests => (q: Parameters) => {
         implicit val p = q
         ScanChainTests() ++
@@ -28,5 +32,6 @@ class UnitTestConfig extends Config((site, here, up) => {
         TLControllerTests()(p) ++
         TLLaneTests()(p) ++
         BitStufferTests()
+        TLLaneTests()(p)
     }
 })
