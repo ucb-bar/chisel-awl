@@ -47,12 +47,11 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
         val dEdge = managerEdge
         val eEdge = clientEdge
     }
-    // TODO
-    val aMaxOutstanding = 8
-    val bMaxOutstanding = 8
-    val cMaxOutstanding = 8
-    val dMaxOutstanding = 8
-    val eMaxOutstanding = 8
+    val aMaxOutstanding = p(HbwifTLKey).maxOutstanding
+    val bMaxOutstanding = p(HbwifTLKey).maxOutstanding
+    val cMaxOutstanding = p(HbwifTLKey).maxOutstanding
+    val dMaxOutstanding = p(HbwifTLKey).maxOutstanding
+    val eMaxOutstanding = p(HbwifTLKey).maxOutstanding
     val aMaxBeats = divCeil(tlrx.aEdge.maxTransfer, (tlrx.aEdge.bundle.dataBits / 8))
     val bMaxBeats = divCeil(tlrx.bEdge.maxTransfer, (tlrx.bEdge.bundle.dataBits / 8))
     val cMaxBeats = divCeil(tlrx.cEdge.maxTransfer, (tlrx.cEdge.bundle.dataBits / 8))
@@ -137,7 +136,6 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     }
     val dataInflight = txADataInflight || txBDataInflight || txCDataInflight || txDDataInflight
 
-    // TODO how to handle a,b backpressure, and c needs something to handle Release/ReleaseData
     cOutstanding := cOutstanding + Mux(tltx.b.fire() && txBFirst, tlResponseMap(tltx.b.bits), 0.U) - tlrx.cEdge.last(tlrx.c)
     dOutstanding := dOutstanding + Mux(tltx.a.fire() && txAFirst, tlResponseMap(tltx.a.bits), 0.U) + Mux(tltx.c.fire() && txCFirst, tlResponseMap(tltx.c.bits), 0.U) - tlrx.dEdge.last(tlrx.d)
     eOutstanding := eOutstanding + Mux(tltx.d.fire() && txDFirst, tlResponseMap(tltx.d.bits), 0.U) - tlrx.eEdge.last(tlrx.e)

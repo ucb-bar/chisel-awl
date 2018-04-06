@@ -13,6 +13,7 @@ case class HbwifTLConfig(
     numXact: Int = 32,
     tluh: Boolean = true,
     tlc: Boolean = true,
+    maxOutstanding: Int = 8,
     asyncQueueDepth: Int = 8,
     asyncQueueSync: Int = 3,
     asyncQueueSafe: Boolean = true,
