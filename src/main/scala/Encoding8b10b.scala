@@ -158,6 +158,7 @@ class Decoded8b10bSymbol extends DecodedSymbol(8, 10, 1) {
 
     override def fromData(x: UInt): Decoded8b10bSymbol = Decoded8b10bSymbol(x, false.B)
     override def isData: Bool = ~control
+    override def isComma: Bool = (this === Decoded8b10bSymbol.comma)
 
     def encode(rd: Bool): UInt = {
         MuxLookup(Cat(control,rd,bits),

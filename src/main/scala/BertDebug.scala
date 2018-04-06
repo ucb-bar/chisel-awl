@@ -24,7 +24,7 @@ class BertDebugIO(prbs: Seq[(Int, Int)])(implicit c: SerDesConfig, implicit val 
     val clear = Input(Bool())
     val prbsLoad = Input(UInt(prbs.map(_._1).max.W))
     val prbsModeTx = Input(UInt(2.W))
-    val prbsModeRx = Input(Vec(c.numWays, UInt(2.W)))
+    val prbsModeRx = Input(UInt(2.W))
     val prbsSelect = Input(UInt(log2Ceil(prbs.length).W))
     val prbsSeedGoods = Output(Vec(c.numWays, Bool()))
     val sampleCount = Input(UInt(b.bertSampleCounterWidth.W))
@@ -39,7 +39,6 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
 
     val io = IO(new BertDebugIO(prbs()))
 
-    // TODO deal with rx valid and tx ready
     withClockAndReset(io.txClock, io.txReset) {
         val prbsModulesTx = prbs().map(PRBS(_, c.dataWidth))
 
@@ -47,13 +46,13 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
         io.txIn.ready := Mux(io.enable, false.B, io.txOut.ready)
 
         prbsModulesTx.foreach { p =>
-            p.io.seed := 0.U
+            p.io.seed := 1.U
             p.io.load := io.prbsLoad
-            p.io.mode := io.prbsModeTx
+            p.io.mode := Mux(io.txOut.ready, io.prbsModeTx, p.sStop)
         }
     }
 
-    // XXX TODO clock crossings for controls here
+    // These clock crossings are unsafe, but most of these signals will be constant when sampled, so we won't worry about them for now
     withClockAndReset(io.rxClock, io.rxReset) {
         val prbsModulesRx = Seq.fill(c.numWays) { prbs().map(PRBS(_, c.dataWidth/c.numWays)) }
         val errorCounts = RegInit(VecInit(Seq.fill(c.numWays) {0.U(b.bertErrorCounterWidth.W)}))
@@ -68,11 +67,11 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
         io.prbsSeedGoods.zip(prbsModulesRx).foreach { case (p, m) => p := MuxLookup(io.prbsSelect, false.B, m.zipWithIndex.map { x => (x._2.U, x._1.io.seedGood) }) }
         io.errorCounts := errorCounts
 
-        val prbsRxData = prbsModulesRx.zip(wayData).zip(io.prbsModeRx).map { case ((w, d), m) =>
+        val prbsRxData = prbsModulesRx.zip(wayData).map { case (w, d) =>
             w.foreach { p =>
                 p.io.seed := d.asUInt
                 p.io.load := io.prbsLoad
-                p.io.mode := m
+                p.io.mode := Mux(io.rxIn.valid, io.prbsModeRx, p.sStop)
             }
             MuxLookup(io.prbsSelect, 0.U, w.zipWithIndex.map { x => (x._2.U, x._1.io.out.asUInt ) })
         }
@@ -85,7 +84,7 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
             sampleCount := 0.U
             errorCounts.foreach(_ := 0.U)
         } .otherwise {
-            when (!done && io.enable) {
+            when (!done && io.enable && io.rxIn.valid) {
                 sampleCount := sampleCount + 1.U
                 errorCounts.zip(wayErrors).foreach { case (e, w) => e := e + w }
             }

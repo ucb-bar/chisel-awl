@@ -32,6 +32,7 @@ abstract class DecodedSymbol(val decodedWidth: Int, val encodedWidth: Int, val r
     // How to convert data to/from (NOT the encoding, how do we convert this type to a data UInt)
     def fromData(d: UInt): DecodedSymbol
     def isData: Bool
+    def isComma: Bool
 }
 
 trait HasEncoderParams {
@@ -172,16 +173,12 @@ final class DecoderQueue[S <: DecodedSymbol](val decodedSymbolsPerCycle: Int,  v
         val deq = Vec(decodedSymbolsPerCycle, Valid(symbolFactory()))
     })
 
-    io.enq <> io.deq
-    // TODO FIXME
-}
-/*
     val multiQueue = withClockAndReset(io.enqClock, io.enqReset) {
         Module(new MultiQueue(symbolFactory(), 1 << (log2Ceil(decodedSymbolsPerCycle) + 1), decodedSymbolsPerCycle, decodedSymbolsPerCycle))
     }
     multiQueue.io.enq.zip(io.enq).foreach { case (m,i) =>
         m.bits := i.bits
-        m.valid := i.valid
+        m.valid := i.valid && !i.bits.isComma // filter out commas
         assert(m.ready || !m.valid, "Buffer overrun")
     }
 
@@ -206,5 +203,3 @@ final class DecoderQueue[S <: DecodedSymbol](val decodedSymbolsPerCycle: Int,  v
 
 
 }
-*/
-
