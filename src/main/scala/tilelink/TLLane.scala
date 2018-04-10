@@ -85,7 +85,7 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         require(lanes % banks == 0)
 
         // These go to clock receivers
-        val hbwifRefClock = IO(Input(Vec(lanes/banks, Clock())))
+        val hbwifRefClock = IO(Input(Vec(banks, Clock())))
         // These go to mmio registers
         val hbwifReset = IO(Input(Vec(lanes, Bool())))
 
