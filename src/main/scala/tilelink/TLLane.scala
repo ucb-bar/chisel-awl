@@ -64,6 +64,7 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
             supportsAcquireB   = if (tlc) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
             fifoId             = Some(0))),
         beatBytes = beatBytes,
+        endSinkId = numXact*2,
         minLatency = 1
     ))) }
     //val adapterNodes = (0 until lanes).map { id => TLAdapterNode() }
