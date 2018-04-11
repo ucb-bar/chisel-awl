@@ -7,6 +7,8 @@ import freechips.rocketchip.unittest._
 
 class BitStufferTest(val mode: Int, timeout: Int = 50000) extends UnitTest(timeout) {
 
+    this.suggestName(s"BitStufferTest_mode${mode}")
+
     val numModes = 4
     implicit val c = SerDesConfig()
     val decodedSymbolsPerCycle = (c.dataWidth + 9)/10

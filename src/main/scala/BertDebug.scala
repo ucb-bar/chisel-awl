@@ -41,6 +41,7 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
 
     withClockAndReset(io.txClock, io.txReset) {
         val prbsModulesTx = prbs().map(PRBS(_, c.dataWidth))
+        prbsModulesTx.foreach { x => x.suggestName(s"tx_PRBS${x.prbsWidth}") }
 
         io.txOut.bits := Mux(io.enable, MuxLookup(io.prbsSelect, 0.U, prbsModulesTx.zipWithIndex.map { x => (x._2.U, x._1.io.out.asUInt) }), io.txIn.bits)
         io.txIn.ready := Mux(io.enable, false.B, io.txOut.ready)
@@ -48,18 +49,17 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
         prbsModulesTx.foreach { p =>
             p.io.seed := 1.U
             p.io.load := io.prbsLoad
-            p.io.mode := Mux(io.txOut.ready, io.prbsModeTx, p.sStop)
+            p.io.mode := Mux(io.txOut.ready, io.prbsModeTx, PRBS.sStop)
         }
     }
 
     // These clock crossings are unsafe, but most of these signals will be constant when sampled, so we won't worry about them for now
     withClockAndReset(io.rxClock, io.rxReset) {
         val prbsModulesRx = Seq.fill(c.numWays) { prbs().map(PRBS(_, c.dataWidth/c.numWays)) }
+        prbsModulesRx.zipWithIndex.foreach { x => x._1.foreach { y => y.suggestName(s"rx_PRBS${y.prbsWidth}_way${x._2}") } }
         val errorCounts = RegInit(VecInit(Seq.fill(c.numWays) {0.U(b.bertErrorCounterWidth.W)}))
         val sampleCount = RegInit(0.U(b.bertSampleCounterWidth.W))
-        val wayData = Seq.fill(c.numWays) { Wire(Vec(c.dataWidth/c.numWays, Bool())) }
-
-        (0 until c.dataWidth) foreach { i => wayData(i % c.numWays)(i / c.numWays) := io.rxIn.bits(i) }
+        val wayData = (0 until c.numWays).map { w => (0 until c.dataWidth/c.numWays).map({ i => io.rxIn.bits(i*c.numWays + w).asUInt }).reverse.reduce(Cat(_,_)) }
 
         io.sampleCountOut := sampleCount
         val done = io.sampleCount === io.sampleCountOut
@@ -69,14 +69,14 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
 
         val prbsRxData = prbsModulesRx.zip(wayData).map { case (w, d) =>
             w.foreach { p =>
-                p.io.seed := d.asUInt
+                p.io.seed := d
                 p.io.load := io.prbsLoad
-                p.io.mode := Mux(io.rxIn.valid, io.prbsModeRx, p.sStop)
+                p.io.mode := Mux(io.rxIn.valid, io.prbsModeRx, PRBS.sStop)
             }
-            MuxLookup(io.prbsSelect, 0.U, w.zipWithIndex.map { x => (x._2.U, x._1.io.out.asUInt ) })
+            MuxLookup(io.prbsSelect, 0.U, w.zipWithIndex.map { x => (x._2.U, x._1.io.out ) })
         }
 
-        val wayErrors = prbsRxData.zip(wayData).map { case (p, d) => PopCount(Mux(io.berMode, p ^ d.asUInt, d.asUInt)) }
+        val wayErrors = prbsRxData.zip(wayData).map { case (p, d) => PopCount(Mux(io.berMode, p ^ d, d)) }
 
         io.rxOut <> io.rxIn
 
@@ -108,42 +108,47 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
 }
 
 object PRBS {
+
+    val sLoad :: sSeed :: sRun :: sStop :: Nil = Enum(4)
+
     def apply(prbs: (Int, Int), parallel: Int): PRBS = Module(new PRBS(prbs._1, prbs._2, parallel))
 }
 
-class PRBS(prbsWidth: Int, polynomial: Int, parallel: Int) extends Module {
+class PRBS(val prbsWidth: Int, polynomial: Int, parallel: Int) extends Module {
 
     val io = IO(new Bundle {
-        val out = Output(Vec(parallel, Bool()))
+        val out = Output(UInt(parallel.W))
         val seedGood = Output(Bool())
         val seed = Input(UInt(parallel.W))
         val load = Input(UInt(prbsWidth.W))
         val mode = Input(UInt(2.W))
     })
 
-    val sLoad :: sSeed :: sRun :: sStop :: Nil = Enum(4)
-
     val lfsr = RegInit(1.U(prbsWidth.W))
 
-    val nextLfsr = (0 until parallel).foldLeft(lfsr)({ (stage, i) =>
-        io.out(i) := stage(prbsWidth-1)
-        Cat(stage(prbsWidth-2,0),(stage & polynomial.U).xorR)
+    val out = Wire(Vec(parallel, Bool()))
+
+    val nextLfsr = (0 until parallel).foldRight(lfsr)({ (i, stage) =>
+        val nextBit = (stage & polynomial.U).xorR
+        out(i) := nextBit
+        Cat(stage(prbsWidth-2,0), nextBit)
     })
 
+    io.out := out.asUInt
     io.seedGood := lfsr.orR
 
     switch (io.mode) {
-        is (sLoad) {
+        is (PRBS.sLoad) {
             lfsr := io.load
         }
-        is (sSeed) {
+        is (PRBS.sSeed) {
             if (parallel >= prbsWidth) {
-                lfsr := io.seed(parallel-1, parallel-prbsWidth)
+                lfsr := io.seed(prbsWidth-1, 0)
             } else {
                 lfsr := Cat(lfsr(prbsWidth-parallel-1,0), io.seed)
             }
         }
-        is (sRun) {
+        is (PRBS.sRun) {
             lfsr := nextLfsr
         }
     }
@@ -159,17 +164,17 @@ trait HasPRBS {
 
 trait HasPRBS7 extends HasPRBS {
     this: BertDebug =>
-    abstract override def prbs() = Seq((7, 0x60)) ++ super.prbs()
+    abstract override def prbs() = super.prbs() ++ Seq((7, 0x60))
 }
 
 trait HasPRBS15 extends HasPRBS {
     this: BertDebug =>
-    abstract override def prbs() = Seq((15, 0x6000)) ++ super.prbs()
+    abstract override def prbs() = super.prbs() ++ Seq((15, 0x6000))
 }
 
 trait HasPRBS31 extends HasPRBS {
     this: BertDebug =>
-    abstract override def prbs() = Seq((31, 0x48000000)) ++ super.prbs()
+    abstract override def prbs() = super.prbs() ++ Seq((31, 0x48000000))
 }
 
 trait HasAllPRBS extends HasPRBS7 with HasPRBS15 with HasPRBS31 { this: BertDebug => }

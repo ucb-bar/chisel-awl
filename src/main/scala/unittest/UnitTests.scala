@@ -34,6 +34,7 @@ class UnitTestConfig extends Config((site, here, up) => {
         TLPacketizerTests()(p) ++
         TLControllerTests()(p) ++
         BitStufferTests() ++
-        TLLaneTests()(p)
+        TLLaneTests()(p) ++
+        BertTests()
     }
 })

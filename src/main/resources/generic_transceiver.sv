@@ -44,6 +44,7 @@ module generic_transceiver (
   end
 
   always @(posedge clock_fast or negedge clock_fast) begin
+    #0.01
     if (count == `SERDES_BITS/2-1) clock_tx_reg <= 1'b0;
     else if (count == `SERDES_BITS-1) clock_tx_reg <= 1'b1;
   end

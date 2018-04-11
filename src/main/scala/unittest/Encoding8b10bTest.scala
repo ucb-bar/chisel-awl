@@ -6,6 +6,8 @@ import freechips.rocketchip.unittest._
 
 class Encoding8b10bTest(val decodedSymbolsPerCycle: Int, val performanceEffort: Int, val offset: Int, timeout: Int = 50000) extends UnitTest(timeout) {
 
+    this.suggestName(s"Encoding8b10bTest_decoded${decodedSymbolsPerCycle}_effort${performanceEffort}_offset${offset}")
+
     val str = s"{decodedSymbolsPerCycle: $decodedSymbolsPerCycle, performanceEffort: $performanceEffort, offset: $offset}"
     val encoder = Module(new Encoder8b10b(decodedSymbolsPerCycle, performanceEffort))
     val decoder = Module(new Decoder8b10b(decodedSymbolsPerCycle))

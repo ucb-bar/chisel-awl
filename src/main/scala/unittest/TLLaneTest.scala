@@ -87,14 +87,3 @@ object TLLaneTests {
     def apply(timeout: Int = 500000)(implicit p: Parameters):Seq[UnitTest] = for (d <- delays) yield Module(new TLLaneTest(d, timeout))
 
 }
-
-class DifferentialDelayLine(delay: Int) extends BlackBox(Map("delay" -> IntParam(delay))) {
-
-    val io = IO(new Bundle {
-        val in = Flipped(new Differential)
-        val out = new Differential
-        val clock = Input(Clock())
-    })
-
-}
-
