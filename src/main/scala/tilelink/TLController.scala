@@ -40,6 +40,12 @@ class TLControllerMap extends HashMap[String, TLControllerMapEntry] {
             }
         }
     }
+
+    def print(): String = {
+        this.toSeq.sortWith(_._2.address < _._2.address).map { case (name, entry) =>
+            f"0x${entry.address}%010x $name%s"
+        } mkString("\n")
+    }
 }
 
 class TLControllerBuilder(edge: TLEdgeIn)(implicit val p: Parameters) extends ControllerBuilder {
@@ -51,12 +57,9 @@ class TLControllerBuilder(edge: TLEdgeIn)(implicit val p: Parameters) extends Co
 
     private val maxSize = edge.bundle.dataBits
     private val beatBytes = edge.bundle.dataBits / 8
-    private val maxAddress = (1 << edge.bundle.addressBits) - beatBytes // TODO is this safe
+    private val maxAddress = (1 << edge.bundle.addressBits) - beatBytes
 
     def generate(laneClock: Clock, laneReset: Bool, globalClock: Clock, globalReset: Bool, port: TLBundle) {
-
-        require(wSeqMems.length == 0, "TODO")
-        require(rSeqMems.length == 0, "TODO")
 
         val qDepth = p(HbwifTLKey).asyncQueueDepth
         val qSync = p(HbwifTLKey).asyncQueueSync
@@ -156,6 +159,10 @@ class TLControllerBuilder(edge: TLEdgeIn)(implicit val p: Parameters) extends Co
                 address + beatBytes
             }
         }
+
+        println("\n\n\nPrinting TLController address map:")
+        println(map.print())
+        println("\n\n\n")
     }
 
 }

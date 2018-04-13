@@ -47,12 +47,11 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
         val dEdge = managerEdge
         val eEdge = clientEdge
     }
-    // TODO
-    val aMaxOutstanding = 8
-    val bMaxOutstanding = 8
-    val cMaxOutstanding = 8
-    val dMaxOutstanding = 8
-    val eMaxOutstanding = 8
+    val aMaxOutstanding = p(HbwifTLKey).maxOutstanding
+    val bMaxOutstanding = p(HbwifTLKey).maxOutstanding
+    val cMaxOutstanding = p(HbwifTLKey).maxOutstanding
+    val dMaxOutstanding = p(HbwifTLKey).maxOutstanding
+    val eMaxOutstanding = p(HbwifTLKey).maxOutstanding
     val aMaxBeats = divCeil(tlrx.aEdge.maxTransfer, (tlrx.aEdge.bundle.dataBits / 8))
     val bMaxBeats = divCeil(tlrx.bEdge.maxTransfer, (tlrx.bEdge.bundle.dataBits / 8))
     val cMaxBeats = divCeil(tlrx.cEdge.maxTransfer, (tlrx.cEdge.bundle.dataBits / 8))
@@ -137,7 +136,6 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     }
     val dataInflight = txADataInflight || txBDataInflight || txCDataInflight || txDDataInflight
 
-    // TODO how to handle a,b backpressure, and c needs something to handle Release/ReleaseData
     cOutstanding := cOutstanding + Mux(tltx.b.fire() && txBFirst, tlResponseMap(tltx.b.bits), 0.U) - tlrx.cEdge.last(tlrx.c)
     dOutstanding := dOutstanding + Mux(tltx.a.fire() && txAFirst, tlResponseMap(tltx.a.bits), 0.U) + Mux(tltx.c.fire() && txCFirst, tlResponseMap(tltx.c.bits), 0.U) - tlrx.dEdge.last(tlrx.d)
     eOutstanding := eOutstanding + Mux(tltx.d.fire() && txDFirst, tlResponseMap(tltx.d.bits), 0.U) - tlrx.eEdge.last(tlrx.e)
@@ -145,7 +143,6 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     val sTxReset :: sTxSync :: sTxAck :: sTxReady :: Nil = Enum(4)
     val txState = RegInit(sTxReset)
 
-    // TODO can we process more than one request at a time (e + other?)
     // Assign priorities to the channels
     val txReady = io.enable && (txCount === 0.U) && (txState === sTxReady)
     val aReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.a.bits)))
@@ -295,15 +292,6 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
         }
         count + (symbol.valid && symbol.bits.isData && (txState === sTxReady))
     }
-
-/* TODO do we need this
-    (0 until decodedSymbolsPerCycle).foreach { i =>
-        when (rxFire && (rxSymCount > rxSymPopped + i.U)) {
-            rxBuffer((rxBufferBytes - i - 1).U) := rxBuffer((rxBufferBytes - i - 1).U - rxSymPopped)
-        }
-    }
-*/
-
 
     // TODO can we add another symbol to NACK a transaction in progress (and set error)
     // TODO need to not assume that the sender interface looks like ours, it's possible we get multiple E messages per cycle

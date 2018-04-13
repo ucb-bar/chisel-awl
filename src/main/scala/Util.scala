@@ -24,25 +24,6 @@ object LCM {
     def apply(a: Int, b: Int): Int = a*b / GCD(a, b)
 }
 
-class DifferentialToBool extends BlackBox {
-
-    val io = IO(new Bundle {
-        val in = Flipped(new Differential)
-        val outBool = Output(Bool())
-        val outTee = new Differential
-    })
-
-}
-
-object DifferentialToBool {
-
-    def apply(d: Differential): (Bool, Differential) = {
-        val x = Module(new DifferentialToBool)
-        x.io.in <> d
-        (x.io.outBool, x.io.outTee)
-    }
-
-}
 
 // pack all valid bytes into the lowest-indexed slots available
 // e.g.

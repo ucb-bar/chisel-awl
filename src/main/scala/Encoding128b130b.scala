@@ -15,6 +15,7 @@ class Decoded128b130bSymbol extends DecodedSymbol(8, 130, 16) {
 
     override def fromData(x: UInt): Decoded128b130bSymbol = Decoded128b130bSymbol(x, false.B)
     override def isData: Bool = ~control
+    override def isComma: Bool = ???
 
 }
 
@@ -41,7 +42,8 @@ class Encoder128b130b(decodedSymbolsPerCycle: Int) extends Encoder(decodedSymbol
     require(decodedSymbolsPerCycle <= 16, "FIXME, multiple encoded frames per cycle not implemented")
 
     val io = IO(new EncoderIO(symbolFactory, decodedSymbolsPerCycle))
-    // TODO
+
+    require(false, "Not Implemented")
 
     def connectController(builder: ControllerBuilder) { ??? }
 }
@@ -54,7 +56,8 @@ class Decoder128b130b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbol
     require(decodedSymbolsPerCycle <= 16, "FIXME, multiple encoded frames per cycle not implemented")
 
     val io = IO(new DecoderIO(symbolFactory, decodedSymbolsPerCycle))
-    // TODO
+
+    require(false, "Not Implemented")
 
     def connectController(builder: ControllerBuilder) { ??? }
 }

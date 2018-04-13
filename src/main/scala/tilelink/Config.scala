@@ -11,11 +11,16 @@ case class HbwifTLConfig(
     numBanks: Int = 2,
     beatBytes: Int = 16,
     numXact: Int = 32,
+    tluh: Boolean = true,
+    tlc: Boolean = true,
+    maxOutstanding: Int = 8,
     asyncQueueDepth: Int = 8,
     asyncQueueSync: Int = 3,
     asyncQueueSafe: Boolean = true,
     asyncQueueNarrow: Boolean = true
-)
+) {
+    require(tluh || !tlc)
+}
 
 case object HbwifSerDesKey extends Field[SerDesConfig]
 case object HbwifBertKey extends Field[BertConfig]

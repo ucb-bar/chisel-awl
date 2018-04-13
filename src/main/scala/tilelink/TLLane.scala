@@ -6,6 +6,8 @@ import chisel3.util._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config._
+import freechips.rocketchip.coreplex.CacheBlockBytes
+import freechips.rocketchip.tile.XLen
 
 abstract class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn, val configEdge: TLEdgeIn)
     (implicit val c: SerDesConfig, implicit val b: BertConfig, implicit val m: PatternMemConfig, implicit val p: Parameters) extends Lane
@@ -28,20 +30,21 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
     val numXact = p(HbwifTLKey).numXact
     val managerAddressSets = p(HbwifTLKey).managerAddressSets
     val configAddressSets = p(HbwifTLKey).configAddressSets
+    val tlc = p(HbwifTLKey).tlc
+    val tluh = p(HbwifTLKey).tluh
     require(managerAddressSets.length == lanes)
 
-    /*
     val clientNodes = (0 until lanes).map { id => TLClientNode(Seq(TLClientPortParameters(
         Seq(TLClientParameters(
             name               = s"HbwifClient$id",
             sourceId           = IdRange(0,numXact),
-            supportsProbe      = TransferSizes(1, beatBytes), //TODO I think this can be larger
-            supportsArithmetic = TransferSizes(1, beatBytes),
-            supportsLogical    = TransferSizes(1, beatBytes),
-            supportsGet        = TransferSizes(1, beatBytes),
-            supportsPutFull    = TransferSizes(1, beatBytes),
-            supportsPutPartial = TransferSizes(1, beatBytes),
-            supportsHint       = TransferSizes(1, beatBytes)
+            supportsGet        = TransferSizes(1, p(CacheBlockBytes)),
+            supportsPutFull    = TransferSizes(1, p(CacheBlockBytes)),
+            supportsPutPartial = TransferSizes(1, p(CacheBlockBytes)),
+            supportsArithmetic = TransferSizes(1, p(CacheBlockBytes)),
+            supportsLogical    = TransferSizes(1, p(CacheBlockBytes)),
+            supportsHint       = TransferSizes(1, p(CacheBlockBytes)),
+            supportsProbe      = TransferSizes(1, p(CacheBlockBytes))
         )),
         minLatency = 1
     ))) }
@@ -49,32 +52,32 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         Seq(TLManagerParameters(
             address            = List(managerAddressSets(id)),
             resources          = (new SimpleDevice(s"HbwifManager$id",Seq())).reg("mem"),
-            regionType         = RegionType.CACHED,
+            regionType         = if (tlc) RegionType.CACHED else RegionType.UNCACHED,
             executable         = true,
-            supportsAcquireT   = TransferSizes(1, beatBytes), //TODO I think this can be larger
-            supportsAcquireB   = TransferSizes(1, beatBytes),
-            supportsArithmetic = TransferSizes(1, beatBytes),
-            supportsLogical    = TransferSizes(1, beatBytes),
-            supportsGet        = TransferSizes(1, beatBytes),
-            supportsPutFull    = TransferSizes(1, beatBytes),
-            supportsPutPartial = TransferSizes(1, beatBytes),
-            supportsHint       = TransferSizes(1, beatBytes),
-            fifoId             = None)),
+            supportsGet        = TransferSizes(1, p(CacheBlockBytes)),
+            supportsPutFull    = TransferSizes(1, p(CacheBlockBytes)),
+            supportsPutPartial = TransferSizes(1, p(CacheBlockBytes)),
+            supportsArithmetic = if (tluh) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
+            supportsLogical    = if (tluh) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
+            supportsHint       = if (tluh) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
+            supportsAcquireT   = if (tlc) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
+            supportsAcquireB   = if (tlc) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
+            fifoId             = Some(0))),
         beatBytes = beatBytes,
+        endSinkId = numXact*2,
         minLatency = 1
     ))) }
-    */
-    val adapterNodes = (0 until lanes).map { id => TLAdapterNode() }
+    //val adapterNodes = (0 until lanes).map { id => TLAdapterNode() }
     val configNodes = (0 until lanes).map { id => TLManagerNode(Seq(TLManagerPortParameters(
         Seq(TLManagerParameters(
             address            = List(configAddressSets(id)),
-            resources          = new SimpleDevice(s"HbwifConfig$id",Seq()).reg("mem"), //TODO ?
+            resources          = new SimpleDevice(s"HbwifConfig$id",Seq()).reg("control"),
             executable         = false,
-            supportsGet        = TransferSizes(1, beatBytes),
-            supportsPutFull    = TransferSizes(1, beatBytes),
-            supportsPutPartial = TransferSizes(1, beatBytes),
-            fifoId             = None)),
-        beatBytes = beatBytes,
+            supportsGet        = TransferSizes(1, p(XLen)/8),
+            supportsPutFull    = TransferSizes(1, p(XLen)/8),
+            supportsPutPartial = TransferSizes(1, p(XLen)/8),
+            fifoId             = Some(0))),
+        beatBytes = p(XLen)/8,
         minLatency = 1
     ))) }
 
@@ -83,7 +86,7 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         require(lanes % banks == 0)
 
         // These go to clock receivers
-        val hbwifRefClock = IO(Input(Vec(lanes/banks, Clock())))
+        val hbwifRefClock = IO(Input(Vec(banks, Clock())))
         // These go to mmio registers
         val hbwifReset = IO(Input(Vec(lanes, Bool())))
 
@@ -91,8 +94,8 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         val rx = IO(Vec(lanes, Flipped(new Differential())))
 
         val laneModules = (0 until lanes).map { id =>
-            val (clientOut, clientEdge) = adapterNodes(id).out(0)
-            val (managerIn, managerEdge) = adapterNodes(id).in(0)
+            val (clientOut, clientEdge) = clientNodes(id).out(0)
+            val (managerIn, managerEdge) = managerNodes(id).in(0)
             val (configIn, configEdge) = configNodes(id).in(0)
             val lane = Module(genLane(clientEdge, managerEdge, configEdge))
             clientOut <> lane.io.data.client

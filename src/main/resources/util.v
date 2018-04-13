@@ -46,3 +46,42 @@ module DifferentialToBool (
     assign outTee_n = in_n;
 
 endmodule
+
+module ErrorInjector #(
+    parameter per1k = 0
+) (
+    input in_p,
+    input in_n,
+    output out_p,
+    output out_n,
+    input reset,
+    input clock,
+    input stop,
+    output reg [63:0] errors
+);
+
+    reg inject;
+
+    assign out_p = in_p ^ inject;
+    assign out_n = in_n ^ inject;
+
+    always @(posedge clock or negedge clock) begin
+        if (reset) begin
+            errors <= 0;
+            inject <= 0;
+        end else begin
+            if (stop) begin
+                inject <= 0;
+            end else begin
+                if ($urandom % 1000 < per1k) begin
+                    inject <= 1;
+                    errors <= errors + 1;
+                end else begin
+                    inject <= 0;
+                end
+            end
+        end
+    end
+
+
+endmodule
