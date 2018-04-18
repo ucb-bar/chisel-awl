@@ -103,7 +103,7 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
             lane.io.control <> configIn
             tx(id) <> lane.io.tx
             lane.io.rx <> rx(id)
-            lane.io.clockRef <> hbwifRefClock(id/banks)
+            lane.io.clockRef <> hbwifRefClock(id/(lanes/banks))
             lane.io.asyncResetIn <> hbwifReset(id)
             lane
         }
