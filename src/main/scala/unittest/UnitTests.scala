@@ -4,7 +4,7 @@ import hbwif.tilelink._
 import chisel3.Module
 import freechips.rocketchip.unittest._
 import freechips.rocketchip.config.{Config, Parameters}
-import freechips.rocketchip.coreplex.CacheBlockBytes
+import freechips.rocketchip.subsystem.CacheBlockBytes
 import freechips.rocketchip.diplomacy.AddressSet
 import freechips.rocketchip.tile.XLen
 
