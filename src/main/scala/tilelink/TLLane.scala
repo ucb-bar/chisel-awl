@@ -27,48 +27,47 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
 
     val lanes = p(HbwifTLKey).numLanes
     val beatBytes = p(HbwifTLKey).beatBytes
+    val cacheBlockBytes = p(CacheBlockBytes)
     val numXact = p(HbwifTLKey).numXact
-    val managerAddressSets = p(HbwifTLKey).managerAddressSets
+    val managerAddressSet = p(HbwifTLKey).managerAddressSet
     val configAddressSets = p(HbwifTLKey).configAddressSets
     val tlc = p(HbwifTLKey).tlc
     val tluh = p(HbwifTLKey).tluh
-    require(managerAddressSets.length == lanes)
 
-    val clientNodes = (0 until lanes).map { id => TLClientNode(Seq(TLClientPortParameters(
+    val clientNode = TLClientNode((0 until lanes).map { id => TLClientPortParameters(
         Seq(TLClientParameters(
             name               = s"HbwifClient$id",
             sourceId           = IdRange(0,numXact),
-            supportsGet        = TransferSizes(1, p(CacheBlockBytes)),
-            supportsPutFull    = TransferSizes(1, p(CacheBlockBytes)),
-            supportsPutPartial = TransferSizes(1, p(CacheBlockBytes)),
-            supportsArithmetic = TransferSizes(1, p(CacheBlockBytes)),
-            supportsLogical    = TransferSizes(1, p(CacheBlockBytes)),
-            supportsHint       = TransferSizes(1, p(CacheBlockBytes)),
-            supportsProbe      = TransferSizes(1, p(CacheBlockBytes))
-        )),
-        minLatency = 1
-    ))) }
-    val managerNodes = (0 until lanes).map { id => TLManagerNode(Seq(TLManagerPortParameters(
-        Seq(TLManagerParameters(
-            address            = List(managerAddressSets(id)),
+            supportsGet        = TransferSizes(1, cacheBlockBytes),
+            supportsPutFull    = TransferSizes(1, cacheBlockBytes),
+            supportsPutPartial = TransferSizes(1, cacheBlockBytes),
+            supportsArithmetic = TransferSizes(1, cacheBlockBytes),
+            supportsLogical    = TransferSizes(1, cacheBlockBytes),
+            supportsHint       = TransferSizes(1, cacheBlockBytes),
+            supportsProbe      = TransferSizes(1, cacheBlockBytes))),
+        minLatency = 1)
+        })
+    val managerNode = TLManagerNode((0 until lanes).map { id =>
+        val base = managerAddressSet
+        val filter = AddressSet(id * cacheBlockBytes, ~((lanes-1) * cacheBlockBytes))
+        TLManagerPortParameters(Seq(TLManagerParameters(
+            address            = base.intersect(filter).toList,
             resources          = (new SimpleDevice(s"HbwifManager$id",Seq())).reg("mem"),
             regionType         = if (tlc) RegionType.CACHED else RegionType.UNCACHED,
             executable         = true,
-            supportsGet        = TransferSizes(1, p(CacheBlockBytes)),
-            supportsPutFull    = TransferSizes(1, p(CacheBlockBytes)),
-            supportsPutPartial = TransferSizes(1, p(CacheBlockBytes)),
-            supportsArithmetic = if (tluh) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
-            supportsLogical    = if (tluh) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
-            supportsHint       = if (tluh) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
-            supportsAcquireT   = if (tlc) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
-            supportsAcquireB   = if (tlc) TransferSizes(1, p(CacheBlockBytes)) else TransferSizes.none,
+            supportsGet        = TransferSizes(1, cacheBlockBytes),
+            supportsPutFull    = TransferSizes(1, cacheBlockBytes),
+            supportsPutPartial = TransferSizes(1, cacheBlockBytes),
+            supportsArithmetic = if (tluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsLogical    = if (tluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsHint       = if (tluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsAcquireT   = if (tlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsAcquireB   = if (tlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
             fifoId             = Some(0))),
         beatBytes = beatBytes,
-        endSinkId = numXact*2,
-        minLatency = 1
-    ))) }
-    //val adapterNodes = (0 until lanes).map { id => TLAdapterNode() }
-    val configNodes = (0 until lanes).map { id => TLManagerNode(Seq(TLManagerPortParameters(
+        endSinkId = 0,
+        minLatency = 1) })
+    val configNode = TLManagerNode((0 until lanes).map { id => TLManagerPortParameters(
         Seq(TLManagerParameters(
             address            = List(configAddressSets(id)),
             resources          = new SimpleDevice(s"HbwifConfig$id",Seq()).reg("control"),
@@ -78,8 +77,7 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
             supportsPutPartial = TransferSizes(1, p(XLen)/8),
             fifoId             = Some(0))),
         beatBytes = p(XLen)/8,
-        minLatency = 1
-    ))) }
+        minLatency = 1) })
 
     lazy val module = new LazyModuleImp(this) {
         val banks = p(HbwifTLKey).numBanks
@@ -94,9 +92,9 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         val rx = IO(Vec(lanes, Flipped(new Differential())))
 
         val laneModules = (0 until lanes).map { id =>
-            val (clientOut, clientEdge) = clientNodes(id).out(0)
-            val (managerIn, managerEdge) = managerNodes(id).in(0)
-            val (configIn, configEdge) = configNodes(id).in(0)
+            val (clientOut, clientEdge) = clientNode.out(id)
+            val (managerIn, managerEdge) = managerNode.in(id)
+            val (configIn, configEdge) = configNode.in(id)
             val lane = Module(genLane(clientEdge, managerEdge, configEdge))
             clientOut <> lane.io.data.client
             lane.io.data.manager <> managerIn

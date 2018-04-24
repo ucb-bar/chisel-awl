@@ -29,7 +29,6 @@ object AsyncResetReg {
 }
 
 class AsyncResetReg(init: Boolean = true) extends BlackBox {
-//with HasBlackBoxResource {
     val io = IO(new Bundle {
         val d = Input(Bool())
         val clk = Input(Clock())
@@ -39,7 +38,6 @@ class AsyncResetReg(init: Boolean = true) extends BlackBox {
 
     override def desiredName = if (init) "async_reset_reg1" else "async_reset_reg0"
 
-    //setResource("/async_reset_reg.v")
 }
 
 /*

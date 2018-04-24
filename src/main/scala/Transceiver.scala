@@ -2,7 +2,6 @@ package hbwif
 
 import chisel3._
 import chisel3.experimental.Analog
-import chisel3.util.HasBlackBoxResource
 
 case class SerDesConfig(
     dataWidth: Int = 16,

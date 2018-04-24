@@ -14,7 +14,7 @@ class TestHarness(implicit p: Parameters)
 class UnitTestConfig extends Config((site, here, up) => {
     case XLen => 64
     case HbwifTLKey => HbwifTLConfig(
-        managerAddressSets = Seq(AddressSet(0x10000, 0xffff)),
+        managerAddressSet = AddressSet(0x10000, 0xffff),
         configAddressSets = Seq(AddressSet(0x00000, 0xffff)),
         numLanes = 1,
         numBanks = 1,
@@ -29,12 +29,16 @@ class UnitTestConfig extends Config((site, here, up) => {
     case CacheBlockBytes => 16
     case UnitTests => (q: Parameters) => {
         implicit val p = q
+        /*
         ScanChainTests() ++
         Encoding8b10bTests() ++
         TLPacketizerTests()(p) ++
         TLControllerTests()(p) ++
         BitStufferTests() ++
         TLLaneTests()(p) ++
-        BertTests()
+        BertTests() ++
+        FixedWidthLaneTests()
+        */
+        TLLaneTests()(p)
     }
 })
