@@ -1,6 +1,7 @@
 package hbwif
 
 import chisel3._
+import chisel3.core.{IntParam, Param}
 import chisel3.experimental.Analog
 
 case class SerDesConfig(
@@ -46,7 +47,7 @@ class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle {
 
 }
 
-abstract class Transceiver()(implicit val c: SerDesConfig) extends BlackBox {
+abstract class Transceiver(params: Map[String, Param] = Map.empty[String, Param])(implicit val c: SerDesConfig) extends BlackBox(params) {
 
     val io: TransceiverIO
 
@@ -56,7 +57,7 @@ abstract class Transceiver()(implicit val c: SerDesConfig) extends BlackBox {
 
 }
 
-class GenericTransceiver()(implicit c: SerDesConfig) extends Transceiver()(c) {
+class GenericTransceiver()(implicit c: SerDesConfig) extends Transceiver(Map("SERDES_BITS" -> IntParam(c.dataWidth)))(c) {
 
     val io = IO(new TransceiverIO)
 

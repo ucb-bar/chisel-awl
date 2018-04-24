@@ -29,7 +29,6 @@ class UnitTestConfig extends Config((site, here, up) => {
     case CacheBlockBytes => 16
     case UnitTests => (q: Parameters) => {
         implicit val p = q
-        /*
         ScanChainTests() ++
         Encoding8b10bTests() ++
         TLPacketizerTests()(p) ++
@@ -38,7 +37,5 @@ class UnitTestConfig extends Config((site, here, up) => {
         TLLaneTests()(p) ++
         BertTests() ++
         FixedWidthLaneTests()
-        */
-        TLLaneTests()(p)
     }
 })
