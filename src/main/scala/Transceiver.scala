@@ -27,10 +27,10 @@ class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle {
     val data = new TransceiverDataIF
 
     // low speed clock output
-    val clock_rx = Output(Clock())
+    val clock_rx_div = Output(Clock())
 
     // low speed clock output
-    val clock_tx = Output(Clock())
+    val clock_tx_div = Output(Clock())
 
     // reference clock input
     val clock_ref = Input(Clock())
