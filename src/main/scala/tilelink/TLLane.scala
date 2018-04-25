@@ -84,9 +84,9 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         require(lanes % banks == 0)
 
         // These go to clock receivers
-        val hbwifRefClock = IO(Input(Vec(banks, Clock())))
+        val hbwifRefClocks = IO(Input(Vec(banks, Clock())))
         // These go to mmio registers
-        val hbwifReset = IO(Input(Vec(lanes, Bool())))
+        val hbwifResets = IO(Input(Vec(lanes, Bool())))
 
         val tx = IO(Vec(lanes, new Differential()))
         val rx = IO(Vec(lanes, Flipped(new Differential())))
@@ -101,8 +101,8 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
             lane.io.control <> configIn
             tx(id) <> lane.io.tx
             lane.io.rx <> rx(id)
-            lane.io.clockRef <> hbwifRefClock(id/(lanes/banks))
-            lane.io.asyncResetIn <> hbwifReset(id)
+            lane.io.clockRef <> hbwifRefClocks(id/(lanes/banks))
+            lane.io.asyncResetIn <> hbwifResets(id)
             lane
         }
     }
