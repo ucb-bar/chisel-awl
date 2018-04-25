@@ -10,7 +10,6 @@
 module generic_transceiver (
   input [`SERDES_BITS-1:0] data_tx,
   output [`SERDES_BITS-1:0] data_rx,
-  output [`SERDES_BITS-1:0] data_dlev,
   output tx_p,
   output tx_n,
   input rx_p,
