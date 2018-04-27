@@ -1,6 +1,7 @@
 package hbwif
 
 import chisel3._
+import chisel3.core.BaseModule
 import chisel3.experimental.Analog
 
 case class SerDesConfig(
@@ -46,20 +47,16 @@ class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle {
 
 }
 
-abstract class Transceiver()(implicit val c: SerDesConfig) extends BlackBox {
+trait HasTransceiverIO extends BaseModule {
 
     val io: TransceiverIO
 
-    def transceiverName: String
-
-    override def desiredName = transceiverName
-
 }
 
-class GenericTransceiver()(implicit c: SerDesConfig) extends Transceiver()(c) {
+class GenericTransceiver()(implicit c: SerDesConfig) extends BlackBox with HasTransceiverIO {
 
     val io = IO(new TransceiverIO)
 
-    def transceiverName = "generic_transceiver"
+    override def desiredName = "generic_transceiver"
 
 }
