@@ -55,8 +55,8 @@ class TLLaneTestLazy(delay: Int)(implicit p: Parameters) extends LazyModule {
         require(md.sink.getWidth == cd.sink.getWidth,       s"HBWIF is misconfigured in TLLaneTest: D sink mismatch: ${md.sink.getWidth} != ${cd.sink.getWidth}")
         require(md.data.getWidth == cd.data.getWidth,       s"HBWIF is misconfigured in TLLaneTest: D data mismatch: ${md.data.getWidth} != ${cd.data.getWidth}")
 
-        hbwif.module.hbwifReset(0) := reset
-        hbwif.module.hbwifRefClock(0) := clock
+        hbwif.module.hbwifResets(0) := reset
+        hbwif.module.hbwifRefClocks(0) := clock
         hbwif.module.rx(0) <> delayLine.io.out
         delayLine.io.in <> hbwif.module.tx(0)
         delayLine.io.clock := clock

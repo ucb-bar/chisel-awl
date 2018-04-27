@@ -49,7 +49,7 @@ class TransceiverSubsystemIO()(implicit val c: SerDesConfig) extends Bundle with
 abstract class TransceiverSubsystem()(implicit val c: SerDesConfig) extends Module with HasControllerConnector {
 
 
-    type T <: Transceiver
+    type T <: HasTransceiverIO
     type I <: TransceiverSubsystemIO
 
     def genTransceiver(): T
@@ -72,7 +72,7 @@ class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends Transceive
 
 trait HasTransceiverSubsystemConnections {
     this: TransceiverSubsystem =>
-    val txrx: Transceiver
+    val txrx: HasTransceiverIO
 
     txrx.io.clock_ref := io.clockRef
     txrx.io.async_reset_in := io.asyncResetIn
@@ -80,17 +80,17 @@ trait HasTransceiverSubsystemConnections {
     io.tx <> txrx.io.tx
     io.rx <> txrx.io.rx
 
-    val txSyncReset = AsyncResetSynchronizer(txrx.io.clock_tx, io.asyncResetIn)
-    val rxSyncReset = AsyncResetSynchronizer(txrx.io.clock_rx, io.asyncResetIn)
+    val txSyncReset = AsyncResetSynchronizer(txrx.io.clock_tx_div, io.asyncResetIn)
+    val rxSyncReset = AsyncResetSynchronizer(txrx.io.clock_rx_div, io.asyncResetIn)
 
     io.data.rx.bits := txrx.io.data.rx ^ Fill(c.dataWidth, io.rxInvert)
     txrx.io.data.tx := io.data.tx.bits ^ Fill(c.dataWidth, io.txInvert)
     io.data.rx.valid := true.B
     io.data.tx.ready := true.B
 
-    io.txClock := txrx.io.clock_tx
+    io.txClock := txrx.io.clock_tx_div
     io.txReset := txSyncReset
-    io.rxClock := txrx.io.clock_rx
+    io.rxClock := txrx.io.clock_rx_div
     io.rxReset := rxSyncReset
 
     def connectController(builder: ControllerBuilder) {

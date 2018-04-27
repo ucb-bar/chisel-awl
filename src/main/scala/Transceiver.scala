@@ -1,7 +1,11 @@
 package hbwif
 
 import chisel3._
+<<<<<<< HEAD
 import chisel3.core.{IntParam, Param}
+=======
+import chisel3.core.BaseModule
+>>>>>>> master
 import chisel3.experimental.Analog
 
 case class SerDesConfig(
@@ -28,10 +32,10 @@ class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle {
     val data = new TransceiverDataIF
 
     // low speed clock output
-    val clock_rx = Output(Clock())
+    val clock_rx_div = Output(Clock())
 
     // low speed clock output
-    val clock_tx = Output(Clock())
+    val clock_tx_div = Output(Clock())
 
     // reference clock input
     val clock_ref = Input(Clock())
@@ -47,20 +51,16 @@ class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle {
 
 }
 
-abstract class Transceiver(params: Map[String, Param] = Map.empty[String, Param])(implicit val c: SerDesConfig) extends BlackBox(params) {
+trait HasTransceiverIO extends BaseModule {
 
     val io: TransceiverIO
 
-    def transceiverName: String
-
-    override def desiredName = transceiverName
-
 }
 
-class GenericTransceiver()(implicit c: SerDesConfig) extends Transceiver(Map("SERDES_BITS" -> IntParam(c.dataWidth)))(c) {
+class GenericTransceiver()(implicit c: SerDesConfig) extends BlackBox(Map("SERDES_BITS" -> IntParam(c.dataWidth)))(c) with HasTransceiverIO {
 
     val io = IO(new TransceiverIO)
 
-    def transceiverName = "generic_transceiver"
+    override def desiredName = "generic_transceiver"
 
 }

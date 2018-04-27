@@ -9,8 +9,8 @@ module generic_transceiver #(
   input rx_p,
   input rx_n,
   input async_reset_in,
-  output clock_tx,
-  output clock_rx,
+  output clock_tx_div,
+  output clock_rx_div,
   input clock_ref
 );
 
@@ -28,18 +28,14 @@ module generic_transceiver #(
   //***********************************
 
   reg [$clog2(SERDES_BITS)-1:0] count = 0;
-  reg clock_tx_reg = 0;
-  assign clock_tx = clock_tx_reg;
-  assign clock_rx = clock_tx_reg;
+  reg clock_tx_div_reg = 0;
+  assign clock_tx_div = clock_tx_div_reg;
+  assign clock_rx_div = clock_tx_div_reg;
 
   always @(posedge clock_fast or negedge clock_fast) begin
-    count <= (count + 1) % SERDES_BITS;
-  end
-
-  always @(posedge clock_fast or negedge clock_fast) begin
-    #0.01
-    if (count == SERDES_BITS/2-1) clock_tx_reg <= 1'b0;
-    else if (count == SERDES_BITS-1) clock_tx_reg <= 1'b1;
+    if (count == SERDES_BITS/2-1) clock_tx_div_reg = 1'b0;
+    else if (count == SERDES_BITS-1) clock_tx_div_reg = 1'b1;
+    count = (count + 1) % SERDES_BITS;
   end
 
   //***********************************
