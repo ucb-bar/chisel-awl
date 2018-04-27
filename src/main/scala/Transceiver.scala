@@ -1,11 +1,7 @@
 package hbwif
 
 import chisel3._
-<<<<<<< HEAD
-import chisel3.core.{IntParam, Param}
-=======
-import chisel3.core.BaseModule
->>>>>>> master
+import chisel3.core.{BaseModule, IntParam, Param}
 import chisel3.experimental.Analog
 
 case class SerDesConfig(
@@ -57,7 +53,7 @@ trait HasTransceiverIO extends BaseModule {
 
 }
 
-class GenericTransceiver()(implicit c: SerDesConfig) extends BlackBox(Map("SERDES_BITS" -> IntParam(c.dataWidth)))(c) with HasTransceiverIO {
+class GenericTransceiver()(implicit c: SerDesConfig) extends BlackBox(Map("SERDES_BITS" -> IntParam(c.dataWidth))) with HasTransceiverIO {
 
     val io = IO(new TransceiverIO)
 
