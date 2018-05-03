@@ -19,37 +19,36 @@ object BertConfig {
 
 }
 
-class BertDebugIO(prbs: Seq[(Int, Int)])(implicit c: SerDesConfig, implicit val b: BertConfig) extends DebugIO()(c) {
-    val enable = Input(Bool())
-    val clear = Input(Bool())
-    val prbsLoad = Input(UInt(prbs.map(_._1).max.W))
-    val prbsModeTx = Input(UInt(2.W))
-    val prbsModeRx = Input(UInt(2.W))
-    val prbsSelect = Input(UInt(log2Ceil(prbs.length).W))
-    val prbsSeedGoods = Output(Vec(c.numWays, Bool()))
-    val sampleCount = Input(UInt(b.bertSampleCounterWidth.W))
-    val sampleCountOut = Output(UInt(b.bertSampleCounterWidth.W))
-    val errorCounts = Output(Vec(c.numWays, UInt(b.bertErrorCounterWidth.W)))
-    val berMode = Input(Bool()) // 1 = track BER, 0 = track 1s
-}
-
 class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends Debug()(c) with HasPRBS {
 
     require((c.dataWidth % c.numWays) == 0)
 
-    val io = IO(new BertDebugIO(prbs()))
+    override val controlIO = Some(IO(new ControlIO {
+        val enable         = input(Bool(), 0, "bert_enable")
+        val clear          = input(Bool(), 1, "bert_clear")
+        val prbsLoad       = input(UInt(prbs.map(_._1).max.W), "bert_prbs_load")
+        val prbsModeTx     = input(UInt(2.W), "bert_prbs_mode_tx")
+        val prbsModeRx     = input(UInt(2.W), "bert_prbs_mode_rx")
+        val prbsSelect     = input(UInt(log2Ceil(prbs.length).W), "bert_prbs_select")
+        val prbsSeedGoods  = output(UInt(c.numWays.W), "bert_prbs_seed_goods")
+        val sampleCount    = input(UInt(b.bertSampleCounterWidth.W), "bert_sample_count")
+        val sampleCountOut = output(UInt(b.bertSampleCounterWidth.W), "bert_sample_count_out")
+        val errorCounts    = output(Vec(c.numWays, UInt(b.bertErrorCounterWidth.W)), "bert_error_counts")
+        val berMode        = input(Bool(), "bert_ber_mode")
+    }))
+    val ctrl = controlIO.get
 
     withClockAndReset(io.txClock, io.txReset) {
         val prbsModulesTx = prbs().map(PRBS(_, c.dataWidth))
         prbsModulesTx.foreach { x => x.suggestName(s"tx_PRBS${x.prbsWidth}") }
 
-        io.txOut.bits := Mux(io.enable, MuxLookup(io.prbsSelect, 0.U, prbsModulesTx.zipWithIndex.map { x => (x._2.U, x._1.io.out.asUInt) }), io.txIn.bits)
-        io.txIn.ready := Mux(io.enable, false.B, io.txOut.ready)
+        io.txOut.bits := Mux(ctrl.enable, MuxLookup(ctrl.prbsSelect, 0.U, prbsModulesTx.zipWithIndex.map { x => (x._2.U, x._1.io.out.asUInt) }), io.txIn.bits)
+        io.txIn.ready := Mux(ctrl.enable, false.B, io.txOut.ready)
 
         prbsModulesTx.foreach { p =>
             p.io.seed := 1.U
-            p.io.load := io.prbsLoad
-            p.io.mode := Mux(io.txOut.ready, io.prbsModeTx, PRBS.sStop)
+            p.io.load := ctrl.prbsLoad
+            p.io.mode := Mux(io.txOut.ready, ctrl.prbsModeTx, PRBS.sStop)
         }
     }
 
@@ -61,48 +60,34 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
         val sampleCount = RegInit(0.U(b.bertSampleCounterWidth.W))
         val wayData = (0 until c.numWays).map { w => (0 until c.dataWidth/c.numWays).map({ i => io.rxIn.bits(i*c.numWays + w).asUInt }).reverse.reduce(Cat(_,_)) }
 
-        io.sampleCountOut := sampleCount
-        val done = io.sampleCount === io.sampleCountOut
+        ctrl.sampleCountOut := sampleCount
+        val done = ctrl.sampleCount === ctrl.sampleCountOut
 
-        io.prbsSeedGoods.zip(prbsModulesRx).foreach { case (p, m) => p := MuxLookup(io.prbsSelect, false.B, m.zipWithIndex.map { x => (x._2.U, x._1.io.seedGood) }) }
-        io.errorCounts := errorCounts
+        ctrl.prbsSeedGoods := prbsModulesRx.map({ m => MuxLookup(ctrl.prbsSelect, false.B, m.zipWithIndex.map { x => (x._2.U, x._1.io.seedGood) }) }).map(_.asUInt).reduce(Cat(_,_))
+        ctrl.errorCounts := errorCounts
 
         val prbsRxData = prbsModulesRx.zip(wayData).map { case (w, d) =>
             w.foreach { p =>
                 p.io.seed := d
-                p.io.load := io.prbsLoad
-                p.io.mode := Mux(io.rxIn.valid, io.prbsModeRx, PRBS.sStop)
+                p.io.load := ctrl.prbsLoad
+                p.io.mode := Mux(io.rxIn.valid, ctrl.prbsModeRx, PRBS.sStop)
             }
-            MuxLookup(io.prbsSelect, 0.U, w.zipWithIndex.map { x => (x._2.U, x._1.io.out ) })
+            MuxLookup(ctrl.prbsSelect, 0.U, w.zipWithIndex.map { x => (x._2.U, x._1.io.out ) })
         }
 
-        val wayErrors = prbsRxData.zip(wayData).map { case (p, d) => PopCount(Mux(io.berMode, p ^ d, d)) }
+        val wayErrors = prbsRxData.zip(wayData).map { case (p, d) => PopCount(Mux(ctrl.berMode, p ^ d, d)) }
 
         io.rxOut <> io.rxIn
 
-        when (io.clear) {
+        when (ctrl.clear) {
             sampleCount := 0.U
             errorCounts.foreach(_ := 0.U)
         } .otherwise {
-            when (!done && io.enable && io.rxIn.valid) {
+            when (!done && ctrl.enable && io.rxIn.valid) {
                 sampleCount := sampleCount + 1.U
                 errorCounts.zip(wayErrors).foreach { case (e, w) => e := e + w }
             }
         }
-    }
-
-    def connectController(builder: ControllerBuilder) {
-        builder.w("bert_enable", io.enable)
-        builder.w("bert_clear", io.clear)
-        builder.w("bert_prbs_load", io.prbsLoad)
-        builder.w("bert_mode_tx", io.prbsModeTx)
-        builder.w("bert_prbs_mode_rx", io.prbsModeRx)
-        builder.w("bert_prbs_select", io.prbsSelect)
-        builder.r("bert_prbs_seed_goods", io.prbsSeedGoods.asUInt)
-        builder.w("bert_sample_count", io.sampleCount)
-        builder.w("bert_ber_mode", io.berMode)
-        builder.r("bert_sample_count_out", io.sampleCountOut)
-        builder.r("bert_error_counts", io.errorCounts)
     }
 
 }

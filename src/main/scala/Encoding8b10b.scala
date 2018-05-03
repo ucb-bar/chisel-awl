@@ -212,10 +212,12 @@ class Decoder8b10b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbolsPe
     type S = Decoded8b10bSymbol
     def symbolFactory = Decoded8b10bSymbol.apply
 
-    val io = IO(new DecoderIO(symbolFactory, decodedSymbolsPerCycle) {
-        val error = Output(Bool())
-        val clearError = Input(Bool())
-    })
+    val io = IO(new DecoderIO(symbolFactory, decodedSymbolsPerCycle))
+
+    override val controlIO = Some(IO(new ControlIO {
+        val error = output(Bool(), "decoder_error")
+        val clearError = input(Bool(), 0, "decoder_clearError")
+    }))
 
     val idx = RegInit(0.U(4.W))
     val lock = RegInit(false.B)
@@ -242,13 +244,8 @@ class Decoder8b10b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbolsPe
     }
 
     val error = RegInit(false.B)
-    error := ((!(io.decoded.map(_.valid).reduce(_&&_)) && io.encoded.valid) || error) && !io.clearError
-    io.error := error
-
-    override def connectController(builder: ControllerBuilder) {
-        builder.r("decoder_error", io.error)
-        builder.w("decoder_error_clear", io.clearError)
-    }
+    error := ((!(io.decoded.map(_.valid).reduce(_&&_)) && io.encoded.valid) || error) && !controlIO.get.clearError
+    controlIO.get.error := error
 
 }
 
@@ -302,7 +299,6 @@ class Encoder8b10b(decodedSymbolsPerCycle: Int, val performanceEffort: Int = 0) 
         rd := r
     }
 
-    def connectController(builder: ControllerBuilder) { }
 }
 
 trait HasEncoding8b10b {

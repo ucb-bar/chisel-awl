@@ -2,6 +2,7 @@ package hbwif
 
 import chisel3._
 import chisel3.util._
+import chisel3.experimental.RawModule
 import scala.collection.mutable.ArraySeq
 
 
@@ -16,9 +17,9 @@ class DebugIO()(implicit val c: SerDesConfig) extends Bundle {
     val rxReset = Input(Bool())
 }
 
-abstract class Debug()(implicit val c: SerDesConfig) extends Module with HasControllerConnector {
+abstract class Debug()(implicit val c: SerDesConfig) extends RawModule with HasControllerConnector {
 
-    val io: DebugIO
+    val io = IO(new DebugIO)
 
 }
 

@@ -2,54 +2,74 @@ package hbwif
 
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.{DataMirror, requireIsChiselType}
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.immutable.ListMap
+import scala.collection.mutable.HashMap
 
-abstract class ControllerBuilder {
+case class ControlInput(
+    name: String,
+    signal: UInt,
+    default: Option[BigInt],
+    desc: Option[String]
+)
 
-    type P <: Bundle
-    def createPort(): P
+case class ControlOutput(
+    name: String,
+    signal: UInt,
+    desc: Option[String]
+)
 
-    protected val ws = new ArrayBuffer[(String,UInt,Option[BigInt])]
-    protected val rs = new ArrayBuffer[(String,UInt)]
+class ControlIO extends Bundle {
+    final val inputMap = new HashMap[String, ControlInput]
+    final val outputMap = new HashMap[String, ControlOutput]
 
-    def w(name: String, signal: UInt) { this.w(name, signal, None) }
-
-    def w(name: String, signal: UInt, init: BigInt) { this.w(name, signal, Some(init)) }
-
-    def w(name: String, signal: Seq[UInt], init: Seq[BigInt]) { this.w(name, signal, Some(init)) }
-
-    def w(name: String, signal: UInt, init: Option[BigInt]) {
-        if (signal.getWidth > 0) {
-            ws.append((name, signal, init))
-        }
+    def attach[T <: ControlIO](other: T) {
+        // connect by name
+        inputMap.foreach { case (name, i) => i.signal := other.inputMap(name).signal }
+        outputMap.foreach { case (name, o) => other.outputMap(name).signal := o.signal }
     }
+    def attach[T <: ControlIO](other: Option[T]) { attach(other.get) }
 
-    def w(name: String, signal: Seq[UInt]) { this.w(name, signal, None) }
-
-    def w(name: String, signal: Seq[UInt], init: Option[Seq[BigInt]]) {
-        (0 until signal.length) foreach { i => this.w(name + s"_$i", signal(i), init.map(_(i))) }
+    def input[T <: UInt](in: T, default: Option[BigInt], name: String, desc: Option[String]): T = {
+        val x = Input(in)
+        inputMap.put(name, ControlInput(name, x, default, desc))
+        x
     }
+    def input[T <: UInt](in: T, default: Option[BigInt], name: String): T = input[T](in, default, name, None)
+    def input[T <: UInt](in: T, default: Option[BigInt], name: String, desc: String): T = input[T](in, default, name, Some(desc))
+    def input[T <: UInt](in: T, default: BigInt, name: String, desc: String): T = input[T](in, Some(default), name, Some(desc))
+    def input[T <: UInt](in: T, default: BigInt, name: String): T = input[T](in, Some(default), name, None)
+    def input[T <: UInt](in: T, name: String, desc: String): T = input[T](in, None, name, Some(desc))
+    def input[T <: UInt](in: T, name: String): T = input[T](in, None, name, None)
 
-    def r(name: String, signal: UInt) {
-        if (signal.getWidth > 0) {
-            rs.append((name, signal))
-        }
+    def input[T <: UInt](in: Vec[T], default: Option[Seq[BigInt]], name: String, desc: Option[String]): Vec[T] = {
+        val x = Input(in)
+        x.zipWithIndex.foreach { case (signal, i) => inputMap.put(name + s"_$i", ControlInput(name + s"_$i", signal, default.map(_(i)), desc)) }
+        x
     }
+    def input[T <: UInt](in: Vec[T], default: Option[Seq[BigInt]], name: String): Vec[T] = input[T](in, default, name, None)
+    def input[T <: UInt](in: Vec[T], default: Option[Seq[BigInt]], name: String, desc: String): Vec[T] = input[T](in, default, name, Some(desc))
+    def input[T <: UInt](in: Vec[T], default: Seq[BigInt], name: String, desc: String): Vec[T] = input[T](in, Some(default), name, Some(desc))
+    def input[T <: UInt](in: Vec[T], default: Seq[BigInt], name: String): Vec[T] = input[T](in, Some(default), name, None)
+    def input[T <: UInt](in: Vec[T], name: String, desc: String): Vec[T] = input[T](in, None, name, Some(desc))
+    def input[T <: UInt](in: Vec[T], name: String): Vec[T] = input[T](in: Vec[T], None, name, None)
 
-    def r(name: String, signal: Seq[UInt]) {
-        (0 until signal.length) foreach { i => this.r(name + s"_$i", signal(i)) }
+    def output[T <: UInt](out: T, name: String, desc: Option[String]): T = {
+        val x = Output(out)
+        outputMap.put(name, ControlOutput(name, x, desc))
+        x
     }
+    def output[T <: UInt](out: T, name: String): T = output[T](out, name, None)
 
-    // This method must implement any asynchronous crossings if needed
-    def generate(laneClock: Clock, laneReset: Bool, globalClock: Clock, globalReset: Bool, port: P)
-
+    def output[T <: UInt](out: Vec[T], name: String, desc: Option[String]): Vec[T] = {
+        val x = Output(out)
+        x.zipWithIndex.foreach { case (signal, i) => outputMap.put(name + s"_$i", ControlOutput(name + s"_$i", signal, desc)) }
+        x
+    }
+    def output[T <: UInt](out: Vec[T], name: String): Vec[T] = output[T](out, name, None)
 }
 
 trait HasControllerConnector {
 
-    // Override this to connect your signals to the controller
-    def connectController(builder: ControllerBuilder)
+    val controlIO: Option[ControlIO] = None
 
 }
+

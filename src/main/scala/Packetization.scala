@@ -2,6 +2,7 @@ package hbwif
 
 import chisel3._
 import chisel3.util._
+import chisel3.experimental.MultiIOModule
 
 class PacketizerIO[S <: DecodedSymbol, T <: Data](val decodedSymbolsPerCycle: Int, val symbolFactory: () => S, val dataFactory: () => T) extends Bundle {
     val symbolsTx = Vec(decodedSymbolsPerCycle, Valid(symbolFactory()))
@@ -10,7 +11,7 @@ class PacketizerIO[S <: DecodedSymbol, T <: Data](val decodedSymbolsPerCycle: In
     val symbolsRx = Vec(decodedSymbolsPerCycle, Flipped(Valid(symbolFactory())))
 }
 
-abstract class Packetizer[S <: DecodedSymbol, T <: Data](val decodedSymbolsPerCycle: Int, val symbolFactory: () => S, val dataFactory: () => T) extends Module with HasControllerConnector {
+abstract class Packetizer[S <: DecodedSymbol, T <: Data](val decodedSymbolsPerCycle: Int, val symbolFactory: () => S, val dataFactory: () => T) extends MultiIOModule with HasControllerConnector {
 
     val dataWidth = decodedSymbolsPerCycle * symbolFactory().decodedWidth
 

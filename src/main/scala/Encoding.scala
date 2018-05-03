@@ -2,7 +2,7 @@ package hbwif
 
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.withClockAndReset
+import chisel3.experimental.{withClockAndReset, MultiIOModule}
 import scala.math.max
 
 // TODO get rid of this rocketchip dependency
@@ -65,7 +65,7 @@ class EncoderIO[S <: DecodedSymbol](val symbolFactory: () => S, val decodedSymbo
 // io.decoded(0) = C
 //
 // Similarly, this expects the encoded interface to go MSB..LSB with MSB being sent over the line first
-abstract class Encoder(val decodedSymbolsPerCycle: Int) extends Module with HasControllerConnector with HasEncoderParams {
+abstract class Encoder(val decodedSymbolsPerCycle: Int) extends MultiIOModule with HasControllerConnector with HasEncoderParams {
 
     val io: EncoderIO[S]
 
@@ -78,7 +78,7 @@ class DecoderIO[S <: DecodedSymbol](val symbolFactory: () => S, val decodedSymbo
     final val decoded = Vec(decodedSymbolsPerCycle, Valid(symbolFactory()))
 }
 
-abstract class Decoder(val decodedSymbolsPerCycle: Int) extends Module with HasControllerConnector with HasEncoderParams {
+abstract class Decoder(val decodedSymbolsPerCycle: Int) extends MultiIOModule with HasControllerConnector with HasEncoderParams {
 
     val io: DecoderIO[S]
 

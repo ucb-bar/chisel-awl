@@ -13,15 +13,17 @@ class TLBidirectionalPacketizerIO(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn) 
 }
 
 object TLBidirectionalPacketizerIO {
-    def apply(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn)() =  new TLBidirectionalPacketizerIO(clientEdge, managerEdge)
+    def apply(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn)() = new TLBidirectionalPacketizerIO(clientEdge, managerEdge)
 }
 
 class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, managerEdge: TLEdgeIn, decodedSymbolsPerCycle: Int, symbolFactory: () => S)(implicit val p: Parameters)
     extends Packetizer(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIO.apply(clientEdge, managerEdge) _) with TLPacketizerLike {
 
-    val io = IO(new PacketizerIO(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIO.apply(clientEdge, managerEdge) _) {
-        val enable = Input(Bool())
-    })
+    val io = IO(new PacketizerIO(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIO.apply(clientEdge, managerEdge) _))
+
+    override val controlIO = Some(IO(new ControlIO {
+        val enable = input(Bool(), 0, "mem_mode_enable")
+    }))
 
     val tltx = new Object {
         val a = io.data.manager.a
@@ -144,7 +146,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     val txState = RegInit(sTxReset)
 
     // Assign priorities to the channels
-    val txReady = io.enable && (txCount === 0.U) && (txState === sTxReady)
+    val txReady = controlIO.get.enable && (txCount === 0.U) && (txState === sTxReady)
     val aReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.a.bits)))
     val bReady = txReady && (cOutstanding < (cMaxOutstanding.U - tlResponseMap(tltx.b.bits)))
     val cReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.c.bits)))
@@ -161,7 +163,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     val ack = io.symbolsRx map { x => x.valid && (x.bits === symbolFactory().ack) } reduce (_||_)
     val nack = io.symbolsRx map { x => x.valid && (x.bits === symbolFactory().nack) } reduce (_||_)
 
-    when (io.enable) {
+    when (controlIO.get.enable) {
         when (txState === sTxReset) {
             txState := sTxSync
         } .elsewhen(txState === sTxSync) {
@@ -295,10 +297,6 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
 
     // TODO can we add another symbol to NACK a transaction in progress (and set error)
     // TODO need to not assume that the sender interface looks like ours, it's possible we get multiple E messages per cycle
-
-    def connectController(builder: ControllerBuilder) {
-        builder.w("mem_mode_enable", io.enable, 0)
-    }
 
     def connectData(dataClock: Clock, dataReset: Bool, data: TLBidirectionalPacketizerIO) {
         val qDepth = p(HbwifTLKey).asyncQueueDepth
