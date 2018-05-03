@@ -167,7 +167,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
         } .elsewhen(txState === sTxSync) {
             when (ack) {
                 txState := sTxReady
-            } .otherwise {
+            } .elsewhen(io.symbolsTxReady) {
                 txState := sTxAck
             }
         } .elsewhen(txState === sTxAck) {
