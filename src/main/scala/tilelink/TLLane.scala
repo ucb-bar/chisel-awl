@@ -87,6 +87,10 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         val (laneModules, addrmaps) = (0 until lanes).map({ id =>
             val (clientOut, clientEdge) = clientNode.out(id)
             val (managerIn, managerEdge) = managerNode.in(id)
+            val (configIn, configEdge) = configNodes(id).in(0)
+            clientOut.suggestName(s"hbwif_client_port_$id")
+            managerIn.suggestName(s"hbwif_manager_port_$id")
+            configIn.suggestName(s"hbwif_config_port_$id")
             val lane = Module(genLane(clientEdge, managerEdge))
             val regmap = lane.regmap
             val addrmap = TLController.toAddrmap(regmap)
