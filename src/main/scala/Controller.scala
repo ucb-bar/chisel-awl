@@ -30,10 +30,10 @@ class ControlBundle extends Bundle {
 
     def child[T <: ControlBundle](x: T, prefix: String): T = {
         x.inputMap.values.foreach { input =>
-            addInput(input.signal, input.default, prefix + input.name, input.desc)
+            addInput(input.signal, input.default, prefix + "_" + input.name, input.desc)
         }
         x.outputMap.values.foreach { output =>
-            addOutput(output.signal, prefix + output.name, output.desc)
+            addOutput(output.signal, prefix + "_" + output.name, output.desc)
         }
         x
     }
