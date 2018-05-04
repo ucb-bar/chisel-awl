@@ -23,7 +23,7 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
 
     require((c.dataWidth % c.numWays) == 0)
 
-    override val controlIO = Some(IO(new ControlIO {
+    override val controlIO = Some(IO(new ControlBundle {
         val enable         = input(Bool(), 0, "bert_enable")
         val clear          = input(Bool(), 1, "bert_clear")
         val prbsLoad       = input(UInt(prbs.map(_._1).max.W), "bert_prbs_load")

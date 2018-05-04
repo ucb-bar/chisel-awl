@@ -13,7 +13,7 @@ class BitStufferDebug(val numModes: Int)(implicit c: SerDesConfig) extends Debug
     require(numModes > 1)
     require(c.dataWidth % (1 << (numModes - 1)) == 0)
 
-    override val controlIO = Some(IO(new ControlIO {
+    override val controlIO = Some(IO(new ControlBundle {
         val mode = input(UInt(log2Ceil(numModes).W), 0, "bit_stuffer_mode")
     }))
     val ctrl = controlIO.get

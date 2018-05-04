@@ -21,7 +21,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
 
     val io = IO(new PacketizerIO(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIO.apply(clientEdge, managerEdge) _))
 
-    override val controlIO = Some(IO(new ControlIO {
+    override val controlIO = Some(IO(new ControlBundle {
         val enable = input(Bool(), 0, "mem_mode_enable")
     }))
 

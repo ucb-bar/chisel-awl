@@ -40,7 +40,7 @@ class TransceiverSubsystemIO()(implicit val c: SerDesConfig) extends Bundle with
     val rxReset = Output(Bool())
 }
 
-class GenericTransceiverSubsystemControlIO extends ControlIO {
+class GenericTransceiverSubsystemControlBundle extends ControlBundle {
 
     // RX invert bit
     val rxInvert = input(Bool(), 0, "rx_invert")
@@ -72,7 +72,7 @@ class GenericTransceiverSubsystem()(implicit c: SerDesConfig) extends Transceive
     def genTransceiver() = new GenericTransceiver
     def genTransceiverSubsystemIO() = new TransceiverSubsystemIO
 
-    override val controlIO = Some(IO(new GenericTransceiverSubsystemControlIO))
+    override val controlIO = Some(IO(new GenericTransceiverSubsystemControlBundle))
 
     connectInvert
 }
@@ -81,7 +81,7 @@ trait HasTransceiverSubsystemConnections {
     this: TransceiverSubsystem =>
     val txrx: HasTransceiverIO
 
-    val controlIO: Option[GenericTransceiverSubsystemControlIO]
+    val controlIO: Option[GenericTransceiverSubsystemControlBundle]
 
     txrx.io.clock_ref := io.clockRef
     txrx.io.async_reset_in := io.asyncResetIn
@@ -93,7 +93,7 @@ trait HasTransceiverSubsystemConnections {
     val rxSyncReset = AsyncResetSynchronizer(txrx.io.clock_rx_div, io.asyncResetIn)
 
     def connectInvert {
-        val ctrl = controlIO.get.asInstanceOf[GenericTransceiverSubsystemControlIO]
+        val ctrl = controlIO.get.asInstanceOf[GenericTransceiverSubsystemControlBundle]
         io.data.rx.bits := txrx.io.data.rx ^ Fill(c.dataWidth, ctrl.rxInvert)
         txrx.io.data.tx := io.data.tx.bits ^ Fill(c.dataWidth, ctrl.txInvert)
     }

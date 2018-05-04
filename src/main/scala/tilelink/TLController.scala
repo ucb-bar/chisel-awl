@@ -33,7 +33,7 @@ trait HasTLController {
         (seq ++ mapped._1, mapped._2)
     })._1
 
-    private def ioToRegMap(cio: Option[ControlIO], base: Int): (Seq[(Int, Seq[RegField])], Int) = {
+    private def ioToRegMap(cio: Option[ControlBundle], base: Int): (Seq[(Int, Seq[RegField])], Int) = {
         if (cio.isDefined) {
             val bytesPerReg = 8
             val ins = cio.get.inputMap.values.toSeq.sortWith(_.name < _.name).zipWithIndex.map { case (x, i) =>
