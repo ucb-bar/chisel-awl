@@ -45,7 +45,6 @@ class Encoder128b130b(decodedSymbolsPerCycle: Int) extends Encoder(decodedSymbol
 
     require(false, "Not Implemented")
 
-    def connectController(builder: ControllerBuilder) { ??? }
 }
 
 class Decoder128b130b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbolsPerCycle) {
@@ -59,7 +58,6 @@ class Decoder128b130b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbol
 
     require(false, "Not Implemented")
 
-    def connectController(builder: ControllerBuilder) { ??? }
 }
 
 

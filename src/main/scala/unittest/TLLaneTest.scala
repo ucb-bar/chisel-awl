@@ -24,12 +24,12 @@ class TLLaneTestLazy(delay: Int)(implicit p: Parameters) extends LazyModule {
 
     ram.node := TLDelayer(0.25) := hbwif.clientNode
     hbwif.managerNode := model.node := fuzz.node
-    hbwif.configNode := configNode
+    hbwif.configNodes(0) := configNode
 
     lazy val module = new LazyModuleImp(this) with UnitTestModule {
         val (config, edgeConfig) = configNode.out(0)
 
-        val pusher = Module(new TLControllerPusher(edgeConfig, hbwif.module.laneModules(0).builder.asInstanceOf[TLControllerBuilder].map.toPattern(settings)))
+        val pusher = Module(new TLControllerPusher(edgeConfig, TLController.toPattern(hbwif.module.addrmaps(0), p(HbwifTLKey).configAddressSets(0).base, settings)))
         pusher.io.start := io.start
 
         val delayLine = Module(new DifferentialDelayLine(delay))
@@ -65,9 +65,57 @@ class TLLaneTestLazy(delay: Int)(implicit p: Parameters) extends LazyModule {
         io.finished := fuzz.module.io.finished
     }
 
-    def settings:Seq[(String, Option[BigInt], Boolean)] = Seq(
-        ("bert_enable", Option(BigInt(0)), true),
-        ("mem_mode_enable", Option(BigInt(1)), true)
+    def settings: Seq[TLControllerPattern] = Seq(
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("bert_enable", 1, 0),
+        TLControllerWritePattern("mem_mode_enable", 1, 1)
     )
 }
 

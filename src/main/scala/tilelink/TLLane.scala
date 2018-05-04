@@ -6,10 +6,9 @@ import chisel3.util._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config._
-import freechips.rocketchip.subsystem.CacheBlockBytes
-import freechips.rocketchip.tile.XLen
+import freechips.rocketchip.subsystem.{PeripheryBusKey, CacheBlockBytes}
 
-abstract class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn, val configEdge: TLEdgeIn)
+abstract class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn)
     (implicit val c: SerDesConfig, implicit val b: BertConfig, implicit val m: PatternMemConfig, implicit val p: Parameters) extends Lane
     with HasEncoding8b10b
     with HasBertDebug
@@ -18,8 +17,8 @@ abstract class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn,
     with HasTLBidirectionalPacketizer
     with HasTLController
 
-class GenericTLLane8b10b(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn, configEdge: TLEdgeIn)(implicit p: Parameters)
-    extends TLLane8b10b(clientEdge, managerEdge, configEdge)(p(HbwifSerDesKey), p(HbwifBertKey), p(HbwifPatternMemKey), p)
+class GenericTLLane8b10b(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn)(implicit p: Parameters)
+    extends TLLane8b10b(clientEdge, managerEdge)(p(HbwifSerDesKey), p(HbwifBertKey), p(HbwifPatternMemKey), p)
     with HasGenericTransceiverSubsystem
 
 
@@ -67,17 +66,11 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         beatBytes = beatBytes,
         endSinkId = 0,
         minLatency = 1) })
-    val configNode = TLManagerNode((0 until lanes).map { id => TLManagerPortParameters(
-        Seq(TLManagerParameters(
+    val configNodes = (0 until lanes).map { id => TLRegisterNode(
             address            = List(configAddressSets(id)),
-            resources          = new SimpleDevice(s"HbwifConfig$id",Seq()).reg("control"),
-            executable         = false,
-            supportsGet        = TransferSizes(1, p(XLen)/8),
-            supportsPutFull    = TransferSizes(1, p(XLen)/8),
-            supportsPutPartial = TransferSizes(1, p(XLen)/8),
-            fifoId             = Some(0))),
-        beatBytes = p(XLen)/8,
-        minLatency = 1) })
+            device             = new SimpleDevice(s"HbwifConfig$id", Seq(s"ucb-bar,hbwif$id")),
+            beatBytes          = p(PeripheryBusKey).beatBytes
+    )}
 
     lazy val module = new LazyModuleImp(this) {
         val banks = p(HbwifTLKey).numBanks
@@ -91,29 +84,34 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         val tx = IO(Vec(lanes, new Differential()))
         val rx = IO(Vec(lanes, Flipped(new Differential())))
 
-        val laneModules = (0 until lanes).map { id =>
+        val (laneModules, addrmaps) = (0 until lanes).map({ id =>
             val (clientOut, clientEdge) = clientNode.out(id)
             val (managerIn, managerEdge) = managerNode.in(id)
-            val (configIn, configEdge) = configNode.in(id)
-            val lane = Module(genLane(clientEdge, managerEdge, configEdge))
+            val (configIn, configEdge) = configNodes(id).in(0)
+            clientOut.suggestName(s"hbwif_client_port_$id")
+            managerIn.suggestName(s"hbwif_manager_port_$id")
+            configIn.suggestName(s"hbwif_config_port_$id")
+            val lane = Module(genLane(clientEdge, managerEdge))
+            val regmap = lane.regmap
+            val addrmap = TLController.toAddrmap(regmap)
+            configNodes(id).regmap(regmap:_*)
             clientOut <> lane.io.data.client
             lane.io.data.manager <> managerIn
-            lane.io.control <> configIn
             tx(id) <> lane.io.tx
             lane.io.rx <> rx(id)
             lane.io.clockRef <> hbwifRefClocks(id/(lanes/banks))
             lane.io.asyncResetIn <> hbwifResets(id)
-            lane
-        }
+            (lane, addrmap)
+        }).unzip
     }
 
-    def genLane(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn, configEdge: TLEdgeIn)(implicit p: Parameters): TLLane8b10b
+    def genLane(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn)(implicit p: Parameters): TLLane8b10b
 }
 
 class GenericHbwifModule()(implicit p: Parameters) extends HbwifModule()(p) {
 
-    def genLane(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn, configEdge: TLEdgeIn)(implicit p: Parameters) = {
-        new GenericTLLane8b10b(clientEdge, managerEdge, configEdge)(p)
+    def genLane(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn)(implicit p: Parameters) = {
+        new GenericTLLane8b10b(clientEdge, managerEdge)(p)
     }
 
 }

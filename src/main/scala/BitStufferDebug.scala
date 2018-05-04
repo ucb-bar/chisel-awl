@@ -6,7 +6,6 @@ import chisel3.experimental.withClockAndReset
 
 
 class BitStufferDebugIO(val numModes: Int)(implicit c: SerDesConfig) extends DebugIO()(c) {
-    val mode = Input(UInt(log2Ceil(numModes).W))
 }
 
 class BitStufferDebug(val numModes: Int)(implicit c: SerDesConfig) extends Debug()(c) {
@@ -14,22 +13,21 @@ class BitStufferDebug(val numModes: Int)(implicit c: SerDesConfig) extends Debug
     require(numModes > 1)
     require(c.dataWidth % (1 << (numModes - 1)) == 0)
 
-    val io = IO(new BitStufferDebugIO(numModes))
+    override val controlIO = Some(IO(new ControlBundle {
+        val mode = input(UInt(log2Ceil(numModes).W), 0, "bit_stuffer_mode")
+    }))
+    val ctrl = controlIO.get
 
     val txStuffer = withClockAndReset(io.txClock, io.txReset) { Module(new TxBitStuffer(numModes)) }
     val rxStuffer = withClockAndReset(io.rxClock, io.rxReset) { Module(new RxBitStuffer(numModes)) }
 
-    txStuffer.io.mode := io.mode
-    rxStuffer.io.mode := io.mode
+    txStuffer.io.mode := ctrl.mode
+    rxStuffer.io.mode := ctrl.mode
 
     txStuffer.io.enq <> io.txIn
     io.txOut <> txStuffer.io.deq
     rxStuffer.io.enq <> io.rxIn
     io.rxOut <> rxStuffer.io.deq
-
-    def connectController(builder: ControllerBuilder) {
-        builder.w("bit_stuff_mode", io.mode, 0)
-    }
 
 }
 
