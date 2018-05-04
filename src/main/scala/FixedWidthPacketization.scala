@@ -55,7 +55,7 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
         } .elsewhen(txState === sTxSync) {
             when (ack) {
                 txState := sTxReady
-            } .otherwise {
+            } .elsewhen(io.symbolsTxReady) {
                 txState := sTxAck
             }
         } .elsewhen(txState === sTxAck) {
