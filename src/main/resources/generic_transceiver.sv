@@ -65,8 +65,12 @@ module generic_transceiver #(
   assign rx_p_val = (rx_p ^ rx_n) ? rx_p : 1'bx;
 
   always @(posedge clock_fast or negedge clock_fast) begin
-    if (count == 0) data_rx_reg <= data_rx_buf;
+    //if (count == 0) data_rx_reg <= data_rx_buf;
     data_rx_buf <= {data_rx_buf[SERDES_BITS-2:0],rx_p_val};
+  end
+
+  always @(posedge clock_rx_div) begin
+    data_rx_reg <= data_rx_buf;
   end
 
 endmodule

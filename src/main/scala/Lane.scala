@@ -76,7 +76,7 @@ abstract class Lane extends MultiIOModule with HasDebug {
     packetizer.io.symbolsRx <> decoderQueue.io.deq
 
     // Be careful with clock crossings here
-    private def iomap[T <: Data] = { x:T => IO(chiselTypeOf(x)) }
+    private def iomap[T <: Data] = { x:T => IO(chiselTypeOf(x)).asInstanceOf[T] }
     val ssio         = txrxss.controlIO.map(iomap)
     val encoderio    = encoder.controlIO.map(iomap)
     val decoderio    = decoder.controlIO.map(iomap)

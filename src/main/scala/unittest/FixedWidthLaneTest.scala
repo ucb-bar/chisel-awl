@@ -7,7 +7,9 @@ import freechips.rocketchip.unittest._
 
 import scala.util.Random
 
-class FixedWidthLane8b10bTest[F <: Data](delay: Int, dataWidth: Int, fwDataFactory: () => F, timeout: Int = 50000) extends UnitTest(timeout) {
+class FixedWidthLane8b10bTest[F <: Data](delay: Int, dataWidth: Int, fwDataFactory: () => F, timeout: Int) extends UnitTest(timeout) {
+
+    this.suggestName(s"FixedWidthLane8b10bTest_delay_${delay}_dataWidth_${dataWidth}")
 
     implicit val c = SerDesConfig(dataWidth = dataWidth)
 
@@ -20,11 +22,14 @@ class FixedWidthLane8b10bTest[F <: Data](delay: Int, dataWidth: Int, fwDataFacto
     lane.io.clockRef := this.clock
     lane.io.asyncResetIn := this.reset
 
-    val control = lane.io.control.asInstanceOf[ScanChainPort]
-    control.scanIn := false.B
-    control.scanCommit := false.B
-    control.scanClock := false.B.asClock
-    control.scanEnable := false.B
+    val startCounter = Counter(1000)
+    val started = RegInit(false.B)
+    when (startCounter.inc()) { started := true.B }
+
+    lane.decoderio.get.inputMap("decoder_clear_error").signal := false.B
+    lane.ssio.get.inputMap("tx_invert").signal := false.B
+    lane.ssio.get.inputMap("rx_invert").signal := false.B
+    lane.packetizerio.get.inputMap("packetizer_enable").signal := started
 
     val rnd = new Random(5)
     val len = 500
@@ -60,8 +65,14 @@ class BigPusher[F <: Data](seq: Seq[BigInt], fwDataFactory: () => F) extends Mod
 
     io.out.bits := io.out.bits.fromBits(0.U)
 
+    seq.zipWithIndex.foreach { case (d, i) => println(f"Packet $i%d should be $d%x") }
+
     seq.zipWithIndex.foreach { case (d, i) =>
         when (count.value === i.U) {
+            when (io.out.fire()) {
+                printf("Setting %x for packet %d\n", d.U, i.U)
+                printf("Set pusher.io.out.bits to %x", io.out.bits.asUInt)
+            }
             io.out.bits := io.out.bits.fromBits(d.U)
         }
     }
@@ -91,6 +102,8 @@ class BigChecker[F <: Data](seq: Seq[BigInt], fwDataFactory: () => F) extends Mo
 
     seq.zipWithIndex.foreach { case (d, i) =>
         when (count.value === i.U && io.in.fire()) {
+            printf("Checking that we got %x for packet %d\n", d.U, i.U)
+            printf("Got checker.io.in.bits %x\n", io.in.bits.asUInt)
             assert(io.in.bits.asUInt === io.in.bits.fromBits(d.U).asUInt, "Got the wrong data")
         }
     }
@@ -109,6 +122,6 @@ object FixedWidthLaneTests {
     val dataWidths = List(10, 16, 32, 64)
     val dataFormats = List({() => UInt(8.W)}, {() => UInt(130.W)}, {() => new FixedWidthTestData})
 
-    def apply(timeout: Int = 50000):Seq[UnitTest] = for (x <- delays; y <- dataWidths; z <- dataFormats) yield Module(new FixedWidthLane8b10bTest(x, y, z, timeout))
+    def apply(timeout: Int = 100000):Seq[UnitTest] = for (x <- delays; y <- dataWidths; z <- dataFormats) yield Module(new FixedWidthLane8b10bTest(x, y, z, timeout))
 
 }

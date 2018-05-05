@@ -15,30 +15,26 @@ object FixedWidthData {
 }
 
 class FixedWidthPacketizerIO[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle: Int, symbolFactory: () => S, val fwDataFactory: () => F)
-    extends PacketizerIO[S, FixedWidthData[F]](decodedSymbolsPerCycle, symbolFactory, FixedWidthData.apply(fwDataFactory) _) {
-    val enable = Input(Bool())
-}
+    extends PacketizerIO[S, FixedWidthData[F]](decodedSymbolsPerCycle, symbolFactory, FixedWidthData.apply(fwDataFactory) _)
 
 class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle: Int, symbolFactory: () => S, val fwDataFactory: () => F)
     extends Packetizer[S, FixedWidthData[F]](decodedSymbolsPerCycle, symbolFactory, FixedWidthData.apply(fwDataFactory) _) {
 
     val io = IO(new FixedWidthPacketizerIO(decodedSymbolsPerCycle, symbolFactory, fwDataFactory))
 
+    override val controlIO = Some(IO(new ControlBundle {
+        val enable = input(Bool(), 0, "packetizer_enable")
+    }))
+
     val decodedWidth = symbolFactory().decodedWidth
     val packetWidth = io.data.tx.bits.toBits.getWidth
-    val symbolsPerPacket = (packetWidth + decodedWidth - 1)/decodedWidth
+    val symbolsPerPacket = (packetWidth + decodedWidth*decodedSymbolsPerCycle - 1)/decodedWidth
     val cyclesPerPacket = (symbolsPerPacket + decodedSymbolsPerCycle - 1)/decodedSymbolsPerCycle
-    val extendedWidth = (if (cyclesPerPacket > 1) packetWidth else decodedSymbolsPerCycle*decodedWidth)
+    val extendedWidth = symbolsPerPacket*decodedWidth
 
     val txBuffer = Reg(UInt(packetWidth.W))
-    val rxBuffer = Reg(Vec(symbolsPerPacket, UInt(8.W)))
-    val txExtended = Wire(UInt(extendedWidth.W))
-
-    if (extendedWidth > packetWidth) {
-        txExtended := Cat(txBuffer, 0.U((extendedWidth-packetWidth).W))
-    } else {
-        txExtended := txBuffer
-    }
+    val rxBuffer = Reg(Vec(2*symbolsPerPacket - 1, UInt(8.W)))
+    val txExtended = (if (extendedWidth > packetWidth) Cat(txBuffer, 0.U((extendedWidth-packetWidth).W)) else txBuffer)
 
     val sTxReset :: sTxSync :: sTxAck :: sTxReady :: Nil = Enum(4)
     val txState = RegInit(sTxReset)
@@ -49,7 +45,7 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
     val ack = io.symbolsRx map { x => x.valid && (x.bits === symbolFactory().ack) } reduce (_||_)
     val nack = io.symbolsRx map { x => x.valid && (x.bits === symbolFactory().nack) } reduce (_||_)
 
-    when (io.enable) {
+    when (controlIO.get.enable) {
         when (txState === sTxReset) {
             txState := sTxSync
         } .elsewhen(txState === sTxSync) {
@@ -83,7 +79,7 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
         s.bits := Mux(doSync, symbolFactory().ack, symbolFactory().fromData(sym))
     }
 
-    io.data.tx.ready := io.enable && (txCount === 0.U) && (txState === sTxReady)
+    io.data.tx.ready := controlIO.get.enable && (txCount === 0.U) && (txState === sTxReady)
 
     when (io.data.tx.fire()) {
         txCount := symbolsPerPacket.U - txCount
@@ -99,11 +95,12 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
         }
     }
 
-    val rxSymCount = RegInit(0.U(log2Ceil(symbolsPerPacket + 1).W))
+    val rxSymCount = RegInit(0.U((log2Ceil(symbolsPerPacket) + 1).W))
 
     assert(io.data.rx.ready || !io.data.rx.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
 
-    io.data.rx.bits := io.data.rx.bits.fromBits(rxBuffer.asUInt()(packetWidth - 1, 0))
+    // TODO this is broken :
+    io.data.rx.bits := io.data.rx.bits.fromBits(rxBuffer.asUInt()(extendedWidth - 1, extendedWidth - packetWidth))
     io.data.rx.valid := (rxSymCount >= symbolsPerPacket.U)
 
     rxSymCount := io.symbolsRx.foldRight(rxSymCount - Mux(io.data.rx.fire(), symbolsPerPacket.U, 0.U)) { (symbol, count) =>
@@ -142,10 +139,6 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
         rxq.io.enq_reset := this.reset.toBool
         rxq.io.deq_reset := dataReset
 
-    }
-
-    def connectController(builder: ControllerBuilder) {
-        builder.w("packetizer_enable", io.enable, 0)
     }
 
 }

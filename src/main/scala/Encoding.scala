@@ -182,7 +182,7 @@ final class DecoderQueue[S <: DecodedSymbol](val decodedSymbolsPerCycle: Int,  v
         assert(m.ready || !m.valid, "Buffer overrun")
     }
 
-    val async = Module(new AsyncQueue(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())), 8, 3, true))
+    val async = Module(new AsyncQueue(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())), 8, 2, true))
     async.io.enq_clock := io.enqClock
     async.io.enq_reset := io.enqReset
     async.io.deq_clock := io.deqClock
