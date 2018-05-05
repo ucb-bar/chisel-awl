@@ -12,15 +12,18 @@ case class HbwifTLConfig(
     numBanks: Int = 2,
     beatBytes: Int = 16,
     numXact: Int = 32,
-    tluh: Boolean = true,
-    tlc: Boolean = true,
+    clientTLUH: Boolean = true,
+    clientTLC: Boolean = true,
+    managerTLUH: Boolean = true,
+    managerTLC: Boolean = true,
     maxOutstanding: Int = 8,
     asyncQueueDepth: Int = 8,
     asyncQueueSync: Int = 3,
     asyncQueueSafe: Boolean = true,
     asyncQueueNarrow: Boolean = true
 ) {
-    require(tluh || !tlc)
+    require(managerTLUH || !managerTLC)
+    require(clientTLUH || !clientTLC)
 }
 
 case object HbwifSerDesKey extends Field[SerDesConfig]
@@ -45,8 +48,10 @@ class WithGenericSerdes extends Config((site, here, up) => {
             numBanks = 2,
             beatBytes = site(MemoryBusKey).beatBytes,
             numXact = 16,
-            tluh = true,
-            tlc = true,
+            clientTLUH = true,
+            clientTLC = true,
+            managerTLUH = true,
+            managerTLC = true,
             asyncQueueDepth = 8,
             asyncQueueSync = 3,
             asyncQueueSafe = true,

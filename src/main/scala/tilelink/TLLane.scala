@@ -14,6 +14,7 @@ abstract class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn)
     with HasBertDebug
     with HasPatternMemDebug
     with HasBitStufferDebug4Modes
+    with HasBitReversalDebug
     with HasTLBidirectionalPacketizer
     with HasTLController
 
@@ -30,8 +31,11 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
     val numXact = p(HbwifTLKey).numXact
     val managerAddressSet = p(HbwifTLKey).managerAddressSet
     val configAddressSets = p(HbwifTLKey).configAddressSets
-    val tlc = p(HbwifTLKey).tlc
-    val tluh = p(HbwifTLKey).tluh
+    val mrtlc = p(HbwifTLKey).managerTLC
+    val mtluh = p(HbwifTLKey).managerTLUH
+    val ctlc = p(HbwifTLKey).clientTLC
+    val cluh = p(HbwifTLKey).clientTLUH
+
 
     val clientNode = TLClientNode((0 until lanes).map { id => TLClientPortParameters(
         Seq(TLClientParameters(
@@ -40,11 +44,11 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
             supportsGet        = TransferSizes(1, cacheBlockBytes),
             supportsPutFull    = TransferSizes(1, cacheBlockBytes),
             supportsPutPartial = TransferSizes(1, cacheBlockBytes),
-            supportsArithmetic = TransferSizes(1, cacheBlockBytes),
-            supportsLogical    = TransferSizes(1, cacheBlockBytes),
-            supportsHint       = TransferSizes(1, cacheBlockBytes),
-            supportsProbe      = TransferSizes(1, cacheBlockBytes))),
-        minLatency = 1)
+            supportsArithmetic = if (ctluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsLogical    = if (ctluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsHint       = if (ctluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsProbe      = if (ctlc) TransferSizes(1, cacheBlockBytes))) else TransferSizes.none,
+            minLatency         = 1)
         })
     val managerNode = TLManagerNode((0 until lanes).map { id =>
         val base = managerAddressSet
@@ -57,11 +61,11 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
             supportsGet        = TransferSizes(1, cacheBlockBytes),
             supportsPutFull    = TransferSizes(1, cacheBlockBytes),
             supportsPutPartial = TransferSizes(1, cacheBlockBytes),
-            supportsArithmetic = if (tluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
-            supportsLogical    = if (tluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
-            supportsHint       = if (tluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
-            supportsAcquireT   = if (tlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
-            supportsAcquireB   = if (tlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsArithmetic = if (mtluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsLogical    = if (mtluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsHint       = if (mtluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsAcquireT   = if (mtlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsAcquireB   = if (mtlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
             fifoId             = Some(0))),
         beatBytes = beatBytes,
         endSinkId = 0,

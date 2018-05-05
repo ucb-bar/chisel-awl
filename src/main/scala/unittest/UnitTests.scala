@@ -21,8 +21,10 @@ class UnitTestConfig extends Config((site, here, up) => {
         maxOutstanding = 8,
         beatBytes = 16,
         numXact = 32,
-        tluh = false,
-        tlc = false)
+        managerTLUH = false,
+        clientTLUH = false,
+        managerTLC = false,
+        clientTLC = false)
     case HbwifSerDesKey => SerDesConfig()
     case HbwifBertKey => BertConfig()
     case HbwifPatternMemKey => PatternMemConfig()
@@ -38,7 +40,7 @@ class UnitTestConfig extends Config((site, here, up) => {
         BertTests() ++
         Encoding8b10bTests() ++
         BitStufferTests() ++
-        TLLaneTests()(p) ++
-        FixedWidthLaneTests()
+        TLLaneTests()(p)
+       // FixedWidthLaneTests()
     }
 })
