@@ -31,10 +31,10 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
     val numXact = p(HbwifTLKey).numXact
     val managerAddressSet = p(HbwifTLKey).managerAddressSet
     val configAddressSets = p(HbwifTLKey).configAddressSets
-    val mrtlc = p(HbwifTLKey).managerTLC
+    val mtlc = p(HbwifTLKey).managerTLC
     val mtluh = p(HbwifTLKey).managerTLUH
     val ctlc = p(HbwifTLKey).clientTLC
-    val cluh = p(HbwifTLKey).clientTLUH
+    val ctluh = p(HbwifTLKey).clientTLUH
 
 
     val clientNode = TLClientNode((0 until lanes).map { id => TLClientPortParameters(
@@ -47,8 +47,8 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
             supportsArithmetic = if (ctluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
             supportsLogical    = if (ctluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
             supportsHint       = if (ctluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
-            supportsProbe      = if (ctlc) TransferSizes(1, cacheBlockBytes))) else TransferSizes.none,
-            minLatency         = 1)
+            supportsProbe      = if (ctlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none)),
+        minLatency         = 1)
         })
     val managerNode = TLManagerNode((0 until lanes).map { id =>
         val base = managerAddressSet
@@ -56,7 +56,7 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         TLManagerPortParameters(Seq(TLManagerParameters(
             address            = base.intersect(filter).toList,
             resources          = (new SimpleDevice(s"HbwifManager$id",Seq())).reg("mem"),
-            regionType         = if (tlc) RegionType.CACHED else RegionType.UNCACHED,
+            regionType         = if (mtlc) RegionType.CACHED else RegionType.UNCACHED,
             executable         = true,
             supportsGet        = TransferSizes(1, cacheBlockBytes),
             supportsPutFull    = TransferSizes(1, cacheBlockBytes),
