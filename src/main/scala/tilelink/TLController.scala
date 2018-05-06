@@ -39,6 +39,7 @@ trait HasTLController {
             val ins = cio.get.inputMap.values.toSeq.sortWith(_.name < _.name).zipWithIndex.map { case (x, i) =>
                 val width = x.signal.getWidth
                 val reg = if(x.default.isDefined) RegInit(x.default.get.U(width.W)) else Reg(UInt(width.W))
+                reg.suggestName(s"hbwif_scr_${x.name}")
                 x.signal := reg
                 ((base + i*bytesPerReg) -> Seq(RegField(width, reg, RegFieldDesc(x.name, x.desc.getOrElse(""), reset = x.default))))
             }
