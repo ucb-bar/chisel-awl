@@ -4,10 +4,6 @@ import chisel3._
 import chisel3.util._
 import chisel3.experimental.withClockAndReset
 
-
-class BitStufferDebugIO(val numModes: Int)(implicit c: SerDesConfig) extends DebugIO()(c) {
-}
-
 class BitStufferDebug(val numModes: Int)(implicit c: SerDesConfig) extends Debug()(c) {
 
     require(numModes > 1)
