@@ -23,7 +23,6 @@ case class HbwifTLConfig(
     asyncQueueNarrow: Boolean = true
 ) {
     require(managerTLUH || !managerTLC)
-    require(clientTLUH || !clientTLC)
 }
 
 case object HbwifSerDesKey extends Field[SerDesConfig]
@@ -48,7 +47,6 @@ class WithGenericSerdes extends Config((site, here, up) => {
             numBanks = 2,
             beatBytes = site(MemoryBusKey).beatBytes,
             numXact = 16,
-            clientTLUH = true,
             clientTLC = true,
             managerTLUH = true,
             managerTLC = true,

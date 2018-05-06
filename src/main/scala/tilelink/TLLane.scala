@@ -34,19 +34,18 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
     val mtlc = p(HbwifTLKey).managerTLC
     val mtluh = p(HbwifTLKey).managerTLUH
     val ctlc = p(HbwifTLKey).clientTLC
-    val ctluh = p(HbwifTLKey).clientTLUH
 
 
     val clientNode = TLClientNode((0 until lanes).map { id => TLClientPortParameters(
         Seq(TLClientParameters(
             name               = s"HbwifClient$id",
             sourceId           = IdRange(0,numXact),
-            supportsGet        = TransferSizes(1, cacheBlockBytes),
-            supportsPutFull    = TransferSizes(1, cacheBlockBytes),
-            supportsPutPartial = TransferSizes(1, cacheBlockBytes),
-            supportsArithmetic = if (ctluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
-            supportsLogical    = if (ctluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
-            supportsHint       = if (ctluh) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsGet        = if (ctlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsPutFull    = if (ctlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsPutPartial = if (ctlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsArithmetic = if (ctlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsLogical    = if (ctlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
+            supportsHint       = if (ctlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
             supportsProbe      = if (ctlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none)),
         minLatency         = 1)
         })
