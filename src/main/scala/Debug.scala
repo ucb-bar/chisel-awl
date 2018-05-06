@@ -34,6 +34,12 @@ abstract class RxDebug()(implicit c: SerDesConfig) extends Debug()(c) {
 trait HasDebug {
     this: Lane =>
 
+    // The standard to ovveride this is to use
+    // abstract override def genDebug(): Seq[Debug] = super.genDebug() ++ Seq(YOUR CODE HERE)
+    // When mixing in Debug traits, the last traits to be included are the closest to the transceiver
+    // e.g.
+    // with HasBertDebug
+    // with HasPatternMemDebug <- closest to the transceiver
     def genDebug(): Seq[Debug] = Seq[Debug]()
 
 }

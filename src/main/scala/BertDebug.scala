@@ -168,5 +168,5 @@ trait HasBertDebug extends HasDebug {
     this: Lane =>
     implicit val c: SerDesConfig
     implicit val b: BertConfig
-    abstract override def genDebug() = Seq(Module(new BertDebug()(c, b) with HasAllPRBS)) ++ super.genDebug()
+    abstract override def genDebug() = super.genDebug() ++ Seq(Module(new BertDebug()(c, b) with HasAllPRBS))
 }

@@ -22,5 +22,5 @@ class BitReversalDebug()(implicit c: SerDesConfig) extends Debug()(c) {
 trait HasBitReversalDebug extends HasDebug {
     this: Lane =>
     implicit val c: SerDesConfig
-    abstract override def genDebug() = Seq(Module(new BitReversalDebug()(c))) ++ super.genDebug()
+    abstract override def genDebug() = super.genDebug() ++ Seq(Module(new BitReversalDebug()(c)))
 }

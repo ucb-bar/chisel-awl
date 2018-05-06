@@ -14,6 +14,7 @@ class FixedWidthLane8b10b[F <: Data](val fwDataFactory: () => F)
     with HasBertDebug
     with HasPatternMemDebug
     with HasBitStufferDebug4Modes
+    with HasBitReversalDebug
     with HasFixedWidthPacketizer[F]
     with HasGenericTransceiverSubsystem
 

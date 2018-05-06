@@ -107,5 +107,5 @@ trait HasBitStufferDebug4Modes extends HasDebug {
     this: Lane =>
     def numModes = 4
     implicit val c: SerDesConfig
-    abstract override def genDebug() = Seq(Module(new BitStufferDebug(numModes)(c))) ++ super.genDebug()
+    abstract override def genDebug() = super.genDebug() ++ Seq(Module(new BitStufferDebug(numModes)(c)))
 }
