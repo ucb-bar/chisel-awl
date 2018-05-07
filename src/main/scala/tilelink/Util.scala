@@ -105,48 +105,53 @@ trait TLPacketizerLike {
         }).asInstanceOf[DecoupledIO[T]]
     }
 
-    def tlToBuffer[T <: TLChannel](edge: TLEdge, x: T, padTo: Int): UInt = {
+    def tlToBuffer[T <: TLChannel](edge: TLEdge, x: T, padTo: Int, first: Bool): UInt = {
 
         x match {
             case a: TLBundleA => {
                 val pad1 = (8 - (headerWidth(a) % 8)) % 8
                 val pad2 = padTo - headerWidth(a) - pad1 - a.params.dataBits/8 - a.params.dataBits
-                Cat((if (pad1 > 0)
+                Mux(first, Cat((if (pad1 > 0)
                     Cat(typeA, a.opcode, a.param, a.size, a.source, a.address, 0.U(pad1.W)) else
                     Cat(typeA, a.opcode, a.param, a.size, a.source, a.address)),
                     (if (pad2 > 0)
                     Cat(a.mask, a.data, 0.U(pad2.W)) else
-                    Cat(a.mask, a.data)))
+                    Cat(a.mask, a.data))),
+                    a.data)
+
             }
             case b: TLBundleB => {
                 val pad1 = (8 - (headerWidth(b) % 8)) % 8
                 val pad2 = padTo - headerWidth(b) - pad1 - b.params.dataBits/8 - b.params.dataBits
-                Cat((if (pad1 > 0)
+                Mux(first, Cat((if (pad1 > 0)
                     Cat(typeB, b.opcode, b.param, b.size, b.source, b.address, 0.U(pad1.W)) else
                     Cat(typeB, b.opcode, b.param, b.size, b.source, b.address)),
                     (if (pad2 > 0)
                     Cat(b.mask, b.data, 0.U(pad2.W)) else
-                    Cat(b.mask, b.data)))
+                    Cat(b.mask, b.data))),
+                    b.data)
             }
             case c: TLBundleC => {
                 val pad1 = (8 - (headerWidth(c) % 8)) % 8
                 val pad2 = padTo - headerWidth(c) - pad1 - c.params.dataBits
-                Cat((if (pad1 > 0)
+                Mux(first, Cat((if (pad1 > 0)
                     Cat(typeC, c.opcode, c.param, c.size, c.source, c.address, 0.U(pad1.W)) else
                     Cat(typeC, c.opcode, c.param, c.size, c.source, c.address)),
                     (if (pad2 > 0)
                     Cat(c.data, 0.U(pad2.W)) else
-                    c.data))
+                    c.data)),
+                    c.data)
             }
             case d: TLBundleD => {
                 val pad1 = (8 - (headerWidth(d) % 8)) % 8
                 val pad2 = padTo - headerWidth(d) - pad1 - d.params.dataBits
-                Cat((if (pad1 > 0)
+                Mux(first, Cat((if (pad1 > 0)
                     Cat(typeD, d.opcode, d.param, d.size, d.source, d.sink, 0.U(pad1.W)) else
                     Cat(typeD, d.opcode, d.param, d.size, d.source, d.sink)),
                     (if (pad2 > 0)
                     Cat(d.data, 0.U(pad2.W)) else
-                    d.data))
+                    d.data)),
+                    d.data)
             }
             case e: TLBundleE => {
                 val pad = 0.U((padTo - headerWidth(e)).W)

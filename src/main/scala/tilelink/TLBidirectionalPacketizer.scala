@@ -82,16 +82,16 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     val txBufferBits = div8Ceil(txHeaderBits)*8 + List(managerEdge.bundle.dataBits, clientEdge.bundle.dataBits).max + List(managerEdge.bundle.dataBits/8, clientEdge.bundle.dataBits/8).max
     val txBuffer = Reg(UInt(txBufferBits.W))
 
-    val txA = tlToBuffer(tltx.aEdge, tltx.a.bits, txBufferBits)
-    val txB = tlToBuffer(tltx.bEdge, tltx.b.bits, txBufferBits)
-    val txC = tlToBuffer(tltx.cEdge, tltx.c.bits, txBufferBits)
-    val txD = tlToBuffer(tltx.dEdge, tltx.d.bits, txBufferBits)
-    val txE = tlToBuffer(tltx.eEdge, tltx.e.bits, txBufferBits)
-
     val (txAFirst, txALast, txADone, txACount) = tltx.aEdge.firstlastHelper(tltx.a.bits, tltx.a.fire())
     val (txBFirst, txBLast, txBDone, txBCount) = tltx.bEdge.firstlastHelper(tltx.b.bits, tltx.b.fire())
     val (txCFirst, txCLast, txCDone, txCCount) = tltx.cEdge.firstlastHelper(tltx.c.bits, tltx.c.fire())
     val (txDFirst, txDLast, txDDone, txDCount) = tltx.dEdge.firstlastHelper(tltx.d.bits, tltx.d.fire())
+
+    val txA = tlToBuffer(tltx.aEdge, tltx.a.bits, txBufferBits, txAFirst)
+    val txB = tlToBuffer(tltx.bEdge, tltx.b.bits, txBufferBits, txBFirst)
+    val txC = tlToBuffer(tltx.cEdge, tltx.c.bits, txBufferBits, txCFirst)
+    val txD = tlToBuffer(tltx.dEdge, tltx.d.bits, txBufferBits, txDFirst)
+    val txE = tlToBuffer(tltx.eEdge, tltx.e.bits, txBufferBits, true.B)
 
     val txPayloadBytes = Wire(UInt())
     val txPacked = Wire(UInt(txBufferBits.W))
@@ -142,11 +142,11 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     dOutstanding := dOutstanding + Mux(tltx.a.fire() && txAFirst, tlResponseMap(tltx.a.bits), 0.U) + Mux(tltx.c.fire() && txCFirst, tlResponseMap(tltx.c.bits), 0.U) - tlrx.dEdge.last(tlrx.d)
     eOutstanding := eOutstanding + Mux(tltx.d.fire() && txDFirst, tlResponseMap(tltx.d.bits), 0.U) - tlrx.eEdge.last(tlrx.e)
 
-    val sTxReset :: sTxSync :: sTxAck :: sTxReady :: Nil = Enum(4)
-    val txState = RegInit(sTxReset)
+    val sReset :: sSync :: sAckAcked :: sAckSynced :: sWaitForAck :: sReady :: Nil = Enum(6)
+    val state = RegInit(sReset)
 
     // Assign priorities to the channels
-    val txReady = controlIO.get.enable && (txCount === 0.U) && (txState === sTxReady)
+    val txReady = controlIO.get.enable && (txCount === 0.U) && (state === sReady)
     val aReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.a.bits)))
     val bReady = txReady && (cOutstanding < (cMaxOutstanding.U - tlResponseMap(tltx.b.bits)))
     val cReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.c.bits)))
@@ -161,44 +161,58 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
 
     // These come from the RX
     val ack = io.symbolsRx map { x => x.valid && (x.bits === symbolFactory().ack) } reduce (_||_)
-    val nack = io.symbolsRx map { x => x.valid && (x.bits === symbolFactory().nack) } reduce (_||_)
+    val sync = io.symbolsRx map { x => x.valid && (x.bits === symbolFactory().sync) } reduce (_||_)
+
+    // This counter will send a sync every N cycles in an attempt to communicate with the receiver
+    val txSyncCounter = Counter(16)
 
     when (controlIO.get.enable) {
-        when (txState === sTxReset) {
-            txState := sTxSync
-        } .elsewhen(txState === sTxSync) {
+        // I am in reset
+        when (state === sReset) {
+            state := sSync
+        // I am waiting for an ack or a sync to signify the remote link is up
+        // I will periodically send syncs to the remote link while waiting
+        } .elsewhen(state === sSync) {
+            txSyncCounter.inc()
+            // ack should have priority over sync
             when (ack) {
-                txState := sTxReady
-            } .elsewhen(io.symbolsTxReady) {
-                txState := sTxAck
+                state := sAckAcked
+            } .elsewhen (sync) {
+                state := sAckSynced
             }
-        } .elsewhen(txState === sTxAck) {
-            when (nack) {
-                txState := sTxSync
-            } .elsewhen(ack) {
-                txState := sTxReady
+        // I got an ack, so I can just ack back and then go straight to sReady
+        } .elsewhen(state === sAckAcked) {
+            when (io.symbolsTxReady) {
+                state := sReady
             }
-        } .elsewhen(txState === sTxReady) {
-            when (nack) {
-                txState := sTxSync
+        // I got a sync, so I need to wait for an ack after sending mine
+        } .elsewhen(state === sAckSynced) {
+            when (io.symbolsTxReady) {
+                state := sWaitForAck
             }
-        } .otherwise {
-            // shouldn't get here
-            txState := sTxSync
+        // I am waiting for an ack to go to sReady; I came from sAckSynced
+        } .elsewhen(state === sWaitForAck) {
+            when (ack) {
+                state := sReady
+            }
         }
+        // otherwise I am ready! I will not respond to acks or syncs
     } .otherwise {
-        txState := sTxReset
+        state := sReset
     }
 
     io.symbolsTx.reverse.zipWithIndex.foreach { case (s,i) =>
-        val doSync = ((i.U === 0.U) && (txState === sTxSync))
-        s.valid := ((i.U < txCount) && (txState === sTxReady)) || doSync
+        val doSync = (i.U === 0.U) && (state === sSync) && (txSyncCounter.value === 0.U)
+        val doAck = (i.U === 0.U) && ((state === sAckAcked) || (state === sAckSynced))
+        s.valid := ((i.U < txCount) && (state === sReady)) || doSync || doAck
         s.bits := Mux(doSync, symbolFactory().ack, symbolFactory().fromData(txBuffer(txBufferBits-8*i-1,txBufferBits-8*i-8)))
     }
 
     val txFire = tltx.a.fire() || tltx.b.fire() || tltx.c.fire() || tltx.d.fire() || tltx.e.fire()
 
-    when (txFire) {
+    when (state === sReset) {
+        txCount := 0.U
+    } .elsewhen (txFire) {
         txCount := txPayloadBytes - txCount
         txBuffer := txPacked
     } .elsewhen(txCount > decodedSymbolsPerCycle.U) {
@@ -292,7 +306,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
         when (symbol.valid && symbol.bits.isData) {
             rxBuffer((rxBufferBytes - 1).U - count) := symbol.bits.bits
         }
-        count + (symbol.valid && symbol.bits.isData && (txState === sTxReady))
+        count + (symbol.valid && symbol.bits.isData && (state === sReady))
     }
 
     // TODO can we add another symbol to NACK a transaction in progress (and set error)
