@@ -182,12 +182,17 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
             }
         // I got an ack, so I can just ack back and then go straight to sReady
         } .elsewhen(state === sAckAcked) {
+            // Wait until symbolsTxReady (i.e. symbolsTx fires)
             when (io.symbolsTxReady) {
                 state := sReady
             }
         // I got a sync, so I need to wait for an ack after sending mine
         } .elsewhen(state === sAckSynced) {
-            when (io.symbolsTxReady) {
+            // If I happen to get an ack here, I still may need to ack back, so go to sAckAcked
+            when (ack) {
+                state := sAckAcked
+            // Wait until symbolsTxReady (i.e. symbolsTx fires)
+            } .elsewhen (io.symbolsTxReady) {
                 state := sWaitForAck
             }
         // I am waiting for an ack to go to sReady; I came from sAckSynced
@@ -233,13 +238,14 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
 
     val rxTypeValid = RegInit(false.B)
     val rxBuffer = Reg(Vec(rxBufferBytes, UInt(8.W)))
-    val (rxType, rxOpcode) = typeFromBuffer(rxBuffer.asUInt)
+    val rxBufferUInt = rxBuffer.asUInt
+    val (rxType, rxOpcode) = typeFromBuffer(rxBufferUInt)
 
-    val rxA = tlFromBuffer(tlrx.aEdge, tlrx.a.bits, rxBuffer.asUInt, false.B)
-    val rxB = tlFromBuffer(tlrx.bEdge, tlrx.b.bits, rxBuffer.asUInt, false.B)
-    val rxC = tlFromBuffer(tlrx.cEdge, tlrx.c.bits, rxBuffer.asUInt, false.B)
-    val rxD = tlFromBuffer(tlrx.dEdge, tlrx.d.bits, rxBuffer.asUInt, false.B)
-    val rxE = tlFromBuffer(tlrx.eEdge, tlrx.e.bits, rxBuffer.asUInt, false.B)
+    val rxA = tlFromBuffer(tlrx.aEdge, tlrx.a.bits, rxBufferUInt, false.B)
+    val rxB = tlFromBuffer(tlrx.bEdge, tlrx.b.bits, rxBufferUInt, false.B)
+    val rxC = tlFromBuffer(tlrx.cEdge, tlrx.c.bits, rxBufferUInt, false.B)
+    val rxD = tlFromBuffer(tlrx.dEdge, tlrx.d.bits, rxBufferUInt, false.B)
+    val rxE = tlFromBuffer(tlrx.eEdge, tlrx.e.bits, rxBufferUInt, false.B)
 
     // Assume we can only handle one thing at a time, for now
     tlrx.a <> Queue(rxA, aMaxOutstanding * aMaxBeats)

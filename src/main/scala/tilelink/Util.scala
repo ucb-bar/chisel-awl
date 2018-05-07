@@ -117,7 +117,7 @@ trait TLPacketizerLike {
                     (if (pad2 > 0)
                     Cat(a.mask, a.data, 0.U(pad2.W)) else
                     Cat(a.mask, a.data))),
-                    a.data)
+                    Cat(a.data, 0.U((padTo - a.params.dataBits).W)))
 
             }
             case b: TLBundleB => {
@@ -129,7 +129,7 @@ trait TLPacketizerLike {
                     (if (pad2 > 0)
                     Cat(b.mask, b.data, 0.U(pad2.W)) else
                     Cat(b.mask, b.data))),
-                    b.data)
+                    Cat(b.data, 0.U((padTo - b.params.dataBits).W)))
             }
             case c: TLBundleC => {
                 val pad1 = (8 - (headerWidth(c) % 8)) % 8
@@ -140,7 +140,7 @@ trait TLPacketizerLike {
                     (if (pad2 > 0)
                     Cat(c.data, 0.U(pad2.W)) else
                     c.data)),
-                    c.data)
+                    Cat(c.data, 0.U((padTo - c.params.dataBits).W)))
             }
             case d: TLBundleD => {
                 val pad1 = (8 - (headerWidth(d) % 8)) % 8
@@ -151,7 +151,7 @@ trait TLPacketizerLike {
                     (if (pad2 > 0)
                     Cat(d.data, 0.U(pad2.W)) else
                     d.data)),
-                    d.data)
+                    Cat(d.data, 0.U((padTo - d.params.dataBits).W)))
             }
             case e: TLBundleE => {
                 val pad = 0.U((padTo - headerWidth(e)).W)

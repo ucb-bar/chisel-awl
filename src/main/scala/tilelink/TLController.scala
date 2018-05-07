@@ -12,15 +12,18 @@ trait TLControllerPattern {
     def toPattern(base: BigInt, map: Map[String, Int]): Pattern
 }
 
-case class TLControllerWritePattern(name: String, size: Int, data: BigInt) extends TLControllerPattern {
+case class TLControllerWritePattern(name: String, data: BigInt) extends TLControllerPattern {
+    def size = 1
     def toPattern(base: BigInt, map: Map[String, Int]) = WritePattern(map(name) + base, size, data)
 }
 
-case class TLControllerReadPattern(name: String, size: Int) extends TLControllerPattern {
+case class TLControllerReadPattern(name: String) extends TLControllerPattern {
+    def size = 1
     def toPattern(base: BigInt, map: Map[String, Int]) = ReadPattern(map(name) + base, size)
 }
 
-case class TLControllerReadExpectPattern(name: String, size: Int, data: BigInt) extends TLControllerPattern {
+case class TLControllerReadExpectPattern(name: String, data: BigInt) extends TLControllerPattern {
+    def size = 1
     def toPattern(base: BigInt, map: Map[String, Int]) = ReadExpectPattern(map(name) + base, size, data)
 }
 
