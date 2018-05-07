@@ -4,6 +4,8 @@ import chisel3._
 import chisel3.util._
 import chisel3.experimental._
 
+import freechips.rocketchip.util.ResetCatchAndSync
+
 trait TransceiverOuterIF extends Bundle {
     implicit val c: SerDesConfig
 
@@ -89,8 +91,8 @@ trait HasTransceiverSubsystemConnections {
     io.tx <> txrx.io.tx
     io.rx <> txrx.io.rx
 
-    val txSyncReset = AsyncResetSynchronizer(txrx.io.clock_tx_div, io.asyncResetIn)
-    val rxSyncReset = AsyncResetSynchronizer(txrx.io.clock_rx_div, io.asyncResetIn)
+    val txSyncReset = ResetCatchAndSync(txrx.io.clock_tx_div, io.asyncResetIn, 3)
+    val rxSyncReset = ResetCatchAndSync(txrx.io.clock_rx_div, io.asyncResetIn, 3)
 
     def connectInvert {
         val ctrl = controlIO.get.asInstanceOf[GenericTransceiverSubsystemControlBundle]
