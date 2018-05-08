@@ -202,6 +202,14 @@ trait TLPacketizerLike {
     }
 
     // For now, we reserve enough buffer space for the max number of beats per burst, and deallocate based on burst, not beat
-    def tlResponseMap(x: TLChannel): UInt = 1.U
+    def tlResponseMap(x: TLChannel): UInt = {
+        x match {
+            case a: TLBundleA => { 1.U }
+            case b: TLBundleB => { 1.U }
+            case c: TLBundleC => { (c.opcode === TLMessages.Release || c.opcode === TLMessages.ReleaseData) }
+            case d: TLBundleD => { (d.opcode === TLMessages.Grant   || d.opcode === TLMessages.GrantData) }
+            case e: TLBundleE => { 0.U }
+        }
+    }
 
 }

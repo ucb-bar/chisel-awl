@@ -138,19 +138,19 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     }
     val dataInflight = txADataInflight || txBDataInflight || txCDataInflight || txDDataInflight
 
-    cOutstanding := cOutstanding + Mux(tltx.b.fire() && txBFirst, tlResponseMap(tltx.b.bits), 0.U) - tlrx.cEdge.last(tlrx.c)
-    dOutstanding := dOutstanding + Mux(tltx.a.fire() && txAFirst, tlResponseMap(tltx.a.bits), 0.U) + Mux(tltx.c.fire() && txCFirst, tlResponseMap(tltx.c.bits), 0.U) - tlrx.dEdge.last(tlrx.d)
-    eOutstanding := eOutstanding + Mux(tltx.d.fire() && txDFirst, tlResponseMap(tltx.d.bits), 0.U) - tlrx.eEdge.last(tlrx.e)
+    cOutstanding := cOutstanding + Mux(tltx.b.fire() && txBFirst, tlResponseMap(tltx.b.bits), 0.U) - Mux(tlrx.c.fire(), tlrx.cEdge.last(tlrx.c), 0.U)
+    dOutstanding := dOutstanding + Mux(tltx.a.fire() && txAFirst, tlResponseMap(tltx.a.bits), 0.U) + Mux(tltx.c.fire() && txCFirst, tlResponseMap(tltx.c.bits), 0.U) - Mux(tlrx.d.fire(), tlrx.dEdge.last(tlrx.d), 0.U)
+    eOutstanding := eOutstanding + Mux(tltx.d.fire() && txDFirst, tlResponseMap(tltx.d.bits), 0.U) - Mux(tlrx.e.fire(), tlrx.eEdge.last(tlrx.e), 0.U)
 
     val sReset :: sSync :: sAckAcked :: sAckSynced :: sWaitForAck :: sReady :: Nil = Enum(6)
     val state = RegInit(sReset)
 
     // Assign priorities to the channels
     val txReady = controlIO.get.enable && (txCount === 0.U) && (state === sReady)
-    val aReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.a.bits)))
-    val bReady = txReady && (cOutstanding < (cMaxOutstanding.U - tlResponseMap(tltx.b.bits)))
-    val cReady = txReady && (dOutstanding < (dMaxOutstanding.U - tlResponseMap(tltx.c.bits)))
-    val dReady = txReady && (eOutstanding < (eMaxOutstanding.U - tlResponseMap(tltx.d.bits)))
+    val aReady = txReady && (dOutstanding < dMaxOutstanding.U)
+    val bReady = txReady && (cOutstanding < cMaxOutstanding.U)
+    val cReady = txReady && (dOutstanding < dMaxOutstanding.U)
+    val dReady = txReady && (eOutstanding < eMaxOutstanding.U)
     val eReady = txReady
 
     tltx.a.ready := (aReady && !tltx.b.valid && !tltx.c.valid && !tltx.d.valid && !tltx.e.valid && !dataInflight) || (txReady && txADataInflight)
@@ -210,7 +210,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
         val doSync = (i.U === 0.U) && (state === sSync) && (txSyncCounter.value === 0.U)
         val doAck = (i.U === 0.U) && ((state === sAckAcked) || (state === sAckSynced))
         s.valid := ((i.U < txCount) && (state === sReady)) || doSync || doAck
-        s.bits := Mux(doSync, symbolFactory().ack, symbolFactory().fromData(txBuffer(txBufferBits-8*i-1,txBufferBits-8*i-8)))
+        s.bits := Mux(doSync, symbolFactory().sync, Mux(doAck, symbolFactory().ack, symbolFactory().fromData(txBuffer(txBufferBits-8*i-1,txBufferBits-8*i-8))))
     }
 
     val txFire = tltx.a.fire() || tltx.b.fire() || tltx.c.fire() || tltx.d.fire() || tltx.e.fire()
@@ -248,11 +248,21 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     val rxE = tlFromBuffer(tlrx.eEdge, tlrx.e.bits, rxBufferUInt, false.B)
 
     // Assume we can only handle one thing at a time, for now
-    tlrx.a <> Queue(rxA, aMaxOutstanding * aMaxBeats)
-    tlrx.b <> Queue(rxB, bMaxOutstanding * bMaxBeats)
-    tlrx.c <> Queue(rxC, cMaxOutstanding * cMaxBeats)
-    tlrx.d <> Queue(rxD, dMaxOutstanding * dMaxBeats)
-    tlrx.e <> Queue(rxE, eMaxOutstanding * eMaxBeats)
+    val aQueue = Module(new Queue(chiselTypeOf(rxA.bits), aMaxOutstanding * aMaxBeats, true, true))
+    aQueue.io.enq <> rxA
+    tlrx.a <> aQueue.io.deq
+    val bQueue = Module(new Queue(chiselTypeOf(rxB.bits), bMaxOutstanding * bMaxBeats, true, true))
+    bQueue.io.enq <> rxB
+    tlrx.b <> bQueue.io.deq
+    val cQueue = Module(new Queue(chiselTypeOf(rxC.bits), cMaxOutstanding * cMaxBeats, true, true))
+    cQueue.io.enq <> rxC
+    tlrx.c <> cQueue.io.deq
+    val dQueue = Module(new Queue(chiselTypeOf(rxD.bits), dMaxOutstanding * dMaxBeats, true, true))
+    dQueue.io.enq <> rxD
+    tlrx.d <> dQueue.io.deq
+    val eQueue = Module(new Queue(chiselTypeOf(rxE.bits), eMaxOutstanding * eMaxBeats, true, true))
+    eQueue.io.enq <> rxE
+    tlrx.e <> eQueue.io.deq
 
     val (rxAFirst, rxALast, rxADone, rxACount) = tlrx.aEdge.firstlastHelper(rxA.bits, rxA.fire())
     val (rxBFirst, rxBLast, rxBDone, rxBCount) = tlrx.bEdge.firstlastHelper(rxB.bits, rxB.fire())
