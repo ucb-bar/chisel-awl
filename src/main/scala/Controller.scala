@@ -4,25 +4,25 @@ import chisel3._
 import chisel3.util._
 import scala.collection.mutable.HashMap
 
-abstract class ControllerClock
+abstract class ControlClock
 
-case object TxClock extends ControllerClock
-case object RxClock extends ControllerClock
-case object OuterClock extends ControllerClock
+case object TxClock extends ControlClock
+case object RxClock extends ControlClock
+case object OuterClock extends ControlClock
 
 case class ControlInput(
     name: String,
     signal: UInt,
     default: Option[BigInt],
     desc: Option[String],
-    clock: ControllerClock
+    clock: ControlClock
 )
 
 case class ControlOutput(
     name: String,
     signal: UInt,
     desc: Option[String],
-    clock: ControllerClock
+    clock: ControlClock
 )
 
 class ControlBundle extends Bundle {
@@ -58,12 +58,12 @@ class ControlBundle extends Bundle {
         x
     }
 
-    def addInput[T <: UInt](in: T, default: Option[BigInt], name: String, desc: Option[String], clock: ControllerClock) {
+    def addInput[T <: UInt](in: T, default: Option[BigInt], name: String, desc: Option[String], clock: ControlClock) {
         inputMap.put(name, ControlInput(name, in, default, desc, clock))
     }
 
 
-    def input[T <: UInt](in: T, default: Option[BigInt], name: String, desc: Option[String], clock: ControllerClock): T = {
+    def input[T <: UInt](in: T, default: Option[BigInt], name: String, desc: Option[String], clock: ControlClock): T = {
         val x = Input(in)
         addInput(x, default, name, desc, clock)
         x
@@ -75,18 +75,18 @@ class ControlBundle extends Bundle {
     def input[T <: UInt](in: T, name: String, desc: String): T = input[T](in, None, name, Some(desc), OuterClock)
     def input[T <: UInt](in: T, name: String): T = input[T](in, None, name, None, OuterClock)
 
-    def input[T <: UInt](in: T, default: Option[BigInt], name: String, clock: ControllerClock): T = input[T](in, default, name, None, clock)
-    def input[T <: UInt](in: T, default: Option[BigInt], name: String, desc: String, clock: ControllerClock): T = input[T](in, default, name, Some(desc), clock)
-    def input[T <: UInt](in: T, default: BigInt, name: String, desc: String, clock: ControllerClock): T = input[T](in, Some(default), name, Some(desc), clock)
-    def input[T <: UInt](in: T, default: BigInt, name: String, clock: ControllerClock): T = input[T](in, Some(default), name, None, clock)
-    def input[T <: UInt](in: T, name: String, desc: String, clock: ControllerClock): T = input[T](in, None, name, Some(desc), clock)
-    def input[T <: UInt](in: T, name: String, clock: ControllerClock): T = input[T](in, None, name, None, clock)
+    def input[T <: UInt](in: T, default: Option[BigInt], name: String, clock: ControlClock): T = input[T](in, default, name, None, clock)
+    def input[T <: UInt](in: T, default: Option[BigInt], name: String, desc: String, clock: ControlClock): T = input[T](in, default, name, Some(desc), clock)
+    def input[T <: UInt](in: T, default: BigInt, name: String, desc: String, clock: ControlClock): T = input[T](in, Some(default), name, Some(desc), clock)
+    def input[T <: UInt](in: T, default: BigInt, name: String, clock: ControlClock): T = input[T](in, Some(default), name, None, clock)
+    def input[T <: UInt](in: T, name: String, desc: String, clock: ControlClock): T = input[T](in, None, name, Some(desc), clock)
+    def input[T <: UInt](in: T, name: String, clock: ControlClock): T = input[T](in, None, name, None, clock)
 
-    def addInput[T <: UInt](in: Vec[T], default: Option[Seq[BigInt]], name: String, desc: Option[String], clock: ControllerClock) {
+    def addInput[T <: UInt](in: Vec[T], default: Option[Seq[BigInt]], name: String, desc: Option[String], clock: ControlClock) {
         in.zipWithIndex.foreach { case (signal, i) => inputMap.put(name + s"_$i", ControlInput(name + s"_$i", signal, default.map(_(i)), desc, clock)) }
     }
 
-    def input[T <: UInt](in: Vec[T], default: Option[Seq[BigInt]], name: String, desc: Option[String], clock: ControllerClock): Vec[T] = {
+    def input[T <: UInt](in: Vec[T], default: Option[Seq[BigInt]], name: String, desc: Option[String], clock: ControlClock): Vec[T] = {
         val x = Input(in)
         addInput(x, default, name, desc, clock)
         x
@@ -98,36 +98,36 @@ class ControlBundle extends Bundle {
     def input[T <: UInt](in: Vec[T], name: String, desc: String): Vec[T] = input[T](in, None, name, Some(desc), OuterClock)
     def input[T <: UInt](in: Vec[T], name: String): Vec[T] = input[T](in: Vec[T], None, name, None, OuterClock)
 
-    def input[T <: UInt](in: Vec[T], default: Option[Seq[BigInt]], name: String, clock: ControllerClock): Vec[T] = input[T](in, default, name, None, clock)
-    def input[T <: UInt](in: Vec[T], default: Option[Seq[BigInt]], name: String, desc: String, clock: ControllerClock): Vec[T] = input[T](in, default, name, Some(desc), clock)
-    def input[T <: UInt](in: Vec[T], default: Seq[BigInt], name: String, desc: String, clock: ControllerClock): Vec[T] = input[T](in, Some(default), name, Some(desc), clock)
-    def input[T <: UInt](in: Vec[T], default: Seq[BigInt], name: String, clock: ControllerClock): Vec[T] = input[T](in, Some(default), name, None, clock)
-    def input[T <: UInt](in: Vec[T], name: String, desc: String, clock: ControllerClock): Vec[T] = input[T](in, None, name, Some(desc), clock)
-    def input[T <: UInt](in: Vec[T], name: String, clock: ControllerClock): Vec[T] = input[T](in: Vec[T], None, name, None, clock)
+    def input[T <: UInt](in: Vec[T], default: Option[Seq[BigInt]], name: String, clock: ControlClock): Vec[T] = input[T](in, default, name, None, clock)
+    def input[T <: UInt](in: Vec[T], default: Option[Seq[BigInt]], name: String, desc: String, clock: ControlClock): Vec[T] = input[T](in, default, name, Some(desc), clock)
+    def input[T <: UInt](in: Vec[T], default: Seq[BigInt], name: String, desc: String, clock: ControlClock): Vec[T] = input[T](in, Some(default), name, Some(desc), clock)
+    def input[T <: UInt](in: Vec[T], default: Seq[BigInt], name: String, clock: ControlClock): Vec[T] = input[T](in, Some(default), name, None, clock)
+    def input[T <: UInt](in: Vec[T], name: String, desc: String, clock: ControlClock): Vec[T] = input[T](in, None, name, Some(desc), clock)
+    def input[T <: UInt](in: Vec[T], name: String, clock: ControlClock): Vec[T] = input[T](in: Vec[T], None, name, None, clock)
 
-    def addOutput[T <: UInt](out: T, name: String, desc: Option[String], clock: ControllerClock) {
+    def addOutput[T <: UInt](out: T, name: String, desc: Option[String], clock: ControlClock) {
         outputMap.put(name, ControlOutput(name, out, desc, clock))
     }
 
-    def output[T <: UInt](out: T, name: String, desc: Option[String], clock: ControllerClock): T = {
+    def output[T <: UInt](out: T, name: String, desc: Option[String], clock: ControlClock): T = {
         val x = Output(out)
         addOutput(x, name, desc, clock)
         x
     }
     def output[T <: UInt](out: T, name: String): T = output[T](out, name, None, OuterClock)
-    def output[T <: UInt](out: T, name: String, clock: ControllerClock): T = output[T](out, name, None, clock)
+    def output[T <: UInt](out: T, name: String, clock: ControlClock): T = output[T](out, name, None, clock)
 
-    def addOutput[T <: UInt](out: Vec[T], name: String, desc: Option[String], clock: ControllerClock) {
+    def addOutput[T <: UInt](out: Vec[T], name: String, desc: Option[String], clock: ControlClock) {
         out.zipWithIndex.foreach { case (signal, i) => outputMap.put(name + s"_$i", ControlOutput(name + s"_$i", signal, desc, clock)) }
     }
 
-    def output[T <: UInt](out: Vec[T], name: String, desc: Option[String], clock: ControllerClock): Vec[T] = {
+    def output[T <: UInt](out: Vec[T], name: String, desc: Option[String], clock: ControlClock): Vec[T] = {
         val x = Output(out)
         addOutput(x, name, desc, clock)
         x
     }
     def output[T <: UInt](out: Vec[T], name: String): Vec[T] = output[T](out, name, None, OuterClock)
-    def output[T <: UInt](out: Vec[T], name: String, clock: ControllerClock): Vec[T] = output[T](out, name, None, clock)
+    def output[T <: UInt](out: Vec[T], name: String, clock: ControlClock): Vec[T] = output[T](out, name, None, clock)
 }
 
 trait HasControllerConnector {

@@ -215,8 +215,8 @@ class Decoder8b10b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbolsPe
     val io = IO(new DecoderIO(symbolFactory, decodedSymbolsPerCycle))
 
     override val controlIO = Some(IO(new ControlBundle {
-        val error = output(Bool(), "decoder_error")
-        val clearError = input(Bool(), 0, "decoder_clear_error")
+        val error = output(Bool(), "decoder_error", RxClock)
+        val clearError = input(Bool(), 0, "decoder_clear_error", RxClock)
     }))
 
     val idx = RegInit(0.U(4.W))

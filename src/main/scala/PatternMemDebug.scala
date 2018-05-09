@@ -12,11 +12,11 @@ case class PatternMemConfig(
 class PatternMemDebug()(implicit c: SerDesConfig, implicit val m: PatternMemConfig) extends Debug {
 
     override val controlIO = Some(IO(new ControlBundle {
-        val patternEnable  = input(Bool(), 0, "pattern_mem_pattern_enable")
-        val snapshotEnable = input(Bool(), 0, "pattern_mem_snapshot_enable")
-        val pattern        = input(Vec(m.patternDepth, UInt(c.dataWidth.W)), "pattern_mem_pattern")
-        val snapshot       = output(Vec(m.snapshotDepth, UInt(c.dataWidth.W)), "pattern_mem_snapshot")
-        val snapshotValid  = output(Bool(), "pattern_mem_snapshot_valid")
+        val patternEnable  = input(Bool(), 0, "pattern_mem_pattern_enable", TxClock)
+        val snapshotEnable = input(Bool(), 0, "pattern_mem_snapshot_enable", RxClock)
+        val pattern        = input(Vec(m.patternDepth, UInt(c.dataWidth.W)), "pattern_mem_pattern", TxClock)
+        val snapshot       = output(Vec(m.snapshotDepth, UInt(c.dataWidth.W)), "pattern_mem_snapshot", RxClock)
+        val snapshotValid  = output(Bool(), "pattern_mem_snapshot_valid", RxClock)
     }))
     val ctrl = controlIO.get
 

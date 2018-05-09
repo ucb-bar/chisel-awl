@@ -3,6 +3,7 @@ package hbwif
 import chisel3._
 import chisel3.util._
 import chisel3.experimental.withClockAndReset
+import freechips.rocketchip.util.AsyncResetShiftReg
 
 case class BertConfig(
     bertSampleCounterWidth: Int = 32,
@@ -24,17 +25,17 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
     require((c.dataWidth % c.numWays) == 0)
 
     override val controlIO = Some(IO(new ControlBundle {
-        val enable         = input(Bool(), 0, "bert_enable")
-        val clear          = input(Bool(), 1, "bert_clear")
-        val prbsLoad       = input(UInt(prbs.map(_._1).max.W), "bert_prbs_load")
-        val prbsModeTx     = input(UInt(2.W), "bert_prbs_mode_tx")
-        val prbsModeRx     = input(UInt(2.W), "bert_prbs_mode_rx")
-        val prbsSelect     = input(UInt(log2Ceil(prbs.length).W), "bert_prbs_select")
-        val prbsSeedGoods  = output(UInt(c.numWays.W), "bert_prbs_seed_goods")
-        val sampleCount    = input(UInt(b.bertSampleCounterWidth.W), "bert_sample_count")
-        val sampleCountOut = output(UInt(b.bertSampleCounterWidth.W), "bert_sample_count_out")
-        val errorCounts    = output(Vec(c.numWays, UInt(b.bertErrorCounterWidth.W)), "bert_error_counts")
-        val berMode        = input(Bool(), "bert_ber_mode")
+        val enable         = input(Bool(), 0, "bert_enable", TxClock)
+        val clear          = input(Bool(), 1, "bert_clear", RxClock)
+        val prbsLoad       = input(UInt(prbs.map(_._1).max.W), "bert_prbs_load") // Not resynchronized, load this value while disabled
+        val prbsModeTx     = input(UInt(2.W), "bert_prbs_mode_tx", TxClock)
+        val prbsModeRx     = input(UInt(2.W), "bert_prbs_mode_rx", RxClock)
+        val prbsSelect     = input(UInt(log2Ceil(prbs.length).W), "bert_prbs_select") // Not resynchronized, load this value while disabled
+        val prbsSeedGoods  = output(UInt(c.numWays.W), "bert_prbs_seed_goods", TxClock)
+        val sampleCount    = input(UInt(b.bertSampleCounterWidth.W), "bert_sample_count", RxClock)
+        val sampleCountOut = output(UInt(b.bertSampleCounterWidth.W), "bert_sample_count_out", RxClock)
+        val errorCounts    = output(Vec(c.numWays, UInt(b.bertErrorCounterWidth.W)), "bert_error_counts", RxClock)
+        val berMode        = input(Bool(), "bert_ber_mode", RxClock)
     }))
     val ctrl = controlIO.get
 
@@ -51,6 +52,8 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
             p.io.mode := Mux(io.txOut.ready, ctrl.prbsModeTx, PRBS.sStop)
         }
     }
+
+    val enableSync = withClockAndReset(io.rxClock, io.rxReset) { AsyncResetShiftReg(ctrl.enable, 3, 0) }
 
     // These clock crossings are unsafe, but most of these signals will be constant when sampled, so we won't worry about them for now
     withClockAndReset(io.rxClock, io.rxReset) {
@@ -83,7 +86,7 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
             sampleCount := 0.U
             errorCounts.foreach(_ := 0.U)
         } .otherwise {
-            when (!done && ctrl.enable && io.rxIn.valid) {
+            when (!done && enableSync && io.rxIn.valid) {
                 sampleCount := sampleCount + 1.U
                 errorCounts.zip(wayErrors).foreach { case (e, w) => e := e + w }
             }

@@ -7,8 +7,10 @@ import chisel3.experimental._
 final class LaneIO[T <: Data](dataFactory: () => T)(implicit val c: SerDesConfig)
     extends Bundle with TransceiverOuterIF {
     val data = dataFactory()
-    val laneClock = Output(Clock())
-    val laneReset = Output(Bool())
+    val txClock = Output(Clock())
+    val txReset = Output(Bool())
+    val rxClock = Output(Clock())
+    val rxReset = Output(Bool())
 }
 
 abstract class Lane extends MultiIOModule with HasDebug {
@@ -102,7 +104,9 @@ abstract class Lane extends MultiIOModule with HasDebug {
     txrxss.io.rx <> io.rx
     io.tx <> txrxss.io.tx
 
-    io.laneClock := txClock
-    io.laneReset := txReset
+    io.txClock := txClock
+    io.txReset := txReset
+    io.rxClock := rxClock
+    io.rxReset := rxReset
 
 }
