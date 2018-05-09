@@ -109,27 +109,29 @@ trait TLPacketizerLike {
 
         x match {
             case a: TLBundleA => {
+                val dataBits = a.params.dataBits/8 + a.params.dataBits
                 val pad1 = (8 - (headerWidth(a) % 8)) % 8
-                val pad2 = padTo - headerWidth(a) - pad1 - a.params.dataBits/8 - a.params.dataBits
+                val pad2 = padTo - headerWidth(a) - pad1 - dataBits
                 Mux(first, Cat((if (pad1 > 0)
                     Cat(typeA, a.opcode, a.param, a.size, a.source, a.address, 0.U(pad1.W)) else
                     Cat(typeA, a.opcode, a.param, a.size, a.source, a.address)),
                     (if (pad2 > 0)
                     Cat(a.mask, a.data, 0.U(pad2.W)) else
                     Cat(a.mask, a.data))),
-                    Cat(a.data, 0.U((padTo - a.params.dataBits).W)))
+                    Cat(a.mask, a.data, 0.U((padTo - dataBits).W)))
 
             }
             case b: TLBundleB => {
+                val dataBits = b.params.dataBits/8 + b.params.dataBits
                 val pad1 = (8 - (headerWidth(b) % 8)) % 8
-                val pad2 = padTo - headerWidth(b) - pad1 - b.params.dataBits/8 - b.params.dataBits
+                val pad2 = padTo - headerWidth(b) - pad1 - dataBits
                 Mux(first, Cat((if (pad1 > 0)
                     Cat(typeB, b.opcode, b.param, b.size, b.source, b.address, 0.U(pad1.W)) else
                     Cat(typeB, b.opcode, b.param, b.size, b.source, b.address)),
                     (if (pad2 > 0)
                     Cat(b.mask, b.data, 0.U(pad2.W)) else
                     Cat(b.mask, b.data))),
-                    Cat(b.data, 0.U((padTo - b.params.dataBits).W)))
+                    Cat(b.mask, b.data, 0.U((padTo - dataBits).W)))
             }
             case c: TLBundleC => {
                 val pad1 = (8 - (headerWidth(c) % 8)) % 8
