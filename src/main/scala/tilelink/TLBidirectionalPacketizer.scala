@@ -17,13 +17,12 @@ object TLBidirectionalPacketizerIO {
 }
 
 class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, managerEdge: TLEdgeIn, decodedSymbolsPerCycle: Int, symbolFactory: () => S)(implicit val p: Parameters)
-    extends Packetizer(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIO.apply(clientEdge, managerEdge) _) with TLPacketizerLike {
-
-    val io = IO(new PacketizerIO(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIO.apply(clientEdge, managerEdge) _))
-
+    extends Packetizer(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIO.apply(clientEdge, managerEdge) _) with TLPacketizerUtils with BasicPacketizerStateMachine[S, TLBidirectionalPacketizerIO] {
     override val controlIO = Some(IO(new ControlBundle {
         val enable = input(Bool(), 0, "mem_mode_enable", TxClock)
     }))
+
+    enable := controlIO.get.enable
 
     val tltx = new Object {
         val a = io.data.manager.a
@@ -142,11 +141,8 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     dOutstanding := dOutstanding + Mux(tltx.a.fire() && txAFirst, tlResponseMap(tltx.a.bits), 0.U) + Mux(tltx.c.fire() && txCFirst, tlResponseMap(tltx.c.bits), 0.U) - Mux(tlrx.d.fire(), tlrx.dEdge.last(tlrx.d), 0.U)
     eOutstanding := eOutstanding + Mux(tltx.d.fire() && txDFirst, tlResponseMap(tltx.d.bits), 0.U) - Mux(tlrx.e.fire(), tlrx.eEdge.last(tlrx.e), 0.U)
 
-    val sReset :: sSync :: sAckAcked :: sAckSynced :: sWaitForAck :: sReady :: Nil = Enum(6)
-    val state = RegInit(sReset)
-
     // Assign priorities to the channels
-    val txReady = controlIO.get.enable && (txCount === 0.U) && (state === sReady)
+    val txReady = enable && (txCount === 0.U) && (state === sReady)
     val aReady = txReady && (dOutstanding < dMaxOutstanding.U)
     val bReady = txReady && (cOutstanding < cMaxOutstanding.U)
     val cReady = txReady && (dOutstanding < dMaxOutstanding.U)
@@ -159,58 +155,11 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     tltx.d.ready := (dReady && !tltx.e.valid && !dataInflight) || (txReady && txDDataInflight)
     tltx.e.ready := (eReady && !dataInflight)
 
-    // These come from the RX
-    val ack = io.symbolsRx map { x => x.valid && (x.bits === symbolFactory().ack) } reduce (_||_)
-    val sync = io.symbolsRx map { x => x.valid && (x.bits === symbolFactory().sync) } reduce (_||_)
-
-    // This counter will send a sync every N cycles in an attempt to communicate with the receiver
-    val txSyncCounter = Counter(16)
-
-    when (controlIO.get.enable) {
-        // I am in reset
-        when (state === sReset) {
-            state := sSync
-        // I am waiting for an ack or a sync to signify the remote link is up
-        // I will periodically send syncs to the remote link while waiting
-        } .elsewhen(state === sSync) {
-            txSyncCounter.inc()
-            // ack should have priority over sync
-            when (ack) {
-                state := sAckAcked
-            } .elsewhen (sync) {
-                state := sAckSynced
-            }
-        // I got an ack, so I can just ack back and then go straight to sReady
-        } .elsewhen(state === sAckAcked) {
-            // Wait until symbolsTxReady (i.e. symbolsTx fires)
-            when (io.symbolsTxReady) {
-                state := sReady
-            }
-        // I got a sync, so I need to wait for an ack after sending mine
-        } .elsewhen(state === sAckSynced) {
-            // If I happen to get an ack here, I still may need to ack back, so go to sAckAcked
-            when (ack) {
-                state := sAckAcked
-            // Wait until symbolsTxReady (i.e. symbolsTx fires)
-            } .elsewhen (io.symbolsTxReady) {
-                state := sWaitForAck
-            }
-        // I am waiting for an ack to go to sReady; I came from sAckSynced
-        } .elsewhen(state === sWaitForAck) {
-            when (ack) {
-                state := sReady
-            }
-        }
-        // otherwise I am ready! I will not respond to acks or syncs
-    } .otherwise {
-        state := sReset
+    txSymbolData.zipWithIndex.foreach { case (s,i) =>
+        s := txBuffer(txBufferBits-8*i-1, txBufferBits-8*i-8)
     }
-
-    io.symbolsTx.reverse.zipWithIndex.foreach { case (s,i) =>
-        val doSync = (i.U === 0.U) && (state === sSync) && (txSyncCounter.value === 0.U)
-        val doAck = (i.U === 0.U) && ((state === sAckAcked) || (state === sAckSynced))
-        s.valid := ((i.U < txCount) && (state === sReady)) || doSync || doAck
-        s.bits := Mux(doSync, symbolFactory().sync, Mux(doAck, symbolFactory().ack, symbolFactory().fromData(txBuffer(txBufferBits-8*i-1,txBufferBits-8*i-8))))
+    txSymbolValid.zipWithIndex.foreach { case (v,i) =>
+        v := (i.U < txCount)
     }
 
     val txFire = tltx.a.fire() || tltx.b.fire() || tltx.c.fire() || tltx.d.fire() || tltx.e.fire()
