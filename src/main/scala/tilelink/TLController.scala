@@ -3,8 +3,11 @@ package hbwif.tilelink
 import hbwif._
 import chisel3._
 import chisel3.util._
-import freechips.rocketchip.regmapper.{RegField, RegFieldDesc, RegFieldAccessType, RegReadFn}
+import chisel3.experimental.{withClock, withClockAndReset}
+import freechips.rocketchip.regmapper.{RegField, RegFieldDesc, RegFieldAccessType, RegReadFn, RegWriteFn}
 import freechips.rocketchip.tilelink.{Pattern, WritePattern, ReadPattern, ReadExpectPattern}
+import freechips.rocketchip.util.{AsyncQueue, AsyncResetShiftReg}
+import scala.collection.mutable.ArrayBuffer
 
 trait TLControllerPattern {
     def name: String
@@ -40,21 +43,11 @@ trait HasTLController {
         if (cio.isDefined) {
             val bytesPerReg = 8
             val ins = cio.get.inputMap.values.toSeq.sortWith(_.name < _.name).zipWithIndex.map { case (x, i) =>
-                val width = x.signal.getWidth
-                val reg = if(x.default.isDefined) RegInit(x.default.get.U(width.W)) else Reg(UInt(width.W))
-                reg.suggestName(s"hbwif_scr_${x.name}")
-                x.signal := reg
-                ((base + i*bytesPerReg) -> Seq(RegField(width, reg, RegFieldDesc(x.name, x.desc.getOrElse(""), reset = x.default))))
+                ((base + i*bytesPerReg) -> Seq(inputCrossing(x)))
             }
             val outBase = base + ins.length*bytesPerReg
             val outs = cio.get.outputMap.values.toSeq.sortWith(_.name < _.name).zipWithIndex.map { case (x, i) =>
-                val width = x.signal.getWidth
-                ((outBase + i*bytesPerReg) -> Seq(RegField.r(width, RegReadFn(x.signal), RegFieldDesc(
-                    name = x.name,
-                    desc = x.desc.getOrElse(""),
-                    access = RegFieldAccessType.R,
-                    volatile = true
-                ))))
+                ((outBase + i*bytesPerReg) -> Seq(outputCrossing(x)))
             }
             return ((outs ++ ins), (outBase + outs.length*bytesPerReg))
         } else {
@@ -62,8 +55,60 @@ trait HasTLController {
         }
     }
 
+    private def inputCrossing(x: ControlInput): RegField = {
+        val width = x.signal.getWidth
+        val (toClock, toReset) = x.clock match {
+            case OuterClock => (this.clock, this.reset.toBool)
+            case TxClock => (this.io.txClock, this.io.txReset)
+            case RxClock => (this.io.rxClock, this.io.rxReset)
+            case _ => ???
+        }
+        val reg = withClockAndReset(toClock, toReset) { if (x.default.isDefined) RegInit(x.default.get.U(width.W)) else Reg(UInt(width.W)) }
+        x.signal := reg
+        reg.suggestName(s"hbwif_scr_${x.name}")
+        x.clock match {
+            case OuterClock => {
+                x.signal := reg
+                RegField(width, reg, RegFieldDesc(x.name, x.desc.getOrElse(""), reset = x.default))
+            }
+            case _ => {
+                if (width == 1) {
+                    // Use a synchronizer
+                    val outerReg = if (x.default.isDefined) RegInit(x.default.get.U(width.W)) else Reg(UInt(width.W))
+                    outerReg.suggestName(s"hbwif_scrouter_${x.name}")
+                    reg := withClockAndReset(toClock, toReset) { AsyncResetShiftReg(outerReg, 3, x.default.getOrElse(BigInt(0)).toInt, Some(s"hbwif_scrsync_${x.name}")) }
+                    RegField(width, outerReg, RegFieldDesc(x.name, x.desc.getOrElse(""), reset = x.default))
+                } else {
+                    // Use a small async FIFO
+                    val q = Module(new AsyncQueue(chiselTypeOf(x.signal), 1, 3, false, false)).suggestName(s"hbwif_scrqueue_${x.name}")
+                    q.io.enq_clock := this.clock
+                    q.io.deq_clock := toClock
+                    q.io.enq_reset := this.reset.toBool
+                    q.io.deq_reset := toReset
+                    q.io.deq.ready := true.B
+                    when (q.io.deq.fire()) { reg := q.io.deq.bits }
+                    // Shadow for reading- hopefully this just gets optimized away since it is the same function as the Async Queue memory reg
+                    val outerReg = Reg(UInt(width.W))
+                    when (q.io.enq.fire()) { outerReg := q.io.enq.bits }
+                    RegField(width, RegReadFn(outerReg), RegWriteFn(q.io.enq), RegFieldDesc(x.name, x.desc.getOrElse(""), reset = x.default))
+                }
+            }
+        }
+    }
+
+    private def outputCrossing(x: ControlOutput): RegField = {
+        val width = x.signal.getWidth
+        RegField.r(width, RegReadFn(x.signal), RegFieldDesc(
+            name = x.name,
+            desc = x.desc.getOrElse(""),
+            access = RegFieldAccessType.R,
+            volatile = true
+        ))
+    }
 
 }
+
+
 
 object TLController {
 
