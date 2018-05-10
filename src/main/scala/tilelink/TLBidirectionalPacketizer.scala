@@ -142,7 +142,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     eOutstanding := eOutstanding + Mux(tltx.d.fire() && txDFirst, tlResponseMap(tltx.d.bits), 0.U) - Mux(tlrx.e.fire(), tlrx.eEdge.last(tlrx.e), 0.U)
 
     // Assign priorities to the channels
-    val txReady = enable && (txCount === 0.U) && (state === sReady)
+    val txReady = enable && (state === sReady) && ((txCount === 0.U) || ((txCount <= decodedSymbolsPerCycle.U) && (io.symbolsTxReady)))
     val aReady = txReady && (dOutstanding < dMaxOutstanding.U)
     val bReady = txReady && (cOutstanding < cMaxOutstanding.U)
     val cReady = txReady && (dOutstanding < dMaxOutstanding.U)
@@ -166,7 +166,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     when (state === sReset) {
         txCount := 0.U
     } .elsewhen (txFire) {
-        txCount := txPayloadBytes - txCount
+        txCount := txPayloadBytes
         txBuffer := txPacked
     } .elsewhen(txCount > decodedSymbolsPerCycle.U) {
         when (io.symbolsTxReady) {
@@ -182,7 +182,8 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     /************************ RX *************************/
 
     val rxHeaderBits = List(headerWidth(tlrx.a.bits), headerWidth(tlrx.b.bits), headerWidth(tlrx.c.bits), headerWidth(tlrx.d.bits), headerWidth(tlrx.e.bits)).max
-    val rxBufferBytes = div8Ceil(rxHeaderBits) + List(managerEdge.bundle.dataBits/64, clientEdge.bundle.dataBits/64).max + List(managerEdge.bundle.dataBits, clientEdge.bundle.dataBits).max/8 + (decodedSymbolsPerCycle - 1)
+    val rxMaxBytes = div8Ceil(rxHeaderBits) + List(managerEdge.bundle.dataBits/64, clientEdge.bundle.dataBits/64).max + List(managerEdge.bundle.dataBits, clientEdge.bundle.dataBits).max/8 + (decodedSymbolsPerCycle - 1)
+    val rxBufferBytes = 2*rxMaxBytes - 1
 
     val rxTypeValid = RegInit(false.B)
     val rxBuffer = Reg(Vec(rxBufferBytes, UInt(8.W)))
@@ -271,6 +272,11 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
             rxBuffer((rxBufferBytes - 1).U - count) := symbol.bits.bits
         }
         count + (symbol.valid && symbol.bits.isData && (state === sReady))
+    }
+    for (i <- 0 until decodedSymbolsPerCycle) {
+        when(rxFire && (rxSymCount > rxNumSymbols + i.U)) {
+            rxBuffer((rxBufferBytes - 1).U - i.U - (rxNumSymbols - rxSymPopped)) := rxBuffer((rxBufferBytes - 1).U - i.U - rxNumSymbols)
+        }
     }
 
     // TODO can we add another symbol to NACK a transaction in progress (and set error)

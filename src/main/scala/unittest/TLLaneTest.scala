@@ -24,7 +24,7 @@ class TLLaneTestLazy(delay: Int, loopback: Boolean)(implicit p: Parameters) exte
     val ram = LazyModule(new TLRAM(p(HbwifTLKey).managerAddressSet, beatBytes=p(CacheBlockBytes)))
     val configNodes = Seq.tabulate(nChips) { i => TLClientNode(Seq(TLClientPortParameters(Seq(TLClientParameters(name = s"LaneConfig$i"))))) }
 
-    ram.node := TLDelayer(0.25) := hbwif(nChips - 1).clientNode
+    ram.node := TLWidthWidget(p(HbwifTLKey).beatBytes) := TLDelayer(0.25) := hbwif(nChips - 1).clientNode
     hbwif(0).managerNode := model.node := fuzz.node
     hbwif.zip(configNodes).foreach { case (x, y) => x.configNodes(0) := y }
     // Dummy connections to make diplomacy happy; this does nothing since no transactions will go through
@@ -82,6 +82,7 @@ class TLLaneTestLazy(delay: Int, loopback: Boolean)(implicit p: Parameters) exte
         TLControllerWritePattern("bert_enable", 0),
         TLControllerWritePattern("mem_mode_enable", 1)
     )
+
 }
 
 class TLLaneTest(delay: Int, loopback: Boolean, timeout: Int = 500000)(implicit p: Parameters) extends UnitTest(timeout) {
