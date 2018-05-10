@@ -37,10 +37,10 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
 
     val txCount = RegInit(0.U(log2Ceil(symbolsPerPacket + 1).W))
 
-    io.data.tx.ready := enable && (txCount === 0.U) && (state === sReady)
+    io.data.tx.ready := enable && (state === sReady) && ((txCount === 0.U) || ((txCount <= decodedSymbolsPerCycle.U) && io.symbolsTxReady))
 
     when (io.data.tx.fire()) {
-        txCount := symbolsPerPacket.U - txCount
+        txCount := symbolsPerPacket.U
         txBuffer := io.data.tx.bits.toBits
     } .elsewhen(txCount > decodedSymbolsPerCycle.U) {
         when (io.symbolsTxReady) {

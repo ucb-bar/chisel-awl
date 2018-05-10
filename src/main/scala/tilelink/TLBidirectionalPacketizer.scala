@@ -142,7 +142,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     eOutstanding := eOutstanding + Mux(tltx.d.fire() && txDFirst, tlResponseMap(tltx.d.bits), 0.U) - Mux(tlrx.e.fire(), tlrx.eEdge.last(tlrx.e), 0.U)
 
     // Assign priorities to the channels
-    val txReady = enable && (txCount === 0.U) && (state === sReady)
+    val txReady = enable && (state === sReady) && ((txCount === 0.U) || ((txCount <= decodedSymbolsPerCycle.U) && (io.symbolsTxReady)))
     val aReady = txReady && (dOutstanding < dMaxOutstanding.U)
     val bReady = txReady && (cOutstanding < cMaxOutstanding.U)
     val cReady = txReady && (dOutstanding < dMaxOutstanding.U)
@@ -166,7 +166,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     when (state === sReset) {
         txCount := 0.U
     } .elsewhen (txFire) {
-        txCount := txPayloadBytes - txCount
+        txCount := txPayloadBytes
         txBuffer := txPacked
     } .elsewhen(txCount > decodedSymbolsPerCycle.U) {
         when (io.symbolsTxReady) {
