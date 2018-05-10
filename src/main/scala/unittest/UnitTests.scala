@@ -19,7 +19,7 @@ class UnitTestConfig extends Config((site, here, up) => {
         numLanes = 1,
         numBanks = 1,
         maxOutstanding = 8,
-        beatBytes = 16,
+        beatBytes = 8,
         numXact = 32,
         managerTLUH = false,
         clientTLUH = false,
@@ -28,10 +28,10 @@ class UnitTestConfig extends Config((site, here, up) => {
     case HbwifSerDesKey => SerDesConfig()
     case HbwifBertKey => BertConfig()
     case HbwifPatternMemKey => PatternMemConfig()
-    case CacheBlockBytes => 16
+    case CacheBlockBytes => 32
     case PeripheryBusKey => PeripheryBusParams(
         beatBytes = 8,
-        blockBytes = 8
+        blockBytes = 16
     )
     case UnitTests => (q: Parameters) => {
         implicit val p = q
