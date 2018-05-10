@@ -27,7 +27,7 @@ class TLBidirectionalPacketizerTestLazy[S <: DecodedSymbol](decodedSymbolsPerCyc
 
         val packetizer = Module(new TLBidirectionalPacketizer(edgeOut, edgeIn, decodedSymbolsPerCycle, symbolFactory))
 
-        packetizer.io.enable := true.B
+        packetizer.controlIO.get.enable := true.B
 
         out <> packetizer.io.data.client
         packetizer.io.data.manager <> in

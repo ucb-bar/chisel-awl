@@ -26,8 +26,8 @@ class BertTest(delay: Int = 1, per1k: Int = 0, prbs: Int = 0, berMode: Boolean =
 
     txrxss.io.asyncResetIn := this.reset.toBool
     txrxss.io.clockRef := this.clock
-    txrxss.io.txInvert := false.B
-    txrxss.io.rxInvert := false.B
+    txrxss.controlIO.get.txInvert := false.B
+    txrxss.controlIO.get.rxInvert := false.B
 
     bert.io.txClock := txrxss.io.txClock
     bert.io.txReset := txrxss.io.txReset
@@ -52,19 +52,20 @@ class BertTest(delay: Int = 1, per1k: Int = 0, prbs: Int = 0, berMode: Boolean =
         val sampleCounter = Counter(numSamples - margin)
         sampleCounter.value.suggestName("sampleCounter")
 
+        val ctrl = bert.controlIO.get
         // Set defaults
-        bert.io.enable         := false.B
-        bert.io.clear          := true.B
-        bert.io.prbsLoad       := 1.U
-        bert.io.prbsModeTx     := PRBS.sStop
-        bert.io.prbsModeRx     := PRBS.sStop
-        bert.io.prbsSelect     := prbs.U
-        bert.io.sampleCount    := numSamples.U
-        bert.io.berMode        := berMode.B
+        ctrl.enable            := false.B
+        ctrl.clear             := true.B
+        ctrl.prbsLoad          := 1.U
+        ctrl.prbsModeTx        := PRBS.sStop
+        ctrl.prbsModeRx        := PRBS.sStop
+        ctrl.prbsSelect        := prbs.U
+        ctrl.sampleCount       := numSamples.U
+        ctrl.berMode           := berMode.B
         errorInjector.io.reset := true.B
         errorInjector.io.stop  := false.B
 
-        when (bert.io.sampleCountOut < numSamples.U && bert.io.enable && !bert.io.clear) {
+        when (ctrl.sampleCountOut < numSamples.U && ctrl.enable && !ctrl.clear) {
             onesCount := onesCount + PopCount(bert.io.rxOut.bits)
         }
 
@@ -73,65 +74,65 @@ class BertTest(delay: Int = 1, per1k: Int = 0, prbs: Int = 0, berMode: Boolean =
                 state := sClear
             }
             is (sClear) {
-                bert.io.enable := true.B
+                ctrl.enable := true.B
                 state := sLoad
             }
             is (sLoad) {
-                bert.io.enable := true.B
-                bert.io.prbsModeTx := PRBS.sLoad
-                bert.io.prbsModeRx := PRBS.sSeed
+                ctrl.enable := true.B
+                ctrl.prbsModeTx := PRBS.sLoad
+                ctrl.prbsModeRx := PRBS.sSeed
                 when (counter.inc()) {
                     state := sSeed
                 }
             }
             is (sSeed) {
-                bert.io.enable := true.B
-                bert.io.prbsModeTx := PRBS.sRun
-                bert.io.prbsModeRx := PRBS.sSeed
+                ctrl.enable := true.B
+                ctrl.prbsModeTx := PRBS.sRun
+                ctrl.prbsModeRx := PRBS.sSeed
                 when (counter.inc()) {
                     state := sErrors
                 }
             }
             is (sErrors) {
-                bert.io.enable := true.B
-                bert.io.clear  := false.B
+                ctrl.enable := true.B
+                ctrl.clear  := false.B
                 errorInjector.io.reset := false.B
-                bert.io.prbsModeTx := PRBS.sRun
-                bert.io.prbsModeRx := PRBS.sRun
-                assert(bert.io.prbsSeedGoods.reduce(_&&_))
+                ctrl.prbsModeTx := PRBS.sRun
+                ctrl.prbsModeRx := PRBS.sRun
+                assert(ctrl.prbsSeedGoods.andR)
                 when (sampleCounter.inc()) {
                     state := sWait
                 }
             }
             is (sWait) {
-                bert.io.enable := true.B
-                bert.io.clear  := false.B
+                ctrl.enable := true.B
+                ctrl.clear  := false.B
                 errorInjector.io.reset := false.B
-                bert.io.prbsModeTx := PRBS.sRun
-                bert.io.prbsModeRx := PRBS.sRun
+                ctrl.prbsModeTx := PRBS.sRun
+                ctrl.prbsModeRx := PRBS.sRun
                 errorInjector.io.stop := true.B
                 when (counter.inc()) {
                     state := sCheck
                 }
             }
             is (sCheck) {
-                bert.io.enable := true.B
-                bert.io.clear  := false.B
+                ctrl.enable := true.B
+                ctrl.clear  := false.B
                 errorInjector.io.reset := false.B
                 errorInjector.io.stop := true.B
-                bert.io.prbsModeTx := PRBS.sRun
-                bert.io.prbsModeRx := PRBS.sRun
-                assert(bert.io.sampleCountOut === numSamples.U)
+                ctrl.prbsModeTx := PRBS.sRun
+                ctrl.prbsModeRx := PRBS.sRun
+                assert(ctrl.sampleCountOut === numSamples.U)
                 if (berMode) {
-                    assert(bert.io.errorCounts.reduce(_+_) === errorInjector.io.errors)
+                    assert(ctrl.errorCounts.reduce(_+_) === errorInjector.io.errors)
                 } else {
-                    assert(bert.io.errorCounts.reduce(_+_) === onesCount)
+                    assert(ctrl.errorCounts.reduce(_+_) === onesCount)
                 }
                 state := sDone
             }
             is (sDone) {
-                bert.io.enable := true.B
-                bert.io.clear  := false.B
+                ctrl.enable := true.B
+                ctrl.clear  := false.B
                 errorInjector.io.reset := false.B
                 errorInjector.io.stop := true.B
             }

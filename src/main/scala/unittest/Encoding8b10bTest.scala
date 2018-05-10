@@ -23,7 +23,7 @@ class Encoding8b10bTest(val decodedSymbolsPerCycle: Int, val performanceEffort: 
     encoder.io.decoded <> generator.io.decoded
     generator.io.decodedReady := encoder.io.decodedReady
     decoder.io.decoded <> checker.io.decoded
-    decoder.io.clearError := false.B
+    decoder.controlIO.get.clearError := false.B
 
     val counter = Counter(10)
     val finished = RegInit(false.B)

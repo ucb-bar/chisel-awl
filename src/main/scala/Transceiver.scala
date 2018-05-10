@@ -22,7 +22,8 @@ class TransceiverDataIF()(implicit val c: SerDesConfig) extends Bundle {
 
 }
 
-class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle {
+trait TransceiverIO extends Bundle {
+    implicit val c: SerDesConfig
 
     // Data
     val data = new TransceiverDataIF
@@ -47,6 +48,8 @@ class TransceiverIO()(implicit val c: SerDesConfig) extends Bundle {
 
 }
 
+class GenericTransceiverIO()(implicit val c: SerDesConfig) extends Bundle with TransceiverIO
+
 trait HasTransceiverIO extends BaseModule {
 
     val io: TransceiverIO
@@ -55,7 +58,7 @@ trait HasTransceiverIO extends BaseModule {
 
 class GenericTransceiver()(implicit c: SerDesConfig) extends BlackBox(Map("SERDES_BITS" -> IntParam(c.dataWidth))) with HasTransceiverIO {
 
-    val io = IO(new TransceiverIO)
+    val io = IO(new GenericTransceiverIO)
 
     override def desiredName = "generic_transceiver"
 

@@ -4,15 +4,16 @@ import chisel3._
 import chisel3.util._
 import chisel3.experimental._
 
-final class LaneIO[P <: Bundle, T <: Data](portFactory: () => P, dataFactory: () => T)(implicit val c: SerDesConfig)
+final class LaneIO[T <: Data](dataFactory: () => T)(implicit val c: SerDesConfig)
     extends Bundle with TransceiverOuterIF {
-    val control = portFactory()
     val data = dataFactory()
-    val laneClock = Output(Clock())
-    val laneReset = Output(Bool())
+    val txClock = Output(Clock())
+    val txReset = Output(Bool())
+    val rxClock = Output(Clock())
+    val rxReset = Output(Bool())
 }
 
-abstract class Lane extends Module with HasDebug {
+abstract class Lane extends MultiIOModule with HasDebug {
 
     def decodedSymbolsPerCycle: Int
 
@@ -23,7 +24,6 @@ abstract class Lane extends Module with HasDebug {
     def genEncoder(): Encoder
     def genDecoder(): Decoder
     def genPacketizer[S <: DecodedSymbol](symbolFactory: () => S): Packetizer[S, T]
-    def genBuilder(): ControllerBuilder
     def genTransceiverSubsystem(): TransceiverSubsystem
 
     val txrxss = Module(genTransceiverSubsystem())
@@ -40,7 +40,6 @@ abstract class Lane extends Module with HasDebug {
     val encoderAdapter = withClockAndReset(txClock, txReset) { Module(new EncoderWidthAdapter(encoder.encodedWidth, c.dataWidth)) }
     val packetizer     = withClockAndReset(txClock, txReset) { Module(genPacketizer(encoder.symbolFactory)) }
 
-    val builder        = genBuilder()
     val debugBus       = genDebug().map { x =>
         x.io.txClock := txClock
         x.io.txReset := txReset
@@ -79,18 +78,22 @@ abstract class Lane extends Module with HasDebug {
     packetizer.io.symbolsRx <> decoderQueue.io.deq
 
     // Be careful with clock crossings here
-    withClockAndReset(txClock, txReset) {
-        txrxss.connectController(builder)
-        encoder.connectController(builder)
-        decoder.connectController(builder)
-        packetizer.connectController(builder)
-        debugBus.foreach(_.connectController(builder))
-    }
+    private def iomap[T <: Data] = { x:T => IO(chiselTypeOf(x)).asInstanceOf[T] }
+    val ssio         = txrxss.controlIO.map(iomap)
+    val encoderio    = encoder.controlIO.map(iomap)
+    val decoderio    = decoder.controlIO.map(iomap)
+    val packetizerio = packetizer.controlIO.map(iomap)
+    val debugio      = debugBus.map(_.controlIO.map(iomap))
 
-    val io = IO(new LaneIO[builder.P, T](builder.createPort _, packetizer.dataFactory))
+    txrxss.controlIO.foreach(_.attach(ssio))
+    encoder.controlIO.foreach(_.attach(encoderio))
+    decoder.controlIO.foreach(_.attach(decoderio))
+    packetizer.controlIO.foreach(_.attach(packetizerio))
+    debugBus.zip(debugio).foreach { case (d, i) => d.controlIO.foreach(_.attach(i)) }
+
+    val io = IO(new LaneIO[T](packetizer.dataFactory))
 
     // async crossings live in here
-    builder.generate(txClock, txReset, clock, reset.toBool, io.control)
 
     // async crossings live in here
     packetizer.connectData(clock, reset.toBool, io.data)
@@ -101,7 +104,9 @@ abstract class Lane extends Module with HasDebug {
     txrxss.io.rx <> io.rx
     io.tx <> txrxss.io.tx
 
-    io.laneClock := txClock
-    io.laneReset := txReset
+    io.txClock := txClock
+    io.txReset := txReset
+    io.rxClock := rxClock
+    io.rxReset := rxReset
 
 }

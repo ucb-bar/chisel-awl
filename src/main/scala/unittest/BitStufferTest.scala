@@ -30,8 +30,8 @@ class BitStufferTest(val mode: Int, timeout: Int = 50000) extends UnitTest(timeo
     val (txPBool, txPTee) = DifferentialToBool(ss.io.tx)
 
     ss.io.rx <> txPTee
-    ss.io.rxInvert := false.B
-    ss.io.txInvert := false.B
+    ss.controlIO.get.rxInvert := false.B
+    ss.controlIO.get.txInvert := false.B
     ss.io.clockRef := clock
     ss.io.asyncResetIn := reset.toBool
 
@@ -73,7 +73,7 @@ class BitStufferTest(val mode: Int, timeout: Int = 50000) extends UnitTest(timeo
             x.valid := txStarted
             x.bits := Decoded8b10bSymbol(i.U + (txCount * decodedSymbolsPerCycle.U), false.B)
         }
-        decoder.io.clearError := false.B
+        decoder.controlIO.get.clearError := false.B
     }
 
     withClockAndReset (ss.io.rxClock, ss.io.rxReset) {
