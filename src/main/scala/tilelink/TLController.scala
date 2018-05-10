@@ -39,14 +39,17 @@ trait HasTLController {
         (seq ++ mapped._1, mapped._2)
     })._1
 
+    private def bytesPerReg = 8
+
     private def ioToRegMap(cio: Option[ControlBundle], base: Int): (Seq[(Int, Seq[RegField])], Int) = {
         if (cio.isDefined) {
-            val bytesPerReg = 8
             val ins = cio.get.inputMap.values.toSeq.sortWith(_.name < _.name).zipWithIndex.map { case (x, i) =>
+                require(x.width <= 8*bytesPerReg, s"The bit width for input register ${x.name} is too large (${x.width} > ${8*bytesPerReg}). Reconfigure the TLController or change your signals")
                 ((base + i*bytesPerReg) -> Seq(inputCrossing(x)))
             }
             val outBase = base + ins.length*bytesPerReg
             val outs = cio.get.outputMap.values.toSeq.sortWith(_.name < _.name).zipWithIndex.map { case (x, i) =>
+                require(x.width <= 8*bytesPerReg, s"The bit width for output register ${x.name} is too large (${x.width} > ${8*bytesPerReg}). Reconfigure the TLController or change your signals")
                 ((outBase + i*bytesPerReg) -> Seq(outputCrossing(x)))
             }
             return ((outs ++ ins), (outBase + outs.length*bytesPerReg))
@@ -56,7 +59,7 @@ trait HasTLController {
     }
 
     private def inputCrossing(x: ControlInput): RegField = {
-        val width = x.signal.getWidth
+        val width = x.width
         val (toClock, toReset) = x.clock match {
             case OuterClock => (this.clock, this.reset.toBool)
             case TxClock => (this.io.txClock, this.io.txReset)
@@ -97,8 +100,7 @@ trait HasTLController {
     }
 
     private def outputCrossing(x: ControlOutput): RegField = {
-        val width = x.signal.getWidth
-        RegField.r(width, RegReadFn(x.signal), RegFieldDesc(
+        RegField.r(x.width, RegReadFn(x.signal), RegFieldDesc(
             name = x.name,
             desc = x.desc.getOrElse(""),
             access = RegFieldAccessType.R,

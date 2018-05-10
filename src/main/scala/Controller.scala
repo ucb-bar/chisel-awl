@@ -16,14 +16,14 @@ case class ControlInput(
     default: Option[BigInt],
     desc: Option[String],
     clock: ControlClock
-)
+) { def width = signal.getWidth }
 
 case class ControlOutput(
     name: String,
     signal: UInt,
     desc: Option[String],
     clock: ControlClock
-)
+) { def width = signal.getWidth }
 
 class ControlBundle extends Bundle {
     final val inputMap = new HashMap[String, ControlInput]
