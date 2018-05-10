@@ -40,7 +40,7 @@ class UnitTestConfig extends Config((site, here, up) => {
         BertTests() ++
         Encoding8b10bTests() ++
         BitStufferTests() ++
-        TLLaneTests()(p)
-       // FixedWidthLaneTests()
+        TLLaneTests()(p) ++
+        FixedWidthLaneTests()
     }
 })

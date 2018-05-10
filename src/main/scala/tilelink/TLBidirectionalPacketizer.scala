@@ -155,11 +155,10 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     tltx.d.ready := (dReady && !tltx.e.valid && !dataInflight) || (txReady && txDDataInflight)
     tltx.e.ready := (eReady && !dataInflight)
 
-    txSymbolData.zipWithIndex.foreach { case (s,i) =>
-        s := txBuffer(txBufferBits-8*i-1, txBufferBits-8*i-8)
-    }
-    txSymbolValid.zipWithIndex.foreach { case (v,i) =>
-        v := (i.U < txCount)
+    // Feed symbols to the state machine stuff
+    for (i <- 0 until decodedSymbolsPerCycle) {
+        txSymbolData(i) := txBuffer(txBufferBits-8*i-1, txBufferBits-8*i-8)
+        txSymbolValid(i) := (i.U < txCount)
     }
 
     val txFire = tltx.a.fire() || tltx.b.fire() || tltx.c.fire() || tltx.d.fire() || tltx.e.fire()

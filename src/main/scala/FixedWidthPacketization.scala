@@ -31,17 +31,11 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
     val extendedWidth = symbolsPerPacket*decodedWidth
 
     val txBuffer = Reg(UInt(packetWidth.W))
-    val rxBuffer = Reg(Vec(2*symbolsPerPacket - 1, UInt(8.W)))
+    val rxBufferEntries = 2*symbolsPerPacket - 1
+    val rxBuffer = Reg(Vec(rxBufferEntries, UInt(decodedWidth.W)))
     val txExtended = (if (extendedWidth > packetWidth) Cat(txBuffer, 0.U((extendedWidth-packetWidth).W)) else txBuffer)
 
     val txCount = RegInit(0.U(log2Ceil(symbolsPerPacket + 1).W))
-
-    txSymbolData.zipWithIndex.foreach { case (s,i) =>
-        s := txExtended(extendedWidth - decodedWidth*i - 1, extendedWidth - decodedWidth*(i+1))
-    }
-    txSymbolValid.zipWithIndex.foreach { case (v,i) =>
-        v := (i.U < txCount)
-    }
 
     io.data.tx.ready := enable && (txCount === 0.U) && (state === sReady)
 
@@ -59,19 +53,30 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
         }
     }
 
-    val rxSymCount = RegInit(0.U((log2Ceil(symbolsPerPacket) + 1).W))
+    // Feed symbols to the state machine stuff
+    for (i <- 0 until decodedSymbolsPerCycle) {
+        txSymbolData(i) := txExtended(extendedWidth - decodedWidth*i - 1, extendedWidth - decodedWidth*(i+1))
+        txSymbolValid(i) := (i.U < txCount)
+    }
+
+    val rxSymCount = RegInit(0.U(log2Ceil(rxBufferEntries + 1).W))
 
     assert(io.data.rx.ready || !io.data.rx.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
 
-    // TODO this is broken :
-    io.data.rx.bits := io.data.rx.bits.fromBits(rxBuffer.asUInt()(extendedWidth - 1, extendedWidth - packetWidth))
+    io.data.rx.bits := io.data.rx.bits.fromBits(rxBuffer.reverse.take(symbolsPerPacket).reduce(Cat(_,_))(extendedWidth - 1, extendedWidth - packetWidth))
     io.data.rx.valid := (rxSymCount >= symbolsPerPacket.U)
 
     rxSymCount := io.symbolsRx.foldRight(rxSymCount - Mux(io.data.rx.fire(), symbolsPerPacket.U, 0.U)) { (symbol, count) =>
-        when (symbol.valid && symbol.bits.isData) {
-            rxBuffer((symbolsPerPacket - 1).U - count) := symbol.bits.bits
+        val symbolFire = symbol.valid && symbol.bits.isData && (state === sReady)
+        when (symbolFire) {
+            rxBuffer((rxBufferEntries - 1).U - count) := symbol.bits.bits
         }
-        count + (symbol.valid && symbol.bits.isData && (state === sReady))
+        count + symbolFire
+    }
+    for (i <- 0 until decodedSymbolsPerCycle) {
+        when(io.data.rx.fire() && (rxSymCount > (symbolsPerPacket + i).U)) {
+            rxBuffer((rxBufferEntries - 1).U - i.U) := rxBuffer((rxBufferEntries - 1).U - i.U - symbolsPerPacket.U)
+        }
     }
 
     def connectData(dataClock: Clock, dataReset: Bool, data: FixedWidthData[F]) {
