@@ -12,11 +12,16 @@ case class PatternMemConfig(
 class PatternMemDebug()(implicit c: SerDesConfig, implicit val m: PatternMemConfig) extends Debug {
 
     override val controlIO = Some(IO(new ControlBundle {
-        val patternEnable  = input(Bool(), 0, "pattern_mem_pattern_enable", TxClock)
-        val snapshotEnable = input(Bool(), 0, "pattern_mem_snapshot_enable", RxClock)
-        val pattern        = input(Vec(m.patternDepth, UInt(c.dataWidth.W)), "pattern_mem_pattern", TxClock)
-        val snapshot       = output(Vec(m.snapshotDepth, UInt(c.dataWidth.W)), "pattern_mem_snapshot", RxClock)
-        val snapshotValid  = output(Bool(), "pattern_mem_snapshot_valid", RxClock)
+        val patternEnable  = input(Bool(), 0, "pattern_mem_pattern_enable",
+            "Active-high pattern memory enable. When enabled, TX data is overridden with the pattern contained in pattern_mem_pattern.", TxClock)
+        val snapshotEnable = input(Bool(), 0, "pattern_mem_snapshot_enable",
+            "Active-high snapshot enable. When enabled, takes a one-shot snapshot of RX data and stores it in pattern_mem_snapshot. Must toggle before taking another snapshot", RxClock)
+        val pattern        = input(Vec(m.patternDepth, UInt(c.dataWidth.W)), "pattern_mem_pattern",
+            s"A sequence of ${m.patternDepth} ${c.dataWidth}-bit words to send repeatedly over the TX. Word 0 is sent first", TxClock)
+        val snapshot       = output(Vec(m.snapshotDepth, UInt(c.dataWidth.W)), "pattern_mem_snapshot",
+            s"A sequence of ${m.snapshotDepth} ${c.dataWidth}-bit words captured by the RX. Word 0 the first received", RxClock)
+        val snapshotValid  = output(Bool(), "pattern_mem_snapshot_valid",
+            "When high, signifies that the most recently requested snapshot is complete, and that pattern_mem_snapshot contains valid data", RxClock)
     }))
     val ctrl = controlIO.get
 

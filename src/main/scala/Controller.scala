@@ -120,6 +120,8 @@ class ControlBundle extends Bundle {
     }
     def output[T <: UInt](out: T, name: String): T = output[T](out, name, None, OuterClock)
     def output[T <: UInt](out: T, name: String, clock: ControlClock): T = output[T](out, name, None, clock)
+    def output[T <: UInt](out: T, name: String, desc: String): T = output[T](out, name, Some(desc), OuterClock)
+    def output[T <: UInt](out: T, name: String, desc: String, clock: ControlClock): T = output[T](out, name, Some(desc), clock)
 
     def addOutput[T <: UInt](out: Vec[T], name: String, desc: Option[String], clock: ControlClock) {
         out.zipWithIndex.foreach { case (signal, i) => addOutput(signal, name + s"_$i", desc, clock) }
@@ -132,6 +134,8 @@ class ControlBundle extends Bundle {
     }
     def output[T <: UInt](out: Vec[T], name: String): Vec[T] = output[T](out, name, None, OuterClock)
     def output[T <: UInt](out: Vec[T], name: String, clock: ControlClock): Vec[T] = output[T](out, name, None, clock)
+    def output[T <: UInt](out: Vec[T], name: String, desc: String): Vec[T] = output[T](out, name, Some(desc), OuterClock)
+    def output[T <: UInt](out: Vec[T], name: String, desc: String, clock: ControlClock): Vec[T] = output[T](out, name, Some(desc), clock)
 }
 
 trait HasControllerConnector {
