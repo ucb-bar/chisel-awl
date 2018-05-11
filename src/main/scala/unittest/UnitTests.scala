@@ -33,14 +33,52 @@ class UnitTestConfig extends Config((site, here, up) => {
         beatBytes = 8,
         blockBytes = 16
     )
+})
+
+class TLPacketizerTestConfig extends Config(new UnitTestConfig ++ new WithTLPacketizerTests)
+class WithTLPacketizerTests extends Config((site, here, up) => {
     case UnitTests => (q: Parameters) => {
         implicit val p = q
-        //TODO TLControllerTests()(p) ++
-        TLPacketizerTests()(p) ++
-        BertTests() ++
-        Encoding8b10bTests() ++
-        BitStufferTests() ++
-        TLLaneTests()(p) ++
+        TLPacketizerTests()(p)
+    }
+})
+
+class BertTestConfig extends Config(new UnitTestConfig ++ new WithBertTests)
+class WithBertTests extends Config((site, here, up) => {
+    case UnitTests => (q: Parameters) => {
+        implicit val p = q
+        BertTests()
+    }
+})
+
+class Encoding8b10bTestConfig extends Config(new UnitTestConfig ++ new WithEncoding8b10bTests)
+class WithEncoding8b10bTests extends Config((site, here, up) => {
+    case UnitTests => (q: Parameters) => {
+        implicit val p = q
+        Encoding8b10bTests()
+    }
+})
+
+class BitStufferTestConfig extends Config(new UnitTestConfig ++ new WithBitStufferTests)
+class WithBitStufferTests extends Config((site, here, up) => {
+    case UnitTests => (q: Parameters) => {
+        implicit val p = q
+        BitStufferTests()
+    }
+})
+
+class TLLaneTestConfig extends Config(new UnitTestConfig ++ new WithTLLaneTests)
+class WithTLLaneTests extends Config((site, here, up) => {
+    case UnitTests => (q: Parameters) => {
+        implicit val p = q
+        TLLaneTests()(p)
+    }
+})
+
+class FixedWidthLaneTestConfig extends Config(new UnitTestConfig ++ new WithFixedWidthLaneTests)
+class WithFixedWidthLaneTests extends Config((site, here, up) => {
+    case UnitTests => (q: Parameters) => {
+        implicit val p = q
         FixedWidthLaneTests()
     }
 })
