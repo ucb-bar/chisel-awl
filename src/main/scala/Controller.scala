@@ -59,6 +59,8 @@ class ControlBundle extends Bundle {
     }
 
     def addInput[T <: UInt](in: T, default: Option[BigInt], name: String, desc: Option[String], clock: ControlClock) {
+        require(!inputMap.contains(name), s"Duplicate input control added: ${name}")
+        require(!outputMap.contains(name), s"Input and output control added with same name: ${name}")
         inputMap.put(name, ControlInput(name, in, default, desc, clock))
     }
 
@@ -83,7 +85,7 @@ class ControlBundle extends Bundle {
     def input[T <: UInt](in: T, name: String, clock: ControlClock): T = input[T](in, None, name, None, clock)
 
     def addInput[T <: UInt](in: Vec[T], default: Option[Seq[BigInt]], name: String, desc: Option[String], clock: ControlClock) {
-        in.zipWithIndex.foreach { case (signal, i) => inputMap.put(name + s"_$i", ControlInput(name + s"_$i", signal, default.map(_(i)), desc, clock)) }
+        in.zipWithIndex.foreach { case (signal, i) => addInput(signal, default.map(_(i)), name + s"_$i", desc, clock) }
     }
 
     def input[T <: UInt](in: Vec[T], default: Option[Seq[BigInt]], name: String, desc: Option[String], clock: ControlClock): Vec[T] = {
@@ -106,6 +108,8 @@ class ControlBundle extends Bundle {
     def input[T <: UInt](in: Vec[T], name: String, clock: ControlClock): Vec[T] = input[T](in: Vec[T], None, name, None, clock)
 
     def addOutput[T <: UInt](out: T, name: String, desc: Option[String], clock: ControlClock) {
+        require(!outputMap.contains(name), s"Duplicate output control added: ${name}")
+        require(!inputMap.contains(name), s"Input and output control added with same name: ${name}")
         outputMap.put(name, ControlOutput(name, out, desc, clock))
     }
 
@@ -118,7 +122,7 @@ class ControlBundle extends Bundle {
     def output[T <: UInt](out: T, name: String, clock: ControlClock): T = output[T](out, name, None, clock)
 
     def addOutput[T <: UInt](out: Vec[T], name: String, desc: Option[String], clock: ControlClock) {
-        out.zipWithIndex.foreach { case (signal, i) => outputMap.put(name + s"_$i", ControlOutput(name + s"_$i", signal, desc, clock)) }
+        out.zipWithIndex.foreach { case (signal, i) => addOutput(signal, name + s"_$i", desc, clock) }
     }
 
     def output[T <: UInt](out: Vec[T], name: String, desc: Option[String], clock: ControlClock): Vec[T] = {
