@@ -11,16 +11,16 @@ import freechips.rocketchip.subsystem.{PeripheryBusKey, CacheBlockBytes}
 abstract class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn)
     (implicit val c: SerDesConfig, implicit val b: BertConfig, implicit val m: PatternMemConfig, implicit val p: Parameters) extends Lane
     with HasEncoding8b10b
-    with HasBertDebug
-    with HasPatternMemDebug
-    with HasBitStufferDebug4Modes
-    with HasBitReversalDebug
     with HasTLBidirectionalPacketizer
     with HasTLController
 
 class GenericTLLane8b10b(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn)(implicit p: Parameters)
     extends TLLane8b10b(clientEdge, managerEdge)(p(HbwifSerDesKey), p(HbwifBertKey), p(HbwifPatternMemKey), p)
     with HasGenericTransceiverSubsystem
+    with HasBertDebug
+    with HasPatternMemDebug
+    with HasBitStufferDebug4Modes
+    with HasBitReversalDebug
 
 
 abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
