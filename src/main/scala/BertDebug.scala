@@ -25,17 +25,40 @@ class BertDebug()(implicit c: SerDesConfig, implicit val b: BertConfig) extends 
     require((c.dataWidth % c.numWays) == 0)
 
     override val controlIO = Some(IO(new ControlBundle {
-        val enable         = input(Bool(), 0, "bert_enable", TxClock)
-        val clear          = input(Bool(), 1, "bert_clear", RxClock)
-        val prbsLoad       = input(UInt(prbs.map(_._1).max.W), "bert_prbs_load") // Not resynchronized, load this value while disabled
-        val prbsModeTx     = input(UInt(2.W), "bert_prbs_mode_tx", TxClock)
-        val prbsModeRx     = input(UInt(2.W), "bert_prbs_mode_rx", RxClock)
-        val prbsSelect     = input(UInt(log2Ceil(prbs.length).W), "bert_prbs_select") // Not resynchronized, load this value while disabled
-        val prbsSeedGoods  = output(UInt(c.numWays.W), "bert_prbs_seed_goods", TxClock)
-        val sampleCount    = input(UInt(b.bertSampleCounterWidth.W), "bert_sample_count", RxClock)
-        val sampleCountOut = output(UInt(b.bertSampleCounterWidth.W), "bert_sample_count_out", RxClock)
-        val errorCounts    = output(Vec(c.numWays, UInt(b.bertErrorCounterWidth.W)), "bert_error_counts", RxClock)
-        val berMode        = input(Bool(), "bert_ber_mode", RxClock)
+        val enable         = input(Bool(), 0, "bert_enable",
+            "Active-high enable for BERT mode. When enabled, incoming TX data is overriden", TxClock)
+
+        val clear          = input(Bool(), 1, "bert_clear",
+            "Active-high clear to 0 for BERT error counters", RxClock)
+
+        val prbsLoad       = input(UInt(prbs.map(_._1).max.W),
+            "bert_prbs_load", "Load data for BERT TX PRBS (LOAD mode only). Only toggle while bert_enable is low")
+            // Not resynchronized, load this value while disabled
+
+        val prbsModeTx     = input(UInt(2.W), "bert_prbs_mode_tx",
+            "BERT TX PRBS Mode: " + PRBS.stateString, TxClock)
+
+        val prbsModeRx     = input(UInt(2.W), "bert_prbs_mode_rx",
+            "BERT RX PRBS Mode: " + PRBS.stateString, RxClock)
+
+        val prbsSelect     = input(UInt(log2Ceil(prbs.length).W), "bert_prbs_select",
+            "BERT PRBS Select: " + prbsSelectString.zipWithIndex.map({case (p, i) => s"${i} = ${p}"}).mkString(", ") + ". Only toggle while bert_enable is low")
+            // Not resynchronized, load this value while disabled
+
+        val prbsSeedGoods  = output(UInt(c.numWays.W), "bert_prbs_seed_goods",
+            "Per-way output signifying the PRBS has seeded correctly (i.e. nonzero)", TxClock)
+
+        val sampleCount    = input(UInt(b.bertSampleCounterWidth.W), "bert_sample_count",
+            s"Desired number of ${c.dataWidth}-bit samples to accumulate before stopping", RxClock)
+
+        val sampleCountOut = output(UInt(b.bertSampleCounterWidth.W), "bert_sample_count_out",
+            "Actual number of samples accumulated at current time", RxClock)
+
+        val errorCounts    = output(Vec(c.numWays, UInt(b.bertErrorCounterWidth.W)), "bert_error_counts",
+            "Total number of bits errors accumulated per-way (bert_ber_mode = 1) or total number of ones accumulated per way (bert_ber_mode = 0)", RxClock)
+
+        val berMode        = input(Bool(), "bert_ber_mode",
+            "BER mode enable: 0 = accumulate ones, 1 = accumulate bit errors", RxClock)
     }))
     val ctrl = controlIO.get
 
@@ -99,6 +122,8 @@ object PRBS {
 
     val sLoad :: sSeed :: sRun :: sStop :: Nil = Enum(4)
 
+    def stateString = "0 = LOAD (manually set PRBS state), 1 = SEED (set PRBS state from incoming data), 2 = RUN (advance PRBS each cycle), 3 = STOP (do not advance PRBS)"
+
     def apply(prbs: (Int, Int), parallel: Int): PRBS = Module(new PRBS(prbs._1, prbs._2, parallel))
 }
 
@@ -147,22 +172,26 @@ trait HasPRBS {
     this: BertDebug =>
     // each entry is a tuple containing (width, polynomial)
     def prbs(): Seq[(Int, Int)] = Seq()
+    def prbsSelectString: Seq[String] = Seq("")
     require(prbs.length > 0, "must override prbs!")
 }
 
 trait HasPRBS7 extends HasPRBS {
     this: BertDebug =>
     abstract override def prbs() = super.prbs() ++ Seq((7, 0x60))
+    abstract override def prbsSelectString = super.prbsSelectString ++ Seq("PRBS7")
 }
 
 trait HasPRBS15 extends HasPRBS {
     this: BertDebug =>
     abstract override def prbs() = super.prbs() ++ Seq((15, 0x6000))
+    abstract override def prbsSelectString = super.prbsSelectString ++ Seq("PRBS15")
 }
 
 trait HasPRBS31 extends HasPRBS {
     this: BertDebug =>
     abstract override def prbs() = super.prbs() ++ Seq((31, 0x48000000))
+    abstract override def prbsSelectString = super.prbsSelectString ++ Seq("PRBS31")
 }
 
 trait HasAllPRBS extends HasPRBS7 with HasPRBS15 with HasPRBS31 { this: BertDebug => }

@@ -19,7 +19,8 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
     with BasicPacketizerStateMachine[S, FixedWidthData[F]] {
 
     override val controlIO = Some(IO(new ControlBundle {
-        val enable = input(Bool(), 0, "packetizer_enable")
+        val enable = input(Bool(), 0, "packetizer_enable",
+            "When high, enables traffic to flow over the interface. Unsafe to deassert while traffic is in flight", TxClock)
     }))
 
     enable := controlIO.get.enable

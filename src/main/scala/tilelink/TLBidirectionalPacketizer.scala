@@ -19,7 +19,8 @@ object TLBidirectionalPacketizerIO {
 class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, managerEdge: TLEdgeIn, decodedSymbolsPerCycle: Int, symbolFactory: () => S)(implicit val p: Parameters)
     extends Packetizer(decodedSymbolsPerCycle, symbolFactory, TLBidirectionalPacketizerIO.apply(clientEdge, managerEdge) _) with TLPacketizerUtils with BasicPacketizerStateMachine[S, TLBidirectionalPacketizerIO] {
     override val controlIO = Some(IO(new ControlBundle {
-        val enable = input(Bool(), 0, "mem_mode_enable", TxClock)
+        val enable = input(Bool(), 0, "mem_mode_enable",
+            "When high, enables memory traffic over the tilelink interface. Unsafe to disable while traffic is in flight", TxClock)
     }))
 
     enable := controlIO.get.enable

@@ -45,10 +45,12 @@ class TransceiverSubsystemIO()(implicit val c: SerDesConfig) extends Bundle with
 class GenericTransceiverSubsystemControlBundle extends ControlBundle {
 
     // RX invert bit
-    val rxInvert = input(Bool(), 0, "rx_invert")
+    val rxInvert = input(Bool(), 0, "rx_invert",
+        "RX polarity select, 0 = normal, 1 = inverted", RxClock)
 
     // TX invert bit
-    val txInvert = input(Bool(), 0, "tx_invert")
+    val txInvert = input(Bool(), 0, "tx_invert",
+        "TX polarity select, 0 = normal, 1 = inverted", TxClock)
 
 }
 

@@ -11,16 +11,16 @@ import freechips.rocketchip.subsystem.{PeripheryBusKey, CacheBlockBytes}
 abstract class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn)
     (implicit val c: SerDesConfig, implicit val b: BertConfig, implicit val m: PatternMemConfig, implicit val p: Parameters) extends Lane
     with HasEncoding8b10b
-    with HasBertDebug
-    with HasPatternMemDebug
-    with HasBitStufferDebug4Modes
-    with HasBitReversalDebug
     with HasTLBidirectionalPacketizer
     with HasTLController
 
 class GenericTLLane8b10b(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn)(implicit p: Parameters)
     extends TLLane8b10b(clientEdge, managerEdge)(p(HbwifSerDesKey), p(HbwifBertKey), p(HbwifPatternMemKey), p)
     with HasGenericTransceiverSubsystem
+    with HasBertDebug
+    with HasPatternMemDebug
+    with HasBitStufferDebug4Modes
+    with HasBitReversalDebug
 
 
 abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
@@ -69,11 +69,18 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         beatBytes = beatBytes,
         endSinkId = 0,
         minLatency = 1) })
-    val configNodes = (0 until lanes).map { id => TLRegisterNode(
-            address            = List(configAddressSets(id)),
-            device             = new SimpleDevice(s"HbwifConfig$id", Seq(s"ucb-bar,hbwif$id")),
-            beatBytes          = p(PeripheryBusKey).beatBytes
+    val registerNodes = (0 until lanes).map { id => TLRegisterNode(
+        address            = List(configAddressSets(id)),
+        device             = new SimpleDevice(s"HbwifConfig$id", Seq(s"ucb-bar,hbwif$id")),
+        beatBytes          = p(PeripheryBusKey).beatBytes
     )}
+    val configBuffers = (0 until lanes).map { id =>
+        LazyModule(new TLBuffer())
+    }
+    val configNodes = (0 until lanes).map { id =>
+        registerNodes(id) := configBuffers(id).node
+        configBuffers(id).node
+    }
 
     lazy val module = new LazyModuleImp(this) {
         val banks = p(HbwifTLKey).numBanks
@@ -90,14 +97,15 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         val (laneModules, addrmaps) = (0 until lanes).map({ id =>
             val (clientOut, clientEdge) = clientNode.out(id)
             val (managerIn, managerEdge) = managerNode.in(id)
-            val (configIn, configEdge) = configNodes(id).in(0)
+            val (registerIn, registerEdge) = registerNodes(id).in(0)
             clientOut.suggestName(s"hbwif_client_port_$id")
             managerIn.suggestName(s"hbwif_manager_port_$id")
-            configIn.suggestName(s"hbwif_config_port_$id")
+            configBuffers(id).module.suggestName(s"hbwif_config_port_$id")
+            registerIn.suggestName(s"hbwif_register_port_$id")
             val lane = Module(genLane(clientEdge, managerEdge))
             val regmap = lane.regmap
             val addrmap = TLController.toAddrmap(regmap)
-            configNodes(id).regmap(regmap:_*)
+            registerNodes(id).regmap(regmap:_*)
             clientOut <> lane.io.data.client
             lane.io.data.manager <> managerIn
             tx(id) <> lane.io.tx

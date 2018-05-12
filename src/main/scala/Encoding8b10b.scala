@@ -215,8 +215,10 @@ class Decoder8b10b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbolsPe
     val io = IO(new DecoderIO(symbolFactory, decodedSymbolsPerCycle))
 
     override val controlIO = Some(IO(new ControlBundle {
-        val error = output(Bool(), "decoder_error", RxClock)
-        val clearError = input(Bool(), 0, "decoder_clear_error", RxClock)
+        val error = output(Bool(), "decoder_error",
+            "When high, signifies that the decoder got an invalid 8b/10b symbol. Remains high until cleared.", RxClock)
+        val clearError = input(Bool(), 0, "decoder_clear_error",
+            "When high, sets decoder_error to 0. Errors will be ignored until set low.", RxClock)
     }))
 
     val idx = RegInit(0.U(4.W))

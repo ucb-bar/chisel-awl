@@ -7,8 +7,8 @@ import chisel3.experimental.withClockAndReset
 class BitReversalDebug()(implicit c: SerDesConfig) extends Debug()(c) {
 
     override val controlIO = Some(IO(new ControlBundle {
-        val txReverse = input(Bool(), 0, "bit_reverse_tx")
-        val rxReverse = input(Bool(), 0, "bit_reverse_rx")
+        val txReverse = input(Bool(), 0, "bit_reverse_tx", "0 = TX bits are normal, 1 = TX bits are reversed in time")
+        val rxReverse = input(Bool(), 0, "bit_reverse_rx", "0 = RX bits are normal, 1 = RX bits are reversed in time")
     }))
 
     io.txOut.bits := Mux(controlIO.get.txReverse, Reverse(io.txIn.bits), io.txIn.bits)

@@ -6,7 +6,7 @@ import chisel3.util._
 import chisel3.experimental.{withClock, withClockAndReset}
 import freechips.rocketchip.regmapper.{RegField, RegFieldDesc, RegFieldAccessType, RegReadFn, RegWriteFn}
 import freechips.rocketchip.tilelink.{Pattern, WritePattern, ReadPattern, ReadExpectPattern}
-import freechips.rocketchip.util.{AsyncQueue, AsyncResetShiftReg}
+import freechips.rocketchip.util.{AsyncQueue, AsyncResetShiftReg, SynchronizerShiftReg}
 import scala.collection.mutable.ArrayBuffer
 
 trait TLControllerPattern {
@@ -39,14 +39,17 @@ trait HasTLController {
         (seq ++ mapped._1, mapped._2)
     })._1
 
+    private def bytesPerReg = 8
+
     private def ioToRegMap(cio: Option[ControlBundle], base: Int): (Seq[(Int, Seq[RegField])], Int) = {
         if (cio.isDefined) {
-            val bytesPerReg = 8
             val ins = cio.get.inputMap.values.toSeq.sortWith(_.name < _.name).zipWithIndex.map { case (x, i) =>
+                require(x.width <= 8*bytesPerReg, s"The bit width for input register ${x.name} is too large (${x.width} > ${8*bytesPerReg}). Reconfigure the TLController or change your signals")
                 ((base + i*bytesPerReg) -> Seq(inputCrossing(x)))
             }
             val outBase = base + ins.length*bytesPerReg
             val outs = cio.get.outputMap.values.toSeq.sortWith(_.name < _.name).zipWithIndex.map { case (x, i) =>
+                require(x.width <= 8*bytesPerReg, s"The bit width for output register ${x.name} is too large (${x.width} > ${8*bytesPerReg}). Reconfigure the TLController or change your signals")
                 ((outBase + i*bytesPerReg) -> Seq(outputCrossing(x)))
             }
             return ((outs ++ ins), (outBase + outs.length*bytesPerReg))
@@ -56,7 +59,7 @@ trait HasTLController {
     }
 
     private def inputCrossing(x: ControlInput): RegField = {
-        val width = x.signal.getWidth
+        val width = x.width
         val (toClock, toReset) = x.clock match {
             case OuterClock => (this.clock, this.reset.toBool)
             case TxClock => (this.io.txClock, this.io.txReset)
@@ -97,8 +100,40 @@ trait HasTLController {
     }
 
     private def outputCrossing(x: ControlOutput): RegField = {
-        val width = x.signal.getWidth
-        RegField.r(width, RegReadFn(x.signal), RegFieldDesc(
+        val width = x.width
+        val (fromClock, fromReset) = x.clock match {
+            case OuterClock => (this.clock, this.reset.toBool)
+            case TxClock => (this.io.txClock, this.io.txReset)
+            case RxClock => (this.io.rxClock, this.io.rxReset)
+            case _ => ???
+        }
+        val readfn = x.clock match {
+            case OuterClock => {
+                RegReadFn(x.signal)
+            }
+            case _ => {
+                if (width == 1) {
+                    val reg = Reg(Bool())
+                    reg.suggestName(s"hbwif_scrouter_${x.name}")
+                    reg := SynchronizerShiftReg(x.signal, 3, Some(s"hbwif_scrsync_${x.name}"))
+                    RegReadFn(reg)
+                } else {
+                    // Use a small async FIFO and have the FIFO constantly churning
+                    val q = Module(new AsyncQueue(chiselTypeOf(x.signal), 1, 3, false, false)).suggestName(s"hbwif_scrqueue_${x.name}")
+                    q.io.enq_clock := fromClock
+                    q.io.deq_clock := this.clock
+                    q.io.enq_reset := fromReset
+                    q.io.deq_reset := this.reset.toBool
+                    q.io.deq.ready := true.B
+                    q.io.enq.valid := true.B // always grab data from the other domain
+                    // ignore q.io.deq.valid
+                    // ignore q.io.enq.ready
+                    q.io.enq.bits := x.signal
+                    RegReadFn(q.io.deq.bits)
+                }
+            }
+        }
+        RegField.r(width, readfn, RegFieldDesc(
             name = x.name,
             desc = x.desc.getOrElse(""),
             access = RegFieldAccessType.R,

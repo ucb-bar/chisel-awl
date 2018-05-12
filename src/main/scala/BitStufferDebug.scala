@@ -10,7 +10,7 @@ class BitStufferDebug(val numModes: Int)(implicit c: SerDesConfig) extends Debug
     require(c.dataWidth % (1 << (numModes - 1)) == 0)
 
     override val controlIO = Some(IO(new ControlBundle {
-        val mode = input(UInt(log2Ceil(numModes).W), 0, "bit_stuffer_mode")
+        val mode = input(UInt(log2Ceil(numModes).W), 0, "bit_stuffer_mode", "For mode = N, artificially divides the frequency of the link by 2^N")
     }))
     val ctrl = controlIO.get
 
