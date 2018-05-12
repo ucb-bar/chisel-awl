@@ -36,27 +36,31 @@ class ControlBundle extends Bundle {
     }
     def attach[T <: ControlBundle](other: Option[T]) { attach(other.get) }
 
-    def child[T <: ControlBundle](x: T, prefix: String): T = {
+    def child[T <: ControlBundle](x: T, prefix: String, clockOverride: Option[ControlClock]): T = {
         x.inputMap.values.foreach { input =>
-            addInput(input.signal, input.default, prefix + "_" + input.name, input.desc, input.clock)
+            addInput(input.signal, input.default, prefix + "_" + input.name, input.desc, clockOverride.getOrElse(input.clock))
         }
         x.outputMap.values.foreach { output =>
-            addOutput(output.signal, prefix + "_" + output.name, output.desc, output.clock)
+            addOutput(output.signal, prefix + "_" + output.name, output.desc, clockOverride.getOrElse(output.clock))
         }
         x
     }
+    def child[T <: ControlBundle](x: T, prefix: String, clockOverride: ControlClock): T = child(x, prefix, Some(clockOverride))
+    def child[T <: ControlBundle](x: T, prefix: String): T = child(x, prefix, None)
 
-    def child[T <: ControlBundle](x: Vec[T], prefix: String): Vec[T] = {
+    def child[T <: ControlBundle](x: Vec[T], prefix: String, clockOverride: Option[ControlClock] = None): Vec[T] = {
         x.zipWithIndex.foreach { case (c, i) =>
             c.inputMap.values.foreach { input =>
-                addInput(input.signal, input.default, prefix + s"_${i}_" + input.name, input.desc, input.clock)
+                addInput(input.signal, input.default, prefix + s"_${i}_" + input.name, input.desc, clockOverride.getOrElse(input.clock))
             }
             c.outputMap.values.foreach { output =>
-                addOutput(output.signal, prefix + s"_${i}_" + output.name, output.desc, output.clock)
+                addOutput(output.signal, prefix + s"_${i}_" + output.name, output.desc, clockOverride.getOrElse(output.clock))
             }
         }
         x
     }
+    def child[T <: ControlBundle](x: Vec[T], prefix: String, clockOverride: ControlClock): Vec[T] = child(x, prefix, Some(clockOverride))
+    def child[T <: ControlBundle](x: Vec[T], prefix: String): Vec[T] = child(x, prefix, None)
 
     def addInput[T <: UInt](in: T, default: Option[BigInt], name: String, desc: Option[String], clock: ControlClock) {
         require(!inputMap.contains(name), s"Duplicate input control added: ${name}")
