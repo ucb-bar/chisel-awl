@@ -3,9 +3,11 @@ package hbwif.tilelink
 import hbwif._
 import chisel3._
 import chisel3.util._
+import chisel3.experimental.withReset
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config._
+import freechips.rocketchip.util._
 import freechips.rocketchip.subsystem.{PeripheryBusKey, CacheBlockBytes}
 
 abstract class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn)
@@ -29,14 +31,17 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
     val beatBytes = p(HbwifTLKey).beatBytes
     val cacheBlockBytes = p(CacheBlockBytes)
     val numXact = p(HbwifTLKey).numXact
+    val sinkIds = p(HbwifTLKey).sinkIds
     val managerAddressSet = p(HbwifTLKey).managerAddressSet
     val configAddressSets = p(HbwifTLKey).configAddressSets
     val mtlc = p(HbwifTLKey).managerTLC
     val mtluh = p(HbwifTLKey).managerTLUH
     val ctlc = p(HbwifTLKey).clientTLC
+    val clientPort = false //p(HbwifTLKey).clientPort
 
+    val numClientPorts = if(clientPort) lanes else 0
 
-    val clientNode = TLClientNode((0 until lanes).map { id => TLClientPortParameters(
+    val clientNode = TLClientNode((0 until numClientPorts).map { id => TLClientPortParameters(
         Seq(TLClientParameters(
             name               = s"HbwifClient$id",
             sourceId           = IdRange(0,numXact),
@@ -67,7 +72,7 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
             supportsAcquireB   = if (mtlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
             fifoId             = Some(0))),
         beatBytes = beatBytes,
-        endSinkId = 0,
+        endSinkId = sinkIds,
         minLatency = 1) })
     val registerNodes = (0 until lanes).map { id => TLRegisterNode(
         address            = List(configAddressSets(id)),
@@ -90,28 +95,49 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         val hbwifRefClocks = IO(Input(Vec(banks, Clock())))
         // These go to mmio registers
         val hbwifResets = IO(Input(Vec(lanes, Bool())))
+        // This is top-level reset
+        val resetAsync = IO(Input(Bool()))
 
         val tx = IO(Vec(lanes, new Differential()))
         val rx = IO(Vec(lanes, Flipped(new Differential())))
 
         val (laneModules, addrmaps) = (0 until lanes).map({ id =>
-            val (clientOut, clientEdge) = clientNode.out(id)
+            val (clientOut, clientEdge) = if(clientPort) {
+              clientNode.out(id)
+            } else {
+            (0.U(1.W), new TLEdgeOut(
+              TLClientPortParameters(Seq(TLClientParameters("FakeHbwifClient"))),
+              TLManagerPortParameters(Seq(
+                TLManagerParameters(
+                  Seq(AddressSet(0, 0xff)),
+                  supportsGet = TransferSizes(1, cacheBlockBytes))), beatBytes = 8),
+              p, chisel3.internal.sourceinfo.SourceLine("fake.scala", 0, 0)))
+            }
             val (managerIn, managerEdge) = managerNode.in(id)
             val (registerIn, registerEdge) = registerNodes(id).in(0)
-            clientOut.suggestName(s"hbwif_client_port_$id")
             managerIn.suggestName(s"hbwif_manager_port_$id")
             configBuffers(id).module.suggestName(s"hbwif_config_port_$id")
             registerIn.suggestName(s"hbwif_register_port_$id")
+            val pipelinedReset = withReset(resetAsync) {
+               AsyncResetShiftReg(reset.toBool, depth = p(HbwifPipelineResetDepth), init = 1)
+            }
             val lane = Module(genLane(clientEdge, managerEdge))
-            val regmap = lane.regmap
+            val regmap = withReset(pipelinedReset) { lane.regmap }
             val addrmap = TLController.toAddrmap(regmap)
             registerNodes(id).regmap(regmap:_*)
-            clientOut <> lane.io.data.client
+            if(clientPort) {
+               clientOut.suggestName(s"hbwif_client_port_$id")
+               clientOut <> lane.io.data.client
+            } else {
+              lane.io.data.client := DontCare
+            }
             lane.io.data.manager <> managerIn
             tx(id) <> lane.io.tx
             lane.io.rx <> rx(id)
             lane.io.clockRef <> hbwifRefClocks(id/(lanes/banks))
             lane.io.asyncResetIn <> hbwifResets(id)
+            lane.reset := pipelinedReset
+            configBuffers(id).module.reset := pipelinedReset
             (lane, addrmap)
         }).unzip
     }

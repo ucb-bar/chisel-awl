@@ -12,6 +12,7 @@ case class HbwifTLConfig(
     numBanks: Int = 2,
     beatBytes: Int = 16,
     numXact: Int = 32,
+    sinkIds: Int = 32,
     clientTLUH: Boolean = true,
     clientTLC: Boolean = true,
     managerTLUH: Boolean = true,
@@ -29,7 +30,12 @@ case object HbwifSerDesKey extends Field[SerDesConfig]
 case object HbwifBertKey extends Field[BertConfig]
 case object HbwifTLKey extends Field[HbwifTLConfig]
 case object HbwifPatternMemKey extends Field[PatternMemConfig]
+case object HbwifPipelineResetDepth extends Field[Int]
 case object BuildHbwif extends Field[Parameters => HbwifModule]
+
+class WithNHbwifLanes(nLanes: Int) extends Config((site, here, up) => {
+  case HbwifTLKey => up(HbwifTLKey, site).copy(numLanes = nLanes)
+})
 
 class WithGenericSerdes extends Config((site, here, up) => {
     case HbwifSerDesKey => SerDesConfig(
