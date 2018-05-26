@@ -27,7 +27,7 @@ class GenericTLLane8b10b(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn)(implicit 
 
 abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
 
-    val lanes = p(HbwifTLKey).numLanes
+    val lanes = p(HbwifNumLanes)
     val beatBytes = p(HbwifTLKey).beatBytes
     val cacheBlockBytes = p(CacheBlockBytes)
     val numXact = p(HbwifTLKey).numXact

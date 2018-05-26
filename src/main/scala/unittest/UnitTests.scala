@@ -13,10 +13,10 @@ class TestHarness(implicit p: Parameters)
 
 class UnitTestConfig extends Config((site, here, up) => {
     case XLen => 64
+    case HbwifNumLanes => 1
     case HbwifTLKey => HbwifTLConfig(
         managerAddressSet = AddressSet(0x10000, 0xffff),
         configAddressSets = Seq(AddressSet(0x00000, 0xffff)),
-        numLanes = 1,
         numBanks = 1,
         maxOutstanding = 8,
         beatBytes = 8,
