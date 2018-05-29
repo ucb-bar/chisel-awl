@@ -8,10 +8,10 @@ import freechips.rocketchip.subsystem.{ExtMem, BankedL2Key, MemoryBusKey}
 case class HbwifTLConfig(
     managerAddressSet: AddressSet,
     configAddressSets: Seq[AddressSet],
-    numLanes: Int = 8,
     numBanks: Int = 2,
     beatBytes: Int = 16,
     numXact: Int = 32,
+    sinkIds: Int = 32,
     clientTLUH: Boolean = true,
     clientTLC: Boolean = true,
     managerTLUH: Boolean = true,
@@ -27,23 +27,28 @@ case class HbwifTLConfig(
 
 case object HbwifSerDesKey extends Field[SerDesConfig]
 case object HbwifBertKey extends Field[BertConfig]
+case object HbwifNumLanes extends Field[Int]
 case object HbwifTLKey extends Field[HbwifTLConfig]
 case object HbwifPatternMemKey extends Field[PatternMemConfig]
+case object HbwifPipelineResetDepth extends Field[Int]
 case object BuildHbwif extends Field[Parameters => HbwifModule]
+
+class WithNHbwifLanes(nLanes: Int) extends Config((site, here, up) => {
+  case HbwifNumLanes => nLanes
+})
 
 class WithGenericSerdes extends Config((site, here, up) => {
     case HbwifSerDesKey => SerDesConfig(
         dataWidth = 16,
         numWays = 2
     )
+    case HbwifNumLanes => site(BankedL2Key).nMemoryChannels
     case HbwifTLKey => {
-        val nMemoryChannels = site(BankedL2Key).nMemoryChannels
         HbwifTLConfig(
             managerAddressSet = AddressSet(site(ExtMem).get.base, site(ExtMem).get.size - 1),
-            configAddressSets = Seq.tabulate(nMemoryChannels) { i =>
+            configAddressSets = Seq.tabulate(site(HbwifNumLanes)) { i =>
                 AddressSet(0x4000000 + i*0x10000, 0xffff)
             },
-            numLanes = nMemoryChannels,
             numBanks = 2,
             beatBytes = site(MemoryBusKey).beatBytes,
             numXact = 16,

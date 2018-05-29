@@ -14,7 +14,7 @@ class TLLaneTestLazy(delay: Int, loopback: Boolean)(implicit p: Parameters) exte
 
     val txns = 100
 
-    require(p(HbwifTLKey).numLanes == 1, "Only testing 1 lane (per chip) right now")
+    require(p(HbwifNumLanes) == 1, "Only testing 1 lane (per chip) right now")
     val nChips = if (loopback) 1 else 2
 
     val fuzz = LazyModule(new TLFuzzer(txns))
