@@ -275,7 +275,7 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
         count + (symbol.valid && symbol.bits.isData && (state === sReady))
     }
     for (i <- 0 until decodedSymbolsPerCycle) {
-        when(rxFire && (rxSymCount > rxNumSymbols + i.U)) {
+        when(rxFire && (rxSymCount > (rxNumSymbols +& i.U))) {
             rxBuffer((rxBufferBytes - 1).U - i.U - (rxNumSymbols - rxSymPopped)) := rxBuffer((rxBufferBytes - 1).U - i.U - rxNumSymbols)
         }
     }
