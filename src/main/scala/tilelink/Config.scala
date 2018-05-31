@@ -12,6 +12,7 @@ case class HbwifTLConfig(
     beatBytes: Int = 16,
     numXact: Int = 32,
     sinkIds: Int = 32,
+    clientPort: Boolean = false,
     clientTLUH: Boolean = true,
     clientTLC: Boolean = true,
     managerTLUH: Boolean = true,

@@ -37,7 +37,7 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
     val mtlc = p(HbwifTLKey).managerTLC
     val mtluh = p(HbwifTLKey).managerTLUH
     val ctlc = p(HbwifTLKey).clientTLC
-    val clientPort = false //p(HbwifTLKey).clientPort
+    val clientPort = p(HbwifTLKey).clientPort
 
     val numClientPorts = if(clientPort) lanes else 0
 
