@@ -138,7 +138,9 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     }
     val dataInflight = txADataInflight || txBDataInflight || txCDataInflight || txDDataInflight
 
-    cOutstanding := cOutstanding + Mux(tltx.b.fire() && txBFirst, tlResponseMap(tltx.b.bits), 0.U) - Mux(tlrx.c.fire(), tlrx.cEdge.last(tlrx.c), 0.U)
+    # Don't decrement cOutstanding on a Release (which is unsolicited)
+    def cRelease(c: TLBundleC) = (c.opcode === TLMessages.Release) || (c.opcode === TLMessages.ReleaseData)
+    cOutstanding := cOutstanding + Mux(tltx.b.fire() && txBFirst, tlResponseMap(tltx.b.bits), 0.U) - Mux(tlrx.c.fire() && !cRelease(tlrx.c.bits), tlrx.cEdge.last(tlrx.c), 0.U)
     dOutstanding := dOutstanding + Mux(tltx.a.fire() && txAFirst, tlResponseMap(tltx.a.bits), 0.U) + Mux(tltx.c.fire() && txCFirst, tlResponseMap(tltx.c.bits), 0.U) - Mux(tlrx.d.fire(), tlrx.dEdge.last(tlrx.d), 0.U)
     eOutstanding := eOutstanding + Mux(tltx.d.fire() && txDFirst, tlResponseMap(tltx.d.bits), 0.U) - Mux(tlrx.e.fire(), tlrx.eEdge.last(tlrx.e), 0.U)
 
