@@ -4,7 +4,7 @@ import hbwif._
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.tilelink._
-import freechips.rocketchip.util.AsyncQueue
+import freechips.rocketchip.util.{AsyncQueue, AsyncQueueParams}
 import freechips.rocketchip.config._
 
 class TLBidirectionalPacketizerIO(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn) extends Bundle {
@@ -193,11 +193,11 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     val rxBufferUInt = rxBuffer.asUInt
     val (rxType, rxOpcode) = typeFromBuffer(rxBufferUInt)
 
-    val rxA = tlFromBuffer(tlrx.aEdge, tlrx.a.bits, rxBufferUInt, false.B)
-    val rxB = tlFromBuffer(tlrx.bEdge, tlrx.b.bits, rxBufferUInt, false.B)
-    val rxC = tlFromBuffer(tlrx.cEdge, tlrx.c.bits, rxBufferUInt, false.B)
-    val rxD = tlFromBuffer(tlrx.dEdge, tlrx.d.bits, rxBufferUInt, false.B)
-    val rxE = tlFromBuffer(tlrx.eEdge, tlrx.e.bits, rxBufferUInt, false.B)
+    val rxA = tlFromBuffer(tlrx.aEdge, tlrx.a.bits, rxBufferUInt)
+    val rxB = tlFromBuffer(tlrx.bEdge, tlrx.b.bits, rxBufferUInt)
+    val rxC = tlFromBuffer(tlrx.cEdge, tlrx.c.bits, rxBufferUInt)
+    val rxD = tlFromBuffer(tlrx.dEdge, tlrx.d.bits, rxBufferUInt)
+    val rxE = tlFromBuffer(tlrx.eEdge, tlrx.e.bits, rxBufferUInt)
 
     // Assume we can only handle one thing at a time, for now
     val aQueue = Module(new Queue(chiselTypeOf(rxA.bits), aMaxOutstanding * aMaxBeats, true, true))
@@ -286,21 +286,18 @@ class TLBidirectionalPacketizer[S <: DecodedSymbol](clientEdge: TLEdgeOut, manag
     // TODO need to not assume that the sender interface looks like ours, it's possible we get multiple E messages per cycle
 
     def connectData(dataClock: Clock, dataReset: Bool, data: TLBidirectionalPacketizerIO) {
-        val qDepth = p(HbwifTLKey).asyncQueueDepth
-        val qSync = p(HbwifTLKey).asyncQueueSync
-        val qSafe = p(HbwifTLKey).asyncQueueSafe
-        val qNarrow = p(HbwifTLKey).asyncQueueNarrow
+        val qParams = AsyncQueueParams(p(HbwifTLKey).asyncQueueDepth, p(HbwifTLKey).asyncQueueSync, p(HbwifTLKey).asyncQueueSafe, p(HbwifTLKey).asyncQueueNarrow)
 
-        val maq = Module(new AsyncQueue(io.data.manager.a.bits, qDepth, qSync, qSafe, qNarrow))
-        val mbq = Module(new AsyncQueue(io.data.manager.b.bits, qDepth, qSync, qSafe, qNarrow))
-        val mcq = Module(new AsyncQueue(io.data.manager.c.bits, qDepth, qSync, qSafe, qNarrow))
-        val mdq = Module(new AsyncQueue(io.data.manager.d.bits, qDepth, qSync, qSafe, qNarrow))
-        val meq = Module(new AsyncQueue(io.data.manager.e.bits, qDepth, qSync, qSafe, qNarrow))
-        val caq = Module(new AsyncQueue(io.data.client.a.bits, qDepth, qSync, qSafe, qNarrow))
-        val cbq = Module(new AsyncQueue(io.data.client.b.bits, qDepth, qSync, qSafe, qNarrow))
-        val ccq = Module(new AsyncQueue(io.data.client.c.bits, qDepth, qSync, qSafe, qNarrow))
-        val cdq = Module(new AsyncQueue(io.data.client.d.bits, qDepth, qSync, qSafe, qNarrow))
-        val ceq = Module(new AsyncQueue(io.data.client.e.bits, qDepth, qSync, qSafe, qNarrow))
+        val maq = Module(new AsyncQueue(io.data.manager.a.bits, qParams))
+        val mbq = Module(new AsyncQueue(io.data.manager.b.bits, qParams))
+        val mcq = Module(new AsyncQueue(io.data.manager.c.bits, qParams))
+        val mdq = Module(new AsyncQueue(io.data.manager.d.bits, qParams))
+        val meq = Module(new AsyncQueue(io.data.manager.e.bits, qParams))
+        val caq = Module(new AsyncQueue(io.data.client.a.bits, qParams))
+        val cbq = Module(new AsyncQueue(io.data.client.b.bits, qParams))
+        val ccq = Module(new AsyncQueue(io.data.client.c.bits, qParams))
+        val cdq = Module(new AsyncQueue(io.data.client.d.bits, qParams))
+        val ceq = Module(new AsyncQueue(io.data.client.e.bits, qParams))
 
         maq.suggestName("AsyncQueueManagerA")
         mbq.suggestName("AsyncQueueManagerB")

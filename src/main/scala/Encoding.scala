@@ -6,7 +6,7 @@ import chisel3.experimental.{withClockAndReset, MultiIOModule}
 import scala.math.max
 
 // TODO get rid of this rocketchip dependency
-import freechips.rocketchip.util.AsyncQueue
+import freechips.rocketchip.util.{AsyncQueue, AsyncQueueParams}
 
 // rate is how many decoded symbols are there per encoded symbol
 abstract class DecodedSymbol(val decodedWidth: Int, val encodedWidth: Int, val rate: Int) extends Bundle {
@@ -182,7 +182,7 @@ final class DecoderQueue[S <: DecodedSymbol](val decodedSymbolsPerCycle: Int,  v
         assert(m.ready || !m.valid, "Buffer overrun")
     }
 
-    val async = Module(new AsyncQueue(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())), 8, 2, true))
+    val async = Module(new AsyncQueue(Vec(decodedSymbolsPerCycle, Valid(symbolFactory())), AsyncQueueParams(8, 2, true)))
     async.io.enq_clock := io.enqClock
     async.io.enq_reset := io.enqReset
     async.io.deq_clock := io.deqClock

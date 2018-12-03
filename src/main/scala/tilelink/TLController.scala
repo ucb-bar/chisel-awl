@@ -6,7 +6,7 @@ import chisel3.util._
 import chisel3.experimental.{withClock, withClockAndReset}
 import freechips.rocketchip.regmapper.{RegField, RegFieldDesc, RegFieldAccessType, RegReadFn, RegWriteFn}
 import freechips.rocketchip.tilelink.{Pattern, WritePattern, ReadPattern, ReadExpectPattern}
-import freechips.rocketchip.util.{AsyncQueue, AsyncResetShiftReg, SynchronizerShiftReg}
+import freechips.rocketchip.util.{AsyncQueue, AsyncQueueParams, AsyncResetShiftReg, SynchronizerShiftReg}
 import scala.collection.mutable.ArrayBuffer
 
 trait TLControllerPattern {
@@ -83,7 +83,7 @@ trait HasTLController {
                     RegField(width, outerReg, RegFieldDesc(x.name, x.desc.getOrElse(""), reset = x.default))
                 } else {
                     // Use a small async FIFO
-                    val q = Module(new AsyncQueue(chiselTypeOf(x.signal), 1, 3, false, false)).suggestName(s"hbwif_scrinqueue_${x.name}")
+                    val q = Module(new AsyncQueue(chiselTypeOf(x.signal), AsyncQueueParams(1, 3, false, false))).suggestName(s"hbwif_scrinqueue_${x.name}")
                     q.io.enq_clock := this.clock
                     q.io.deq_clock := toClock
                     q.io.enq_reset := this.reset.toBool
@@ -119,7 +119,7 @@ trait HasTLController {
                     RegReadFn(reg)
                 } else {
                     // Use a small async FIFO and have the FIFO constantly churning
-                    val q = Module(new AsyncQueue(chiselTypeOf(x.signal), 1, 3, false, false)).suggestName(s"hbwif_scroutqueue_${x.name}")
+                    val q = Module(new AsyncQueue(chiselTypeOf(x.signal), AsyncQueueParams(1, 3, false, false))).suggestName(s"hbwif_scroutqueue_${x.name}")
                     q.io.enq_clock := fromClock
                     q.io.deq_clock := this.clock
                     q.io.enq_reset := fromReset

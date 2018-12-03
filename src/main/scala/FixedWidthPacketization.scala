@@ -3,7 +3,8 @@ package hbwif
 import chisel3._
 import chisel3.util._
 
-import freechips.rocketchip.util.AsyncQueue
+// TODO get rid of this rocketchip dependency
+import freechips.rocketchip.util.{AsyncQueue, AsyncQueueParams}
 
 class FixedWidthData[F <: Data](factory: () => F) extends Bundle {
     val tx = Flipped(Decoupled(factory()))
@@ -81,13 +82,10 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
     }
 
     def connectData(dataClock: Clock, dataReset: Bool, data: FixedWidthData[F]) {
-        val qDepth = 8
-        val qSync = 3
-        val qSafe = true
-        val qNarrow = false
+        val qParams = AsyncQueueParams(8, 3, true, false)
 
-        val txq = Module(new AsyncQueue(io.data.tx.bits, qDepth, qSync, qSafe, qNarrow))
-        val rxq = Module(new AsyncQueue(io.data.rx.bits, qDepth, qSync, qSafe, qNarrow))
+        val txq = Module(new AsyncQueue(io.data.tx.bits, qParams))
+        val rxq = Module(new AsyncQueue(io.data.rx.bits, qParams))
 
         txq.suggestName("AsyncQueueTx")
         rxq.suggestName("AsyncQueueRx")

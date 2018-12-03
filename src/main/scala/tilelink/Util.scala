@@ -13,8 +13,8 @@ trait TLPacketizerUtils {
         x match {
             case a: TLBundleA => { tlTypeWidth + 3 + List(TLAtomics.width, TLPermissions.aWidth, TLHints.width).max + a.params.sizeBits + a.params.sourceBits + a.params.addressBits } // mask is separate
             case b: TLBundleB => { tlTypeWidth + 3 + TLPermissions.bdWidth + b.params.sizeBits + b.params.sourceBits + b.params.addressBits } // mask is separate
-            case c: TLBundleC => { tlTypeWidth + 3 + TLPermissions.cWidth + c.params.sizeBits + c.params.sourceBits + c.params.addressBits }  // ignore error
-            case d: TLBundleD => { tlTypeWidth + 3 + TLPermissions.bdWidth + d.params.sizeBits + d.params.sourceBits + d.params.sinkBits }    // ignore error
+            case c: TLBundleC => { tlTypeWidth + 3 + TLPermissions.cWidth + c.params.sizeBits + c.params.sourceBits + c.params.addressBits }
+            case d: TLBundleD => { tlTypeWidth + 3 + TLPermissions.bdWidth + d.params.sizeBits + d.params.sourceBits + d.params.sinkBits }
             case e: TLBundleE => { tlTypeWidth + e.params.sinkBits }
         }
     }
@@ -28,7 +28,7 @@ trait TLPacketizerUtils {
     def div8Ceil(x: Int): Int = (x + 7)/8
     def divCeil(x: Int, y: Int): Int = (x + y - 1)/y
 
-    def tlFromBuffer[T <: TLChannel](edge: TLEdge, x: T, buf: UInt, error: Bool): DecoupledIO[T] = {
+    def tlFromBuffer[T <: TLChannel](edge: TLEdge, x: T, buf: UInt): DecoupledIO[T] = {
         val w = buf.getWidth - tlTypeWidth
         (x match {
             case a: TLBundleA => {
@@ -77,7 +77,6 @@ trait TLPacketizerUtils {
                         left
                     }
                 }
-                bits.error := error
                 out
             }
             case d: TLBundleD => {
@@ -94,7 +93,6 @@ trait TLPacketizerUtils {
                         left
                     }
                 }
-                bits.error := error
                 out
             }
             case e: TLBundleE => {
@@ -194,7 +192,6 @@ trait TLPacketizerUtils {
         ret
     }
 
-    // Ignore error signals here, we'll generate our own
     def getNumSymbols(edge: TLEdge, x: TLChannel, first: Bool): UInt = {
         Mux(first, div8Ceil(headerWidth(x)).U, 0.U) + Mux(edge.hasData(x), (edge.bundle.dataBits/8).U, 0.U) + (x match {
             case a: TLBundleA => { div8Ceil(edge.bundle.dataBits/8).U }
