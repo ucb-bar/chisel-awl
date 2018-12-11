@@ -84,8 +84,8 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
     def connectData(dataClock: Clock, dataReset: Bool, data: FixedWidthData[F]) {
         val qParams = AsyncQueueParams(8, 3, true, false)
 
-        val txq = Module(new AsyncQueue(io.data.tx.bits, qParams))
-        val rxq = Module(new AsyncQueue(io.data.rx.bits, qParams))
+        val txq = Module(new AsyncQueue(chiselTypeOf(io.data.tx.bits), qParams))
+        val rxq = Module(new AsyncQueue(chiselTypeOf(io.data.rx.bits), qParams))
 
         txq.suggestName("AsyncQueueTx")
         rxq.suggestName("AsyncQueueRx")
