@@ -8,7 +8,6 @@ name := "hbwif"
 
 version := scala.sys.process.Process("git rev-parse --short HEAD").!!.mkString.replaceAll("\\s", "")+"-SNAPSHOT"
 
-scalaVersion := "2.11.11"
 
-libraryDependencies += "berkeley" %% "rocketchip" % "1.2"
+scalaVersion := "2.12.4"
 
