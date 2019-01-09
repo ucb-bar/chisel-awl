@@ -39,7 +39,7 @@ trait HasXilinxGTXClockQ1 extends HasXilinxGTXClock {
 
 trait HasDRPInterface {
     // DRP interface
-    val drpaddr_in = Bool(INPUT)
+    val drpaddr_in = UInt(INPUT, width=9)
     val drpdi_in   = UInt(INPUT, width=16)
     val drpdo_out  = UInt(OUTPUT, width=16)
     val drpen_in   = Bool(INPUT)
@@ -250,15 +250,15 @@ class XilinxFiwbhIO(implicit val p: Parameters) extends util.ParameterizedBundle
   val tx_fsm_reset_done = Vec(hbwifNumLanes, Bool(OUTPUT))
   val rx_fsm_reset_done = Vec(hbwifNumLanes, Bool(OUTPUT))
   val cpll_lock         = Vec(hbwifNumLanes, Bool(OUTPUT))
-  val cpll_reset        = Vec(hbwifNumLanes, Bool(INPUT))
-  val rx_cdr_hold       = Vec(hbwifNumLanes, Bool(INPUT))
-  val rx_polarity       = Vec(hbwifNumLanes, Bool(INPUT))
-  val tx_postcursor     = Vec(hbwifNumLanes, UInt(INPUT, width=5))
-  val tx_precursor      = Vec(hbwifNumLanes, UInt(INPUT, width=5))
-  val tx_elec_idle      = Vec(hbwifNumLanes, Bool(INPUT))
-  val tx_diff_ctrl      = Vec(hbwifNumLanes, UInt(INPUT, width=4))
-  val tx_inhibit        = Vec(hbwifNumLanes, Bool(INPUT))
-  val tx_polarity       = Vec(hbwifNumLanes, Bool(INPUT))
+  val cpll_reset        = Vec(hbwifNumLanes, Bool(OUTPUT)).flip
+  val rx_cdr_hold       = Vec(hbwifNumLanes, Bool(OUTPUT)).flip
+  val rx_polarity       = Vec(hbwifNumLanes, Bool(OUTPUT)).flip
+  val tx_postcursor     = Vec(hbwifNumLanes, UInt(OUTPUT, width=5)).flip
+  val tx_precursor      = Vec(hbwifNumLanes, UInt(OUTPUT, width=5)).flip
+  val tx_elec_idle      = Vec(hbwifNumLanes, Bool(OUTPUT)).flip
+  val tx_diff_ctrl      = Vec(hbwifNumLanes, UInt(OUTPUT, width=4)).flip
+  val tx_inhibit        = Vec(hbwifNumLanes, Bool(OUTPUT)).flip
+  val tx_polarity       = Vec(hbwifNumLanes, Bool(OUTPUT)).flip
 }
 
 class XilinxFiwbh(implicit val p: Parameters) extends Module
