@@ -291,23 +291,23 @@ class XilinxFiwbh(implicit val p: Parameters) extends Module
     io.tx_fsm_reset_done(i) := g.tx_fsm_reset_done_out
     io.rx_fsm_reset_done(i) := g.rx_fsm_reset_done_out
     io.cpll_lock(i)         := g.cplllock_out
-    g.cpllreset_in    := io.cpll_reset
-    g.rxcdrhold_in    := io.rx_cdr_hold
-    g.rxpolarity_in   := io.rx_polarity
-    g.txpostcursor_in := io.tx_postcursor
-    g.txprecursor_in  := io.tx_precursor
-    g.txelecidle_in   := io.tx_elec_idle
-    g.txdiffctrl_in   := io.tx_diff_ctrl
-    g.txinhibit_in    := io.tx_inhibit
-    g.txpolarity_in   := io.tx_polarity
+    g.cpllreset_in    := io.cpll_reset(i)
+    g.rxcdrhold_in    := io.rx_cdr_hold(i)
+    g.rxpolarity_in   := io.rx_polarity(i)
+    g.txpostcursor_in := io.tx_postcursor(i)
+    g.txprecursor_in  := io.tx_precursor(i)
+    g.txelecidle_in   := io.tx_elec_idle(i)
+    g.txdiffctrl_in   := io.tx_diff_ctrl(i)
+    g.txinhibit_in    := io.tx_inhibit(i)
+    g.txpolarity_in   := io.tx_polarity(i)
 
     // other wiring
     g.rxuserrdy_in := g.cplllock_out
     g.txuserrdy_in := g.cplllock_out
   }
 
-  gtx.io.toSeq().map(_.rx()).zip(io.rx).foreach { case (g, top) => top <> g }
-  gtx.io.toSeq().map(_.tx()).zip(io.tx).foreach { case (g, top) => g <> top }
+  gtx.io.toSeq().map(_.rx()).zip(io.rx).foreach { case (g, top) => g <> top }
+  gtx.io.toSeq().map(_.tx()).zip(io.tx).foreach { case (g, top) => top <> g }
   gtx.io.toSeq().zip(io.drp).foreach { case (g, drp) => g.connectDRP(drp) }
 
   lanes.map(_.io.rxData).zip(gtx.io.rxData()).foreach { case (lane, top) => lane <> top }
