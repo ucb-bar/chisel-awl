@@ -25,13 +25,13 @@ trait HasXilinxGTXClock {
 
 trait HasXilinxGTXClockQ1 extends HasXilinxGTXClock {
 
-    val q1_clk0_gtrefclk_pad_n_in = Bool(INPUT)
-    val q1_clk0_gtrefclk_pad_p_in = Bool(INPUT)
+    val q1_clk1_gtrefclk_pad_n_in = Bool(INPUT)
+    val q1_clk1_gtrefclk_pad_p_in = Bool(INPUT)
 
     def clockInput(dummy: Int = 0) = {
         val out = Wire(new Differential)
-        out.n := q1_clk0_gtrefclk_pad_n_in
-        out.p := q1_clk0_gtrefclk_pad_p_in
+        out.n := q1_clk1_gtrefclk_pad_n_in
+        out.p := q1_clk1_gtrefclk_pad_p_in
         out
     }
 
@@ -81,8 +81,6 @@ class GTXBundle(implicit val p: Parameters) extends util.ParameterizedBundle()(p
 
     // PLL info
     val cpllfbclklost_out     = Bool(OUTPUT)
-    val qplloutclk_out        = Bool(OUTPUT)
-    val qplloutrefclk_out     = Bool(OUTPUT)
     val cplllock_out          = Bool(OUTPUT)
     val cpllreset_in          = Bool(INPUT)
 
