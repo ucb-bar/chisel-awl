@@ -30,8 +30,8 @@ trait HasXilinxGTXClockQ1 extends HasXilinxGTXClock {
 
     def clockInput(dummy: Int = 0) = {
         val out = Wire(new Differential)
-        out.n := q1_clk1_gtrefclk_pad_n_in
-        out.p := q1_clk1_gtrefclk_pad_p_in
+        q1_clk1_gtrefclk_pad_n_in := out.n
+        q1_clk1_gtrefclk_pad_p_in := out.p
         out
     }
 
