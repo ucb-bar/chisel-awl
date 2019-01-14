@@ -16,7 +16,8 @@ case object XilinxKey extends Field[XilinxParameters]
 case class XilinxParameters(
     val gtxIPName: String = "gtx_hbwif",
     val gtxNumLanes: Int = 8,
-    val gtxDataWidth: Int = 20
+    val gtxDataWidth: Int = 20,
+    val snapshotDepth: Int = 128
 )
 
 trait HasXilinxGTXClock {
@@ -257,6 +258,10 @@ class XilinxFiwbhIO(implicit val p: Parameters) extends util.ParameterizedBundle
   val tx_diff_ctrl      = Vec(hbwifNumLanes, UInt(OUTPUT, width=4)).flip
   val tx_inhibit        = Vec(hbwifNumLanes, Bool(OUTPUT)).flip
   val tx_polarity       = Vec(hbwifNumLanes, Bool(OUTPUT)).flip
+
+  val soft_loopback     = Vec(hbwifNumLanes, Bool(OUTPUT)).flip
+  val snapshot_en       = Vec(hbwifNumLanes, Bool(OUTPUT)).flip
+  val snapshot          = Vec(hbwifNumLanes, UInt(OUTPUT, width=p(XilinxKey).snapshotDepth))
 }
 
 class XilinxFiwbh(implicit val p: Parameters) extends Module
@@ -312,6 +317,10 @@ class XilinxFiwbh(implicit val p: Parameters) extends Module
   lanes.map(_.io.txData).zip(gtx.io.txData()).foreach { case (lane, top) => top <> lane }
   lanes.map(_.io.mem).zip(io.mem).foreach { case (lane, top) => top <> lane }
 
+  lanes.map(_.io.snapshotEn).zip(io.snapshot_en).foreach { case (lane, top) => lane <> top }
+  lanes.map(_.io.loopbackEn).zip(io.soft_loopback).foreach { case (lane, top) => lane <> top }
+  lanes.map(_.io.snapshot).zip(io.snapshot).foreach { case (lane, top) => top <> lane }
+
 }
 
 class XilinxFiwbhLaneIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
@@ -332,6 +341,16 @@ class XilinxFiwbhLaneIO(implicit val p: Parameters) extends util.ParameterizedBu
   // TileLink port for memory
   val mem = new ClientUncachedTileLinkIO()(memParams)
 
+  // Snapshot stuff
+  val snapshot = UInt(OUTPUT, width=p(XilinxKey).snapshotDepth)
+  val snapshotEn = Bool(INPUT)
+
+  // Soft loopback
+  val loopbackEn = Bool(INPUT)
+
+  // TX data select
+  // TODO
+
 }
 
 class XilinxFiwbhLane(implicit val p: Parameters) extends Module
@@ -343,10 +362,35 @@ class XilinxFiwbhLane(implicit val p: Parameters) extends Module
 
   val backend = Module(new FiwbhLaneBackend(io.slowClk, syncReset)(memParams))
 
-  backend.io.loopback := Bool(false)
+  backend.io.loopback := io.loopbackEn
   backend.io.transceiverData.rx := io.rxData
   io.txData := backend.io.transceiverData.tx
 
+  val snapshot = Module(new XilinxSnapshotModule(backend.clock, backend.reset))
+  io.snapshot := snapshot.io.dataOut
+  snapshot.io.dataIn := backend.io.transceiverData.rx
+  snapshot.io.en := io.snapshotEn
+
   io.mem <> AsyncUTileLinkFrom(backend.clock, backend.reset, backend.io.mem, depth = 4)
+
+}
+
+class XilinxSnapshotModule(c: Clock, r: Bool)(implicit val p: Parameters) extends Module(_clock = c, _reset = r) {
+
+    val snapshotDepth = p(XilinxKey).snapshotDepth
+
+    val io = new Bundle {
+        val dataOut = UInt(OUTPUT, width=snapshotDepth)
+        val dataIn = UInt(INPUT, width=p(XilinxKey).gtxDataWidth)
+        val en = Bool(INPUT)
+    }
+
+    val enSync = Reg(next = Reg(next = io.en))
+
+    val regData = Reg(UInt(width=snapshotDepth))
+
+    when (enSync) {
+        regData := (regData << p(XilinxKey).gtxDataWidth) | io.dataIn
+    }
 
 }
