@@ -158,8 +158,6 @@ class HbwifDeserializer[T <: Bundle](gen: T)(implicit val p: Parameters) extends
   val valid = Reg(init = Bool(false))
   val count = Reg(UInt(width = log2Up(bytes+1)))
 
-  val cat = buffer.asUInt()
-
   io.data.bits := gen.cloneType.fromBits(buffer.asUInt()(size-1,0))
   io.data.valid := valid
 
@@ -417,4 +415,203 @@ class HbwifSerializer[T <: Bundle](gen: T)(implicit val p: Parameters) extends M
   } .otherwise {
     state := sIdle
   }
+}
+
+///////////////////////// XXX This is just a hack to get H2 working
+
+class HbwifSerializer2IO[T <: Bundle](gen: T)(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
+  with HasHbwifTileLinkParameters {
+
+  val data = Decoupled(gen.cloneType).flip
+  val serial = Vec(2, new Decoded8b10bSymbol).asOutput
+
+}
+
+class HbwifSerializer2[T <: Bundle](gen: T)(implicit val p: Parameters) extends Module
+  with HasHbwifTileLinkParameters {
+
+  val io = new HbwifSerializer2IO(gen)
+
+  val tobits = io.data.bits.asUInt()
+  val size = gen.cloneType.fromBits(UInt(0)).asUInt().getWidth
+  val bytes = if (size % 8 == 0) size/8 else size/8 + 1
+  val padBits = if (size % 8 == 0) 0 else 8 - (size % 8)
+  require(bytes > 2)
+
+  val buffer = Reg(Vec(bytes, UInt(width = 8)))
+  val checksum = Reg(init = UInt(0, width = 8))
+  val count = Reg(init = UInt(0, width = log2Up(bytes)))
+
+  val sIdle :: sFill :: sChecksum :: sFillChecksum :: Nil = Enum(UInt(), 4)
+
+  val state = Reg(init = sIdle)
+
+  val raw = if(padBits == 0) tobits else Cat(UInt(0, width=padBits), tobits)
+
+  io.data.ready := (state === sIdle || state === sChecksum || state === sFillChecksum)
+
+  io.serial(0).valid := (state === sFill || state === sChecksum || state === sFillChecksum)
+  io.serial(1).valid := (state === sFill || state === sFillChecksum)
+  io.serial(0).control := Bool(false)
+  io.serial(1).control := Bool(false)
+  io.serial(0).rd := Bool(false) // don't care here
+  io.serial(1).rd := Bool(false) // don't care here
+
+  when (state === sChecksum) {
+    io.serial(0).data := ~checksum + UInt(1)
+    io.serial(1).data := UInt(0) // lose a bit of performance here but don't care
+  } .elsewhen (state === sFillChecksum) {
+    io.serial(0).data := buffer(count)
+    io.serial(1).data := ~(checksum + buffer(count)) + UInt(1)
+  } .otherwise {
+    io.serial(0).data := buffer(count)
+    io.serial(1).data := buffer(count + UInt(1))
+  }
+
+  when (state === sIdle) {
+    when (io.data.fire()) {
+      state := sFill
+      count := UInt(0)
+      checksum := UInt(0)
+      (0 until bytes).foreach { i => buffer(i) := raw(i*8+7,i*8) }
+    }
+  } .elsewhen (state === sFill) {
+    checksum := checksum + buffer(count) + buffer(count + UInt(1))
+    when (count === UInt(bytes-1)) {
+      state := sChecksum
+    } .elsewhen (count === UInt(bytes-2)) {
+      state := sFillChecksum
+    } .otherwise {
+      state := sFill
+      count := count + UInt(2)
+    }
+  } .elsewhen (state === sChecksum || state === sFillChecksum) {
+    when (io.data.fire()) {
+      state := sFill
+      (0 until bytes).foreach { i => buffer(i) := raw(i*8+7,i*8) }
+      count := UInt(0)
+      checksum := UInt(0)
+    } .otherwise {
+      state := sIdle
+    }
+  } .otherwise {
+    state := sIdle
+  }
+}
+
+class HbwifDeserializer2IO[T <: Bundle](gen: T)(implicit val p: Parameters) extends util.ParameterizedBundle()(p) {
+
+  val serial = Vec(2, new Decoded8b10bSymbol).asInput
+  val data = Valid(gen.cloneType)
+
+}
+
+class HbwifDeserializer2[T <: Bundle](gen: T)(implicit val p: Parameters) extends Module {
+
+  val size = gen.cloneType.fromBits(UInt(0)).asUInt().getWidth
+  val bytes = if (size % 8 == 0) size/8 else size/8 + 1
+  require(bytes > 2)
+  val odd = (bytes % 2) == 1
+
+  val io = new HbwifDeserializer2IO(gen)
+
+  val buffer = Reg(Vec(bytes+1, UInt(width = 8)))
+  val checksum = Reg(init = UInt(0, width = 8))
+  val valid = Reg(init = Bool(false))
+  val count = Reg(UInt(width = log2Up(bytes+1)))
+  val offset = Reg(Bool())
+
+  io.data.bits := Mux(offset,
+    gen.cloneType.fromBits(buffer.asUInt()(size+7,8)),
+    gen.cloneType.fromBits(buffer.asUInt()(size-1,0)))
+  io.data.valid := valid
+
+  val sIdle :: sFill :: Nil = Enum(UInt(), 2)
+
+  val state = Reg(init = sIdle)
+
+  when (state === sIdle) {
+    when (io.serial(0).isData()) {
+      state := sFill
+      checksum := io.serial(0).data + io.serial(1).data
+      if (odd) {
+          buffer(UInt(0)) := io.serial(0).data
+          buffer(UInt(1)) := io.serial(1).data
+          offset := Bool(false)
+      } else {
+          buffer(UInt(1)) := io.serial(0).data
+          buffer(UInt(2)) := io.serial(1).data
+          offset := Bool(true)
+      }
+      count := UInt(2)
+      valid := Bool(false)
+    } .elsewhen (io.serial(1).isData()) {
+      state := sFill
+      checksum := io.serial(1).data
+      if (odd) {
+          buffer(UInt(1)) := io.serial(1).data
+          offset := Bool(true)
+      } else {
+          buffer(UInt(0)) := io.serial(1).data
+          offset := Bool(false)
+      }
+      count := UInt(1)
+      valid := Bool(false)
+    }
+  } .elsewhen (state === sFill) {
+    when (io.serial(0).isData()) {
+      when (count === UInt(bytes)) {
+        // io.serial(0) is checksum
+        when (io.serial(1).isData()) {
+          count := UInt(1)
+          when ((checksum + io.serial(0).data) === UInt(0)) {
+            valid := Bool(true)
+          } .otherwise {
+            valid := Bool(false)
+          }
+          checksum := io.serial(1).data
+          buffer(UInt(0)) := io.serial(1).data
+          offset := Bool(false)
+        } .otherwise {
+          // ignore io.serial(1)
+          count := UInt(0)
+          when ((checksum + io.serial(0).data) === UInt(0)) {
+            valid := Bool(true)
+          } .otherwise {
+            valid := Bool(false)
+          }
+          checksum := UInt(0)
+          state := sIdle
+        }
+      } .elsewhen (count === UInt(bytes-1)) {
+        // io.serial(1) is checksum
+        count := UInt(0)
+        when ((checksum + io.serial(1).data + io.serial(0).data) === UInt(0)) {
+          valid := Bool(true)
+        } .otherwise {
+          valid := Bool(false)
+        }
+        buffer(count+offset) := io.serial(0).data
+        checksum := UInt(0)
+        state := sIdle
+      } .otherwise {
+        count := count + UInt(2)
+        buffer(count+offset) := io.serial(0).data
+        buffer(count+UInt(1)+offset) := io.serial(1).data
+        checksum := checksum + io.serial(0).data + io.serial(1).data
+        valid := Bool(false)
+      }
+    } .otherwise {
+      state := sIdle
+      count := UInt(0)
+      checksum := UInt(0)
+      valid := Bool(false)
+    }
+  } .otherwise {
+    state := sIdle
+    count := UInt(0)
+    checksum := UInt(0)
+    valid := Bool(false)
+  }
+
 }

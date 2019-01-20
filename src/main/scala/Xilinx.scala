@@ -271,8 +271,15 @@ class XilinxFiwbh(implicit val p: Parameters) extends Module
 
   val gtx = Module(new XilinxTransceiver)
 
+  val q = p.alterPartial({ case TransceiverKey =>
+    TransceiverParameters(fpgaName = "gtx_hbwif",
+    numIrefs = 0,
+    divideBy = 10,
+    isDDR = true)
+  })
+
   val lanes = gtx.io.toSeq().map { g =>
-    val m = Module(new XilinxFiwbhLane)
+    val m = Module(new XilinxFiwbhLane()(q))
     m.io.slowClk := g.rxusrclk2_out
     m.io.transceiverReset := reset // TODO synchronize me
     m
@@ -355,6 +362,10 @@ class XilinxFiwbhLaneIO(implicit val p: Parameters) extends util.ParameterizedBu
 
 class XilinxFiwbhLane(implicit val p: Parameters) extends Module
   with HasHbwifParameters {
+
+  require(transceiverDataWidth == 20)
+  require(transceiverDivideBy == 10)
+  require(transceiverIsDDR)
 
   val io = new XilinxFiwbhLaneIO
 

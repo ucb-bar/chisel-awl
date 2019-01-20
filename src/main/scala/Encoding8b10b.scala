@@ -224,49 +224,93 @@ class Channel8b10b extends Bundle {
   val encoded = UInt(OUTPUT, width=10)
 }
 
-class Encoder8b10b extends Module {
+class Encoder8b10b(width: Int = 10) extends Module {
 
-  val io = new Channel8b10b
-
-  val rd = Reg(init = Bool(false))
-
-  val decoded = Decoded8b10bSymbol(Bool(true), io.decoded.control || ~io.decoded.valid, rd, Mux(io.decoded.valid, io.decoded.data, UInt(Encoding8b10b.defaultComma)))
-  val encoded = decoded.encode()
-
-  val nextrd = encoded.nextRd()
-
-  rd := encoded.nextRd()
-  io.encoded := encoded.data
-}
-
-class Decoder8b10b extends Module {
-
-  val io = (new Channel8b10b).flip
-
-  val buf = Reg(next = io.encoded(8,0))
-  val idx = Reg(init = UInt(0, width=4))
-  val lock = Reg(init = Bool(false))
-  val rd = Reg(init = Bool(false))
-
-  val cat = Cat(buf,io.encoded)
-  val wires = Vec( (0 to 9).map { i => cat(9+i, i) } )
-  // Check that bits cdeif (7,3) are the same (this defines a comma)
-  val commas = wires.map { x => (x(9,3) === UInt("b0011111")) || (x(9,3) === UInt("b1100000")) }
-  val found = commas.reduce(_|_)
-  val idxs = commas.zipWithIndex.map { case (b, i) => (b, UInt(i)) }
-  val next_idx = MuxCase(UInt(0), idxs)
-
-  when(found) {
-    idx := next_idx
-    lock := Bool(true)
-    // Force RD to a value based on the comma sequence
-    rd := wires(next_idx)(5)
-  } .elsewhen(~wires(idx).toBools.reduce(_^_)) {
-    // Assume we got a valid symbol, if there are an uneven number of 1s and 0s, rd should flip
-    rd := ~rd
+  require(width % 10 == 0)
+  val io = new Bundle {
+    val channels = Vec(width/10, new Channel8b10b)
+    val rdIn = Bool(INPUT)
+    val rdOut = Bool(OUTPUT)
   }
 
-  val encoded = Encoded8b10bSymbol(lock, rd, wires(idx))
-  io.decoded := encoded.decode()
+  if (width == 10) {
+    val d = io.channels(0).decoded
+    val decoded = Decoded8b10bSymbol(Bool(true), d.control || ~d.valid, io.rdIn, Mux(d.valid, d.data, UInt(Encoding8b10b.defaultComma)))
+    val encoded = decoded.encode()
+    io.rdOut := encoded.nextRd()
+    io.channels(0).encoded := encoded.data
+  } else {
+    val encoder = Module(new Encoder8b10b(10))
+    encoder.io.channels(0).decoded.data := io.channels(0).decoded.data
+    encoder.io.channels(0).decoded.control := io.channels(0).decoded.control
+    encoder.io.channels(0).decoded.rd := Bool(false) // Don't care
+    encoder.io.channels(0).decoded.valid := io.channels(0).decoded.valid
+    io.channels(0).encoded := encoder.io.channels(0).encoded
+    io.rdOut := io.channels.tail.foldLeft(encoder.io.rdOut) { case (rd, i) =>
+      val encoder0 = Module(new Encoder8b10b(10))
+      val e0 = encoder0.io.channels(0)
+      encoder0.io.rdIn := Bool(false)
+      e0.decoded.data := i.decoded.data
+      e0.decoded.control := i.decoded.control
+      e0.decoded.rd := Bool(false) // Don't care
+      e0.decoded.valid := i.decoded.valid
+      val encoder1 = Module(new Encoder8b10b(10))
+      val e1 = encoder1.io.channels(0)
+      encoder1.io.rdIn := Bool(true)
+      e1.decoded.data := i.decoded.data
+      e1.decoded.control := i.decoded.control
+      e1.decoded.rd := Bool(false) // Don't care
+      e1.decoded.valid := i.decoded.valid
+      i.encoded := Mux(rd, e1.encoded, e0.encoded)
+      Mux(rd, encoder1.io.rdOut, encoder0.io.rdOut)
+    }
+  }
+
+  def connectRd() {
+    val rdReg = Reg(init = Bool(false))
+    io.rdIn := rdReg
+    rdReg := io.rdOut
+  }
+}
+
+class Decoder8b10b(width: Int = 10) extends Module {
+
+  require(width % 10 == 0)
+  val io = new Bundle {
+    val channels = Vec(width/10, new Channel8b10b).flip
+  }
+
+  if (width == 10) {
+    val buf = Reg(next = io.channels(0).encoded(8,0))
+    val idx = Reg(init = UInt(0, width=4))
+    val lock = Reg(init = Bool(false))
+    val rd = Reg(init = Bool(false))
+
+    val cat = Cat(buf,io.channels(0).encoded)
+    val wires = Vec( (0 to 9).map { i => cat(9+i, i) } )
+    // Check that bits cdeif (7,3) are the same (this defines a comma)
+    val commas = wires.map { x => (x(9,3) === UInt("b0011111")) || (x(9,3) === UInt("b1100000")) }
+    val found = commas.reduce(_|_)
+    val idxs = commas.zipWithIndex.map { case (b, i) => (b, UInt(i)) }
+    val next_idx = MuxCase(UInt(0), idxs)
+
+    when(found) {
+      idx := next_idx
+      lock := Bool(true)
+      // Force RD to a value based on the comma sequence
+      rd := wires(next_idx)(5)
+    } .elsewhen(~wires(idx).toBools.reduce(_^_)) {
+      // Assume we got a valid symbol, if there are an uneven number of 1s and 0s, rd should flip
+      rd := ~rd
+    }
+
+    val encoded = Encoded8b10bSymbol(lock, rd, wires(idx))
+    io.channels(0).decoded := encoded.decode()
+  } else {
+    val decoders = Seq.fill(width/10) { Module(new Decoder8b10b(10)) }
+    decoders.zip(io.channels).foreach { case (d, i) =>
+      d.io.channels(0) <> i
+    }
+  }
 
 }

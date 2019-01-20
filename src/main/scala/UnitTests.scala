@@ -49,11 +49,12 @@ object DisparityCheck {
 class EncodingDataTest extends UnitTest {
 
   val encoder = Module(new Encoder8b10b)
+  encoder.connectRd()
   val decoder = Module(new Decoder8b10b)
 
-  decoder.io.encoded <> encoder.io.encoded
+  decoder.io.channels(0).encoded <> encoder.io.channels(0).encoded
 
-  DisparityCheck(encoder.io.encoded)
+  DisparityCheck(encoder.io.channels(0).encoded)
 
   // randomize every single number and insert an arbitrary number to flip the disparity so we cover everything
   // we pick 3 since it is guaranteed to flip the disparity
@@ -79,18 +80,18 @@ class EncodingDataTest extends UnitTest {
 
   when (ready) {
     encoderCount := encoderCount + UInt(1)
-    encoder.io.decoded.valid := (encoderCount < UInt(vectors.size))
-    encoder.io.decoded.control := Bool(false)
-    encoder.io.decoded.data := vectors(encoderCount)
+    encoder.io.channels(0).decoded.valid := (encoderCount < UInt(vectors.size))
+    encoder.io.channels(0).decoded.control := Bool(false)
+    encoder.io.channels(0).decoded.data := vectors(encoderCount)
   } .otherwise {
-    encoder.io.decoded.valid := Bool(false)
-    encoder.io.decoded.control := Bool(true)
-    encoder.io.decoded.data := UInt(0)
+    encoder.io.channels(0).decoded.valid := Bool(false)
+    encoder.io.channels(0).decoded.control := Bool(true)
+    encoder.io.channels(0).decoded.data := UInt(0)
   }
 
   // check the bits that come out
-  when (decoder.io.decoded.isData() && decoderCount < UInt(vectors.size)) {
-    assert(decoder.io.decoded.data === vectors(decoderCount), "Got the wrong data")
+  when (decoder.io.channels(0).decoded.isData() && decoderCount < UInt(vectors.size)) {
+    assert(decoder.io.channels(0).decoded.data === vectors(decoderCount), "Got the wrong data")
     decoderCount := decoderCount + UInt(1)
   }
 
@@ -99,11 +100,12 @@ class EncodingDataTest extends UnitTest {
 class EncodingAlignmentTest extends UnitTest {
 
   val encoder = Module(new Encoder8b10b)
+  encoder.connectRd()
 
-  val buf = Reg(next = encoder.io.encoded)
-  val cat = Cat(buf, encoder.io.encoded)
+  val buf = Reg(next = encoder.io.channels(0).encoded)
+  val cat = Cat(buf, encoder.io.channels(0).encoded)
 
-  DisparityCheck(encoder.io.encoded)
+  DisparityCheck(encoder.io.channels(0).encoded)
 
   // pick some arbitrary data to send
   val data = 23
@@ -111,10 +113,10 @@ class EncodingAlignmentTest extends UnitTest {
   // add 10 decoders which are spaced a bit time apart and ensure we can align to all of them
   io.finished := (0 until 10).map { x =>
     val m = Module(new Decoder8b10b)
-    m.io.encoded := cat(x+10,x)
+    m.io.channels(0).encoded := cat(x+10,x)
     val done = Reg(init = Bool(false))
-    when (m.io.decoded.isData()) {
-      assert(m.io.decoded.data === UInt(data), s"Data must be $data")
+    when (m.io.channels(0).decoded.isData()) {
+      assert(m.io.channels(0).decoded.data === UInt(data), s"Data must be $data")
       done := Bool(true)
     }
     done
@@ -130,13 +132,13 @@ class EncodingAlignmentTest extends UnitTest {
   }
 
   when (ready) {
-    encoder.io.decoded.valid := Bool(true)
-    encoder.io.decoded.control := Bool(false)
-    encoder.io.decoded.data := UInt(data)
+    encoder.io.channels(0).decoded.valid := Bool(true)
+    encoder.io.channels(0).decoded.control := Bool(false)
+    encoder.io.channels(0).decoded.data := UInt(data)
   } .otherwise {
-    encoder.io.decoded.valid := Bool(false)
-    encoder.io.decoded.control := Bool(true)
-    encoder.io.decoded.data := UInt(0)
+    encoder.io.channels(0).decoded.valid := Bool(false)
+    encoder.io.channels(0).decoded.control := Bool(true)
+    encoder.io.channels(0).decoded.data := UInt(0)
   }
 
 

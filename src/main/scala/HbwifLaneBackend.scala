@@ -35,15 +35,16 @@ class HbwifLaneBackend(val c: Clock, val r: Bool, val id: Int)(implicit val p: P
   require(transceiverDataWidth == 10)
   val encoder = Module(new Encoder8b10b)
   encoder.suggestName("encoderInst")
+  encoder.connectRd()
   val decoder = Module(new Decoder8b10b)
   decoder.suggestName("decoderInst")
 
-  decoder.io.encoded := io.transceiverData.rx
+  decoder.io.channels(0).encoded := io.transceiverData.rx
 
   val memSerDes = Module(new HbwifTileLinkMemSerDes()(memParams))
   memSerDes.suggestName("memSerDesInst")
-  encoder.io.decoded <> memSerDes.io.tx
-  memSerDes.io.rx <> decoder.io.decoded
+  encoder.io.channels(0).decoded <> memSerDes.io.tx
+  memSerDes.io.rx <> decoder.io.channels(0).decoded
   memSerDes.io.mem <> io.mem
 
   val scrBuilder = new SCRBuilder(s"hbwif_lane$id")
@@ -53,7 +54,7 @@ class HbwifLaneBackend(val c: Clock, val r: Bool, val id: Int)(implicit val p: P
   bert.io.dataIn := io.transceiverData.rx
 
   // MUX between BERT and the tilelink channel when BERT is on
-  io.transceiverData.tx := Mux(bert.io.enable, bert.io.dataOut, encoder.io.encoded)
+  io.transceiverData.tx := Mux(bert.io.enable, bert.io.dataOut, encoder.io.channels(0).encoded)
 
   scrBuilder.addControl("bert_enable", UInt(0))
   scrBuilder.addControl("bert_clear", UInt(0))

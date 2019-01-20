@@ -109,27 +109,27 @@ class FiwbhLaneBackend(c: Clock, r: Bool)(implicit val p: Parameters) extends Mo
 
   val io = new FiwbhLaneBackendIO
 
-  require(transceiverDataWidth == 10)
-  val encoder = Module(new Encoder8b10b)
-  val decoder = Module(new Decoder8b10b)
+  val encoder = Module(new Encoder8b10b(transceiverDataWidth)) // XXX this is just a hack to get things working for H2 bringup
+  val decoder = Module(new Decoder8b10b(transceiverDataWidth)) // XXX this is just a hack to get things working for H2 bringup
+  encoder.connectRd()
 
-  decoder.io.encoded := io.transceiverData.rx
+  decoder.io.channels.map(_.encoded).zipWithIndex.foreach { case (e, i) => e := io.transceiverData.rx(10*i+9, 10*i) }
 
   val memDesSer = Module(new FiwbhTileLinkMemDesSer)
 
-  encoder.io.decoded <> memDesSer.io.tx
-  memDesSer.io.rx <> decoder.io.decoded
+  encoder.io.channels.zip(memDesSer.io.tx).foreach { case (c, m) => c.decoded <> m }
+  memDesSer.io.rx.zip(decoder.io.channels).foreach { case (m, c) => m <> c.decoded }
   io.mem <> memDesSer.io.mem
 
-  io.transceiverData.tx := Mux(io.loopback, io.transceiverData.rx, encoder.io.encoded)
+  io.transceiverData.tx := Mux(io.loopback, io.transceiverData.rx, encoder.io.channels.map(_.encoded).reduce(Cat(_,_)))
 
 }
 
 class FiwbhTileLinkMemDesSerIO(implicit val p: Parameters) extends util.ParameterizedBundle()(p)
   with HasHbwifTileLinkParameters {
 
-  val tx = (new Decoded8b10bSymbol).asOutput
-  val rx = (new Decoded8b10bSymbol).asInput
+  val tx = Vec(transceiverDataWidth/10, (new Decoded8b10bSymbol)).asOutput
+  val rx = Vec(transceiverDataWidth/10, (new Decoded8b10bSymbol)).asInput
 
   val mem = new ClientUncachedTileLinkIO
 
@@ -138,22 +138,36 @@ class FiwbhTileLinkMemDesSerIO(implicit val p: Parameters) extends util.Paramete
 class FiwbhTileLinkMemDesSer(implicit val p: Parameters) extends Module
   with HasHbwifTileLinkParameters {
 
+  require(transceiverDataWidth == 10 || transceiverDataWidth == 20)
   val io = new FiwbhTileLinkMemDesSerIO
 
   val acquireBuffer = Module(new HellaFlowQueue(hbwifBufferDepth * tlDataBeats)(new Acquire))
   val acquireFilter = Module(new HbwifFilter(new Acquire))
-  val acquireDeserializer = Module(new HbwifDeserializer(new Acquire))
 
-  val grantSerializer = Module(new HbwifSerializer(new Grant))
+  if (transceiverDataWidth == 10) {
+    val acquireDeserializer = Module(new HbwifDeserializer(new Acquire))
+    val grantSerializer = Module(new HbwifSerializer(new Grant))
+    acquireBuffer.io.enq.bits := acquireFilter.io.out.bits
+    acquireBuffer.io.enq.valid := acquireFilter.io.out.valid
+    io.mem.acquire <> acquireBuffer.io.deq
 
-  acquireBuffer.io.enq.bits := acquireFilter.io.out.bits
-  acquireBuffer.io.enq.valid := acquireFilter.io.out.valid
-  io.mem.acquire <> acquireBuffer.io.deq
+    acquireFilter.io.in <> acquireDeserializer.io.data
+    acquireDeserializer.io.serial <> io.rx
 
-  acquireFilter.io.in <> acquireDeserializer.io.data
-  acquireDeserializer.io.serial <> io.rx
+    grantSerializer.io.data <> io.mem.grant
+    io.tx <> grantSerializer.io.serial
+  } else {
+    val acquireDeserializer = Module(new HbwifDeserializer2(new Acquire))
+    val grantSerializer = Module(new HbwifSerializer2(new Grant))
+    acquireBuffer.io.enq.bits := acquireFilter.io.out.bits
+    acquireBuffer.io.enq.valid := acquireFilter.io.out.valid
+    io.mem.acquire <> acquireBuffer.io.deq
 
-  grantSerializer.io.data <> io.mem.grant
-  io.tx <> grantSerializer.io.serial
+    acquireFilter.io.in <> acquireDeserializer.io.data
+    acquireDeserializer.io.serial <> io.rx
+
+    grantSerializer.io.data <> io.mem.grant
+    io.tx <> grantSerializer.io.serial
+  }
 
 }
