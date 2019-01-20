@@ -404,4 +404,6 @@ class XilinxSnapshotModule(c: Clock, r: Bool)(implicit val p: Parameters) extend
         regData := (regData << p(XilinxKey).gtxDataWidth) | io.dataIn
     }
 
+    io.dataOut := regData
+
 }

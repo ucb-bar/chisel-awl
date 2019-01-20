@@ -117,8 +117,8 @@ class FiwbhLaneBackend(c: Clock, r: Bool)(implicit val p: Parameters) extends Mo
 
   val memDesSer = Module(new FiwbhTileLinkMemDesSer)
 
-  encoder.io.channels.zip(memDesSer.io.tx).foreach { case (c, m) => c.decoded <> m }
-  memDesSer.io.rx.zip(decoder.io.channels).foreach { case (m, c) => m <> c.decoded }
+  encoder.io.channels.zip(memDesSer.io.tx).foreach { case (c, m) => c.decoded := Reg(next = m) }
+  memDesSer.io.rx.zip(decoder.io.channels).foreach { case (m, c) => m := Reg(next = c.decoded) }
   io.mem <> memDesSer.io.mem
 
   io.transceiverData.tx := Mux(io.loopback, io.transceiverData.rx, encoder.io.channels.map(_.encoded).reduce(Cat(_,_)))
