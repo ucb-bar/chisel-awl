@@ -152,10 +152,10 @@ class FiwbhTileLinkMemDesSer(implicit val p: Parameters) extends Module
     io.mem.acquire <> acquireBuffer.io.deq
 
     acquireFilter.io.in <> acquireDeserializer.io.data
-    acquireDeserializer.io.serial <> io.rx
+    acquireDeserializer.io.serial <> io.rx(0)
 
     grantSerializer.io.data <> io.mem.grant
-    io.tx <> grantSerializer.io.serial
+    io.tx(0) <> grantSerializer.io.serial
   } else {
     val acquireDeserializer = Module(new HbwifDeserializer2(new Acquire))
     val grantSerializer = Module(new HbwifSerializer2(new Grant))
