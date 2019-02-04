@@ -1,6 +1,6 @@
 package awl.tilelink
 
-import awl.hbwif._
+import awl.serial._
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.tilelink._

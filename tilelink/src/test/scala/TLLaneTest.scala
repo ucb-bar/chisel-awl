@@ -1,6 +1,6 @@
 package awl.test.tilelink
 
-import awl.hbwif._
+import awl.serial._
 import awl.tilelink._
 import chisel3._
 import chisel3.core.IntParam

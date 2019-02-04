@@ -1,4 +1,4 @@
-package awl.hbwif
+package awl.serial
 
 import chisel3._
 import chisel3.core.{BaseModule, IntParam, Param}

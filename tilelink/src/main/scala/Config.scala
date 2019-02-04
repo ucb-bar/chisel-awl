@@ -1,6 +1,6 @@
 package awl.tilelink
 
-import awl.hbwif._
+import awl.serial._
 import freechips.rocketchip.config._
 import freechips.rocketchip.diplomacy.AddressSet
 import freechips.rocketchip.subsystem.{ExtMem, BankedL2Key, MemoryBusKey}
