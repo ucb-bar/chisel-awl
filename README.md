@@ -25,11 +25,10 @@ for the TileLink implementation, or `FixedWidthPacketization.scala` for the
 FixedWidth implementation.
 
 The controller is the mechanism for reading and writing control and status
-registers. Two controllers are provided: a memory-mapped register-based
-interface using TileLink (using diplomacy) or a scan-chain. The user may also
+registers. One controller is provided: a memory-mapped register-based
+interface using TileLink (using diplomacy). The user may also
 provide a custom controller if desired. See `Controller.scala` for the abstract
-base class, `tilelink/TLController.scala` for the TileLink implementation, or
-`ScanChainController.scala` for the scan chain implementation.
+base class or `tilelink/TLController.scala` for the TileLink implementation.
 
 The aforementioned components are connected in `Lane.scala`. The desired
 variant of each component is specified by implementing a specific generator
