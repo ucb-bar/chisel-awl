@@ -6,7 +6,7 @@ import chisel3.util._
 // TODO get rid of this rocketchip dependency
 import freechips.rocketchip.util.{AsyncQueue, AsyncQueueParams}
 
-class FixedWidthData[F <: Data](factory: () => F) extends Bundle {
+class FixedWidthData[F <: Data](val factory: () => F) extends Bundle {
     val tx = Flipped(Decoupled(factory()))
     val rx = Decoupled(factory())
 }
