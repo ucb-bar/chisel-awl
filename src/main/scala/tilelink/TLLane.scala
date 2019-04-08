@@ -72,7 +72,7 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
             supportsAcquireB   = if (mtlc) TransferSizes(1, cacheBlockBytes) else TransferSizes.none,
             fifoId             = Some(0))),
         beatBytes = beatBytes,
-        endSinkId = sinkIds,
+        endSinkId = if(mtlc) sinkIds else 0,
         minLatency = 1) })
     val registerNodes = (0 until lanes).map { id => TLRegisterNode(
         address            = List(configAddressSets(id)),

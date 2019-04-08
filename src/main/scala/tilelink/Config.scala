@@ -43,10 +43,10 @@ class WithGenericSerdes extends Config((site, here, up) => {
         dataWidth = 16,
         numWays = 2
     )
-    case HbwifNumLanes => site(BankedL2Key).nMemoryChannels
+    case HbwifNumLanes => site(BankedL2Key).nBanks
     case HbwifTLKey => {
         HbwifTLConfig(
-            managerAddressSet = AddressSet(site(ExtMem).get.base, site(ExtMem).get.size - 1),
+            managerAddressSet = AddressSet(site(ExtMem).get.master.base, site(ExtMem).get.master.size - 1),
             configAddressSets = Seq.tabulate(site(HbwifNumLanes)) { i =>
                 AddressSet(0x4000000 + i*0x10000, 0xffff)
             },
