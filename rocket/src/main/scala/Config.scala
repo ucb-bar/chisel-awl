@@ -1,4 +1,4 @@
-package awl.tilelink
+package awl.rocket
 
 import awl.serial._
 import freechips.rocketchip.config._
