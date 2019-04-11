@@ -1,7 +1,6 @@
-package awl.test.tilelink
+package awl.rocket
 
 import awl.serial._
-import awl.tilelink._
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.config._
@@ -65,3 +64,4 @@ object TLPacketizerTests {
     def apply()(implicit p: Parameters):Seq[UnitTest] = for (x <- decodedSymbols; y <- factories) yield Module(new TLBidirectionalPacketizerTest(x, y))
 
 }
+

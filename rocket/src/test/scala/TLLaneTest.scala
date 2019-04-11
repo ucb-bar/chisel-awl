@@ -1,7 +1,6 @@
-package awl.test.tilelink
+package awl.rocket
 
 import awl.serial._
-import awl.tilelink._
 import chisel3._
 import chisel3.core.IntParam
 import chisel3.util._

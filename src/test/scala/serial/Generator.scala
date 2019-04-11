@@ -1,4 +1,4 @@
-package awl.test.serial
+package awl.serial
 
 import freechips.rocketchip.util.GeneratorApp
 
