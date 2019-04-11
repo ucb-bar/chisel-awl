@@ -83,7 +83,7 @@ val commonSettings = Seq(
 
 val awlSettings = Seq(
   name := "awl",
-  libraryDependencies ++= Seq("chisel-iotesters").map {
+  libraryDependencies ++= Seq("chisel-iotesters", "rocketchip").map {
     dep: String => "edu.berkeley.cs" %% dep % sys.props.getOrElse(dep + "Version", defaultVersions(dep))
   },
 // sbt 1.2.6 fails with `Symbol 'term org.junit' is missing from the classpath`
