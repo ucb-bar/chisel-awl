@@ -93,12 +93,22 @@ val awlSettings = Seq(
   ),
 )
 
+lazy val dumpCsrc = taskKey[Unit]("Dump csrc to a directory from JAR files.")
+
+dumpCsrc := {
+    IO.createDirectory(file("generated-src"))
+    (dependencyClasspath in Compile).value.files foreach { entry =>
+        IO.unzip(entry, file("generated-src"), GlobFilter("csrc/*"))
+    }
+}
+
 val rocketSettings = Seq(
     name := "rocket-awl",
     libraryDependencies ++= Seq("chisel-iotesters", "rocketchip").map {
       dep: String => "edu.berkeley.cs" %% dep % sys.props.getOrElse(dep + "Version", defaultVersions(dep))
     },
     Test / parallelExecution := false,
+    dumpCsrc in Compile := Def.sequential(compile in Compile).value,
     // rocket-chip currently (3/7/19) doesn't build under 2.11
     crossScalaVersions := Seq("2.12.8"),
 )

@@ -65,7 +65,7 @@ class BigPusher[F <: Data](seq: Seq[BigInt], fwDataFactory: () => F) extends Mod
 
     io.out.bits := io.out.bits.fromBits(0.U)
 
-    seq.zipWithIndex.foreach { case (d, i) => println(f"Packet $i%d should be $d%x") }
+    //seq.zipWithIndex.foreach { case (d, i) => println(f"Packet $i%d should be $d%x") }
 
     seq.zipWithIndex.foreach { case (d, i) =>
         when (count.value === i.U) {

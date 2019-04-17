@@ -20,6 +20,5 @@ install:
   - verilator --version
 
 script:
-  - set -o pipefail && sbt awl/test
-  - set -o pipefail && sbt rocket-awl/test
+  - set -o pipefail && ./run_test.sh awl.serial BertTestConfig
 

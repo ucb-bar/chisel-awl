@@ -5,8 +5,11 @@ import chisel3.core.IntParam
 import chisel3.util._
 import chisel3.experimental.withClockAndReset
 import freechips.rocketchip.unittest._
+import freechips.rocketchip.util.{ElaborationArtefacts, PlusArgArtefacts}
 
 class BertTest(delay: Int = 1, per1k: Int = 0, prbs: Int = 0, berMode: Boolean = true, numSamples: Int = 1000, timeout: Int = 50000) extends UnitTest(timeout) {
+
+    ElaborationArtefacts.add("plusArgs", PlusArgArtefacts.serialize_cHeader)
 
     this.suggestName(s"BertTest_delay${delay}_per1k${per1k}_prbs${prbs}_berMode${if (berMode) 1 else 0}_numSamples${numSamples}")
 

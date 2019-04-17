@@ -73,7 +73,7 @@ module ErrorInjector #(
             if (stop) begin
                 inject <= 0;
             end else begin
-                if ($urandom % 1000 < per1k) begin
+                if ($random % 1000 < per1k) begin
                     inject <= 1;
                     errors <= errors + 1;
                 end else begin

@@ -33,9 +33,9 @@ module generic_transceiver #(
   assign clock_rx_div = clock_tx_div_reg;
 
   always @(posedge clock_fast or negedge clock_fast) begin
-    if (count == SERDES_BITS/2-1) clock_tx_div_reg = 1'b0;
-    else if (count == SERDES_BITS-1) clock_tx_div_reg = 1'b1;
-    count = (count + 1) % SERDES_BITS;
+    if (count == SERDES_BITS/2-1) clock_tx_div_reg <= 1'b0;
+    else if (count == SERDES_BITS-1) clock_tx_div_reg <= 1'b1;
+    count <= (count + 1) % SERDES_BITS;
   end
 
   //***********************************
