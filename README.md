@@ -1,7 +1,7 @@
 High BandWidth InterFace (HBWIF)
 =======================
 
-[![Build Status](https://travis-ci.org/ucb-bar/hbwif.svg?branch=master)](https://travis-ci.org/ucb-bar/hbwif)
+[![Build Status](https://travis-ci.org/ucb-bar/chisel-awl.svg?branch=master)](https://travis-ci.org/ucb-bar/chisel-awl)
 
 HBWIF is an interface generator for high-speed serial links that leverages
 scala's powerful functional programming capabilities.
