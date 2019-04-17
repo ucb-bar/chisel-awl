@@ -6,7 +6,7 @@ if [ ! -f $INSTALL_DIR/bin/verilator ]; then
   unset VERILATOR_ROOT
   cd verilator
   git pull
-  git checkout verilator_4_011
+  git checkout verilator_4_010
   autoconf
   ./configure --prefix=$INSTALL_DIR
   make
