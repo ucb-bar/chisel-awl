@@ -140,6 +140,7 @@ class GTXBundle(implicit val p: Parameters) extends util.ParameterizedBundle()(p
     // TX misc stuff
     val txoutclkfabric_out = Bool(OUTPUT)
     val txoutclkpcs_out    = Bool(OUTPUT)
+    val txprbssel_in       = UInt(INPUT, width=3)
 
     def rx(dummy: Int = 0): Differential = {
         val d = Wire(new Differential)
@@ -258,6 +259,7 @@ class XilinxFiwbhIO(implicit val p: Parameters) extends util.ParameterizedBundle
   val tx_diff_ctrl      = Vec(hbwifNumLanes, UInt(OUTPUT, width=4)).flip
   val tx_inhibit        = Vec(hbwifNumLanes, Bool(OUTPUT)).flip
   val tx_polarity       = Vec(hbwifNumLanes, Bool(OUTPUT)).flip
+  val tx_prbssel        = Vec(hbwifNumLanes, UInt(OUTPUT, width=3)).flip
 
   val soft_loopback     = Vec(hbwifNumLanes, Bool(OUTPUT)).flip
   val snapshot_en       = Vec(hbwifNumLanes, Bool(OUTPUT)).flip
@@ -310,6 +312,7 @@ class XilinxFiwbh(implicit val p: Parameters) extends Module
     g.txdiffctrl_in   := io.tx_diff_ctrl(i)
     g.txinhibit_in    := io.tx_inhibit(i)
     g.txpolarity_in   := io.tx_polarity(i)
+    g.txprbssel_in    := io.tx_prbssel(i)
 
     // other wiring
     g.rxuserrdy_in := g.cplllock_out
