@@ -21,7 +21,7 @@ class TLLaneTestLazy(delay: Int, loopback: Boolean)(implicit p: Parameters) exte
     val model = LazyModule(new TLRAMModel("SRAMSimple"))
     // Use two hbwifs rather than 2 lanes to emulate second chip
     val hbwif = Seq.fill(nChips) { LazyModule(new GenericHbwifModule) }
-    val ram = LazyModule(new TLRAM(p(HbwifTLKey).managerAddressSet, beatBytes=p(CacheBlockBytes)))
+    val ram = LazyModule(new TLRAM(p(HbwifTLKey).managerAddressSet.head, beatBytes=p(CacheBlockBytes)))
     val configNodes = Seq.tabulate(nChips) { i => TLClientNode(Seq(TLClientPortParameters(Seq(TLClientParameters(name = s"LaneConfig$i"))))) }
 
     ram.node := TLWidthWidget(p(HbwifTLKey).beatBytes) := TLDelayer(0.25) := hbwif(nChips - 1).clientNode

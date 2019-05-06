@@ -58,7 +58,7 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         val base = managerAddressSet
         val filter = AddressSet(id * cacheBlockBytes, ~((lanes-1) * cacheBlockBytes))
         TLManagerPortParameters(Seq(TLManagerParameters(
-            address            = base.intersect(filter).toList,
+            address            = base.flatMap(_.intersect(filter)),
             resources          = (new SimpleDevice(s"HbwifManager$id",Seq())).reg("mem"),
             regionType         = if (mtlc) RegionType.CACHED else RegionType.UNCACHED,
             executable         = true,
