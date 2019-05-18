@@ -2,6 +2,7 @@ package hbwif
 
 import chisel3._
 import chisel3.core.{BaseModule, IntParam, Param}
+import chisel3.util.{HasBlackBoxResource}
 import chisel3.experimental.Analog
 
 case class SerDesConfig(
@@ -56,10 +57,11 @@ trait HasTransceiverIO extends BaseModule {
 
 }
 
-class GenericTransceiver()(implicit c: SerDesConfig) extends BlackBox(Map("SERDES_BITS" -> IntParam(c.dataWidth))) with HasTransceiverIO {
+class GenericTransceiver()(implicit c: SerDesConfig) extends BlackBox(Map("SERDES_BITS" -> IntParam(c.dataWidth))) with HasTransceiverIO with HasBlackBoxResource {
 
     val io = IO(new GenericTransceiverIO)
 
     override def desiredName = "generic_transceiver"
+    addResource("/generic_transceiver.sv")
 
 }
