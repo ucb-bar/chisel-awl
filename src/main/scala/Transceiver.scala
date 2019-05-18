@@ -10,8 +10,8 @@ case class SerDesConfig(
 )
 
 class Differential extends Bundle {
-    val p = Output(Bool())//Analog(1.W)
-    val n = Output(Bool())//Analog(1.W)
+    val p = Analog(1.W)
+    val n = Analog(1.W)
 }
 
 class TransceiverDataIF()(implicit val c: SerDesConfig) extends Bundle {
