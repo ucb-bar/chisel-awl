@@ -2,11 +2,13 @@ package hbwif
 
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.{MultiIOModule}
+import chisel3.experimental.MultiIOModule
+import freechips.rocketchip.util.ResetCatchAndSync
 
 final class LaneIO[T <: Data](val dataFactory: () => T)(implicit val c: SerDesConfig)
     extends Bundle with TransceiverOuterIF {
     val data = dataFactory()
+    val dataClock = Input(Clock())
     val txClock = Output(Clock())
     val txReset = Output(Bool())
     val rxClock = Output(Clock())
@@ -96,7 +98,8 @@ abstract class Lane extends MultiIOModule with HasDebug {
     // async crossings live in here
 
     // async crossings live in here
-    packetizer.connectData(clock, reset.toBool, io.data)
+    val packetizerReset = ResetCatchAndSync(io.dataClock, reset.toBool())
+    packetizer.connectData(io.dataClock, packetizerReset, io.data)
 
     txrxss.io.clockRef := io.clockRef
     txrxss.io.asyncResetIn := io.asyncResetIn
