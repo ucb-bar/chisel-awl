@@ -33,7 +33,8 @@ class BitStufferTest(val mode: Int, timeout: Int = 50000) extends UnitTest(timeo
     ss.controlIO.get.rxInvert := false.B
     ss.controlIO.get.txInvert := false.B
     ss.io.clockRef := clock
-    ss.io.asyncResetIn := reset.toBool
+    ss.io.txAsyncResetIn := reset.toBool
+    ss.io.rxAsyncResetIn := reset.toBool
 
     encoderAdapter.io.enq <> encoder.io.encoded
     txBitStuffer.io.enq <> encoderAdapter.io.deq

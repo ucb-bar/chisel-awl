@@ -24,7 +24,8 @@ class BertTest(delay: Int = 1, per1k: Int = 0, prbs: Int = 0, berMode: Boolean =
     errorInjector.io.clock := this.clock
     delayLine.io.clock := this.clock
 
-    txrxss.io.asyncResetIn := this.reset.toBool
+    txrxss.io.txAsyncResetIn := this.reset.toBool
+    txrxss.io.rxAsyncResetIn := this.reset.toBool
     txrxss.io.clockRef := this.clock
     txrxss.controlIO.get.txInvert := false.B
     txrxss.controlIO.get.rxInvert := false.B

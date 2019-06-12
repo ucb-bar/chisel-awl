@@ -135,7 +135,8 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
             tx(id) <> lane.io.tx
             lane.io.rx <> rx(id)
             lane.io.clockRef <> hbwifRefClocks(id/(lanes/banks))
-            lane.io.asyncResetIn <> hbwifResets(id)
+            lane.io.txAsyncResetIn <> hbwifResets(id)
+            lane.io.rxAsyncResetIn <> hbwifResets(id)
             lane.reset := pipelinedReset
             configBuffers(id).module.reset := pipelinedReset
             (lane, addrmap)

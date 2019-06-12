@@ -20,7 +20,8 @@ class FixedWidthLane8b10bTest[F <: Data](delay: Int, dataWidth: Int, fwDataFacto
     delayLine.io.in <> lane.io.tx
     delayLine.io.clock := this.clock
     lane.io.clockRef := this.clock
-    lane.io.asyncResetIn := this.reset
+    lane.io.txAsyncResetIn := this.reset
+    lane.io.rxAsyncResetIn := this.reset
 
     val startCounter = Counter(1000)
     val started = RegInit(false.B)
