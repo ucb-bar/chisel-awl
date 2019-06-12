@@ -102,7 +102,8 @@ abstract class Lane extends MultiIOModule with HasDebug {
     packetizer.connectData(io.dataClock, packetizerReset, io.data)
 
     txrxss.io.clockRef := io.clockRef
-    txrxss.io.asyncResetIn := io.asyncResetIn
+    txrxss.io.txAsyncResetIn := io.txAsyncResetIn
+    txrxss.io.rxAsyncResetIn := io.rxAsyncResetIn
 
     txrxss.io.rx <> io.rx
     io.tx <> txrxss.io.tx
