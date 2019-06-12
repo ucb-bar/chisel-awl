@@ -39,7 +39,8 @@ trait TransceiverIO extends Bundle {
     val clock_ref = Input(Clock())
 
     // async reset input
-    val async_reset_in = Input(Bool())
+    val tx_async_reset_in = Input(Bool())
+    val rx_async_reset_in = Input(Bool())
 
     // RX pad inputs
     val rx = Flipped(new Differential)

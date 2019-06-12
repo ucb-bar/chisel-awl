@@ -10,7 +10,8 @@ trait TransceiverOuterIF extends Bundle {
     implicit val c: SerDesConfig
 
     // asynchronous reset
-    val asyncResetIn = Input(Bool())
+    val txAsyncResetIn = Input(Bool())
+    val rxAsyncResetIn = Input(Bool())
 
     // reference clock
     val clockRef = Input(Clock())
@@ -88,13 +89,14 @@ trait HasTransceiverSubsystemConnections {
     val controlIO: Option[GenericTransceiverSubsystemControlBundle]
 
     txrx.io.clock_ref := io.clockRef
-    txrx.io.async_reset_in := io.asyncResetIn
+    txrx.io.tx_async_reset_in := io.txAsyncResetIn
+    txrx.io.rx_async_reset_in := io.rxAsyncResetIn
 
     io.tx <> txrx.io.tx
     io.rx <> txrx.io.rx
 
-    val txSyncReset = ResetCatchAndSync(txrx.io.clock_tx_div, io.asyncResetIn, 3)
-    val rxSyncReset = ResetCatchAndSync(txrx.io.clock_rx_div, io.asyncResetIn, 3)
+    val txSyncReset = ResetCatchAndSync(txrx.io.clock_tx_div, io.txAsyncResetIn, 3)
+    val rxSyncReset = ResetCatchAndSync(txrx.io.clock_rx_div, io.rxAsyncResetIn, 3)
 
     def connectInvert {
         val ctrl = controlIO.get.asInstanceOf[GenericTransceiverSubsystemControlBundle]
