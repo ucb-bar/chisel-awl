@@ -8,7 +8,8 @@ module generic_transceiver #(
   output tx_n,
   input rx_p,
   input rx_n,
-  input async_reset_in,
+  input tx_async_reset_in,
+  input rx_async_reset_in,
   output clock_tx_div,
   output clock_rx_div,
   input clock_ref
