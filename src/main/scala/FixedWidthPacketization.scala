@@ -131,7 +131,7 @@ class HydraPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle: Int
 
     require(decodedSymbolsPerCycle == symbolsPerPacket, "This implementation requires that decodedSymbolsPerCycle is the same as symbolsPerPacket")
 
-    val rxBuffer = Reg(Vec(2*symbolsPerPacket - 1, UInt(symbolFactory().decodedWidth.W)))
+    val rxBuffer = Reg(Vec(2*symbolsPerPacket - 1, symbolFactory()))
     val rxValidBuffer = Reg(Vec(2*symbolsPerPacket - 1, Bool()))
     val rxMuxIns = VecInit((0 until symbolsPerPacket).map { i => fwDataFactory().fromBits(VecInit(rxBuffer.slice(i, symbolsPerPacket + i)).toBits) })
     val rxAlign = Reg(UInt(log2Ceil(2*symbolsPerPacket).W))
