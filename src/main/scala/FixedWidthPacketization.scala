@@ -160,6 +160,7 @@ class HydraPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle: Int
 
     txSymbolData := txSymbolData.fromBits(io.data.tx.bits.toBits)
     txSymbolValid.foreach { _ := io.data.tx.valid }
+    io.data.tx.ready := io.symbolsTxReady
 
     def connectData(dataClock: Clock, dataReset: Bool, data: FixedWidthData[F]) {
         val qParams = AsyncQueueParams(8, 3, true, false)
