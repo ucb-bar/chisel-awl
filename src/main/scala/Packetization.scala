@@ -22,6 +22,38 @@ abstract class Packetizer[S <: DecodedSymbol, T <: Data](val decodedSymbolsPerCy
 
 }
 
+trait NoHandshakePacketizerStateMachine[S <: DecodedSymbol, T <: Data] extends Packetizer[S, T] {
+
+    val txEnable = Wire(Bool())
+    val rxEnable = Wire(Bool())
+
+    val sTxReset :: sTxReady :: Nil = Enum(2)
+    val sRxReset :: sRxReady :: Nil = Enum(2)
+    val txState = RegInit(sTxReset)
+    val rxState = RegInit(sRxReset)
+
+    when (txEnable) {
+       txState := sTxReady
+    } .otherwise {
+       txState := sTxReset
+    }
+
+    when (rxEnable) {
+       rxState := sRxReady
+    } .otherwise {
+       rxState := sRxReset
+    }
+
+    val txSymbolData = Wire(Vec(decodedSymbolsPerCycle, UInt(symbolFactory().decodedWidth.W)))
+    val txSymbolValid = Wire(Vec(decodedSymbolsPerCycle, Bool()))
+
+    io.symbolsTx.reverse.zipWithIndex.foreach { case (s,i) =>
+        val doSync = (i.U === 0.U) && (txState === sTxReset)
+        s.valid := (txSymbolValid(i) && (txState === sTxReady)) || doSync
+        s.bits := Mux(doSync, symbolFactory().sync, symbolFactory().fromData(txSymbolData(i)))
+    }
+
+}
 
 trait BasicPacketizerStateMachine[S <: DecodedSymbol, T <: Data] extends Packetizer[S, T] {
 

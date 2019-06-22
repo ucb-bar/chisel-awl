@@ -111,6 +111,86 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
 
 }
 
+class HydraPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle: Int, symbolFactory: () => S, fwDataFactory: () => F)
+    extends Packetizer[S, FixedWidthData[F]](decodedSymbolsPerCycle, symbolFactory, FixedWidthData.apply(fwDataFactory) _)
+    with NoHandshakePacketizerStateMachine[S, FixedWidthData[F]] {
+
+    override val controlIO = Some(IO(new ControlBundle {
+        val txEnable = input(Bool(), 0, "packetizer TX enable",
+            "When high, enables data transmission over the interface. When low, causes the packetizer to send synchronization symbols.")
+        val rxEnable = input(Bool(), 0, "packetizer RX enable",
+            "When high, allows data to be received.")
+    }))
+
+    txEnable := controlIO.get.txEnable
+    rxEnable := controlIO.get.rxEnable
+
+    val decodedWidth = symbolFactory().decodedWidth
+    val packetWidth = io.data.tx.bits.toBits.getWidth
+    val symbolsPerPacket = (packetWidth - 1)/decodedWidth + 1 // This is just ceil(packetWidth/decodedWidth)
+
+    require(decodedSymbolsPerCycle == symbolsPerPacket, "This implementation requires that decodedSymbolsPerCycle is the same as symbolsPerPacket")
+
+    val rxBuffer = Reg(Vec(2*symbolsPerPacket - 1, UInt(symbolFactory().decodedWidth.W)))
+    val rxValidBuffer = Reg(Vec(2*symbolsPerPacket - 1, Bool()))
+    val rxMuxIns = VecInit((0 until symbolsPerPacket).map { i => fwDataFactory().fromBits(VecInit(rxBuffer.slice(i, symbolsPerPacket + i)).toBits) })
+    val rxAlign = Reg(UInt(log2Ceil(2*symbolsPerPacket).W))
+
+    // OK, this is a bit of a hack, but what we're doing here is asserting that the RX valid output is high when at least 2 of the first 3 symbols are high
+    // This makes us robust to 1 word error (from a valid perspective), which is needed for Hydra's system-level synchronization.
+    val rxValids = VecInit((0 until symbolsPerPacket).map { i => Majority(rxValidBuffer(i), rxValidBuffer(i+1), rxValidBuffer(i+2)) })
+
+    // MSB is least recent byte, LSB is most recent byte
+    (0 until (2*symbolsPerPacket-1)).foreach { i =>
+        if (i < symbolsPerPacket) {
+            rxBuffer(i) := io.symbolsRx(i).bits
+            rxValidBuffer(i) := io.symbolsRx(i).valid
+            when (io.symbolsRx(i).valid && io.symbolsRx(i).bits === symbolFactory().sync) {
+                // Last connect will win
+                rxAlign := i.U
+            }
+        } else {
+            rxValidBuffer(i) := rxValidBuffer(i - symbolsPerPacket)
+            rxBuffer(i) := rxBuffer(i - symbolsPerPacket)
+        }
+    }
+
+    io.data.rx.bits := rxMuxIns(rxAlign)
+    io.data.rx.valid := rxValids(rxAlign) && (rxState === sRxReady)
+
+    txSymbolData := txSymbolData.fromBits(io.data.tx.bits.toBits)
+    txSymbolValid.foreach { _ := io.data.tx.valid }
+
+    def connectData(dataClock: Clock, dataReset: Bool, data: FixedWidthData[F]) {
+        val qParams = AsyncQueueParams(8, 3, true, false)
+
+        val txq = Module(new AsyncQueue(chiselTypeOf(io.data.tx.bits), qParams))
+        val rxq = Module(new AsyncQueue(chiselTypeOf(io.data.rx.bits), qParams))
+
+        txq.suggestName("AsyncQueueTx")
+        rxq.suggestName("AsyncQueueRx")
+
+        txq.io.enq <> data.tx
+        io.data.tx <> txq.io.deq
+        data.rx <> rxq.io.deq
+        rxq.io.enq <> io.data.rx
+
+        txq.io.enq_clock := dataClock
+        txq.io.deq_clock := this.clock
+
+        rxq.io.enq_clock := this.clock
+        rxq.io.deq_clock := dataClock
+
+        txq.io.enq_reset := dataReset
+        txq.io.deq_reset := this.reset.toBool
+
+        rxq.io.enq_reset := this.reset.toBool
+        rxq.io.deq_reset := dataReset
+
+    }
+
+}
+
 trait HasFixedWidthPacketizer[F <: Data] {
     this: Lane =>
 
@@ -121,4 +201,23 @@ trait HasFixedWidthPacketizer[F <: Data] {
 
     def genPacketizer[S <: DecodedSymbol](symbolFactory: () => S) = new FixedWidthPacketizer[S, F](decodedSymbolsPerCycle, symbolFactory, fwDataFactory)
 
+}
+
+trait HasHydraPacketizer[F <: Data] {
+    this: Lane =>
+
+    type T = FixedWidthData[F]
+
+    val fwDataFactory: () => F
+
+    // This is final because it needs to be this number for this packetizer to work correctly
+    // This will require you to put this trait after the encoder trait when building the lane
+    final override def decodedSymbolsPerCycle: Int = {
+        val decodedWidth = 8 // This is a hack
+        val packetWidth = fwDataFactory().toBits.getWidth
+        val symbolsPerPacket = (packetWidth - 1)/decodedWidth + 1 // This is just ceil(packetWidth/decodedWidth)
+        return symbolsPerPacket
+    }
+
+    def genPacketizer[S <: DecodedSymbol](symbolFactory: () => S) = new HydraPacketizer(decodedSymbolsPerCycle, symbolFactory, fwDataFactory)
 }

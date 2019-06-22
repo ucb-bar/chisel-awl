@@ -307,7 +307,7 @@ trait HasEncoding8b10b {
     this: Lane =>
     implicit val c: SerDesConfig
     // we want the encoded width to be >= the bit width but as small as possible
-    final def decodedSymbolsPerCycle = (c.dataWidth + 9)/10
+    def decodedSymbolsPerCycle = (c.dataWidth + 9)/10
     final def genEncoder() = new Encoder8b10b(decodedSymbolsPerCycle, 0)
     final def genDecoder() = new Decoder8b10b(decodedSymbolsPerCycle)
 }
@@ -316,7 +316,7 @@ trait HasEncoding8b10bHighPerformance {
     this: Lane =>
     implicit val c: SerDesConfig
     // we want the encoded width to be >= the bit width but as small as possible
-    final def decodedSymbolsPerCycle = (c.dataWidth + 9)/10
+    def decodedSymbolsPerCycle = (c.dataWidth + 9)/10
     final def genEncoder() = new Encoder8b10b(decodedSymbolsPerCycle, 1)
     final def genDecoder() = new Decoder8b10b(decodedSymbolsPerCycle)
 }

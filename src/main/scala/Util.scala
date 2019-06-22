@@ -128,3 +128,7 @@ class MultiQueue[T <: Data](gen: T, depth: Int, numEnqPorts: Int, numDeqPorts: I
         cnt + enq.valid
     }
 }
+
+object Majority {
+  def apply(a: Bool, b: Bool, c: Bool) = a&b|b&c|a&c
+}

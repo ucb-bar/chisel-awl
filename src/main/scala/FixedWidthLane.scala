@@ -18,3 +18,13 @@ class FixedWidthLane8b10b[F <: Data](val fwDataFactory: () => F)
     with HasFixedWidthPacketizer[F]
     with HasGenericTransceiverSubsystem
 
+class GenericHydraLane[F <: Data](val fwDataFactory: () => F)
+    (implicit val c: SerDesConfig, implicit val b: BertConfig, implicit val m: PatternMemConfig) extends Lane
+    with HasEncoding8b10b
+    with HasBertDebug
+    with HasPatternMemDebug
+    with HasBitStufferDebug4Modes
+    with HasBitReversalDebug
+    with HasHydraPacketizer[F]
+    with HasGenericTransceiverSubsystem
+
