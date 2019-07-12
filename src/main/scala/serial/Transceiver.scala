@@ -65,6 +65,5 @@ class GenericTransceiver()(implicit c: SerDesConfig) extends BlackBox(Map("SERDE
     addResource("/awl/vsrc/generic_transceiver.sv")
 
     override def desiredName = "generic_transceiver"
-    addResource("/generic_transceiver.sv")
 
 }
