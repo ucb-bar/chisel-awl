@@ -2,6 +2,7 @@ package awl.serial
 
 import chisel3._
 import chisel3.core.{BaseModule, IntParam, Param}
+import chisel3.util.{HasBlackBoxResource}
 import chisel3.experimental.Analog
 import chisel3.util.HasBlackBoxResource
 
@@ -64,5 +65,6 @@ class GenericTransceiver()(implicit c: SerDesConfig) extends BlackBox(Map("SERDE
     addResource("/awl/vsrc/generic_transceiver.sv")
 
     override def desiredName = "generic_transceiver"
+    addResource("/generic_transceiver.sv")
 
 }

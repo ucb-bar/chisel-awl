@@ -6,7 +6,7 @@ import freechips.rocketchip.diplomacy.AddressSet
 import freechips.rocketchip.subsystem.{ExtMem, BankedL2Key, MemoryBusKey}
 
 case class HbwifTLConfig(
-    managerAddressSet: AddressSet,
+    managerAddressSet: Seq[AddressSet],
     configAddressSets: Seq[AddressSet],
     numBanks: Int = 2,
     beatBytes: Int = 16,
@@ -46,7 +46,7 @@ class WithGenericSerdes extends Config((site, here, up) => {
     case HbwifNumLanes => site(BankedL2Key).nBanks
     case HbwifTLKey => {
         HbwifTLConfig(
-            managerAddressSet = AddressSet(site(ExtMem).get.master.base, site(ExtMem).get.master.size - 1),
+            managerAddressSet = AddressSet.misaligned(site(ExtMem).get.master.base, site(ExtMem).get.master.size),
             configAddressSets = Seq.tabulate(site(HbwifNumLanes)) { i =>
                 AddressSet(0x4000000 + i*0x10000, 0xffff)
             },
