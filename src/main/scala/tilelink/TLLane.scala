@@ -3,7 +3,7 @@ package hbwif.tilelink
 import hbwif._
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.withReset
+import chisel3.experimental.{withReset, MultiIOModule, IO}
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config._
@@ -58,7 +58,7 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
         val base = managerAddressSet
         val filter = AddressSet(id * cacheBlockBytes, ~((lanes-1) * cacheBlockBytes))
         TLManagerPortParameters(Seq(TLManagerParameters(
-            address            = base.intersect(filter).toList,
+            address            = base.flatMap(_.intersect(filter)),
             resources          = (new SimpleDevice(s"HbwifManager$id",Seq())).reg("mem"),
             regionType         = if (mtlc) RegionType.CACHED else RegionType.UNCACHED,
             executable         = true,
@@ -118,11 +118,17 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
             managerIn.suggestName(s"hbwif_manager_port_$id")
             configBuffers(id).module.suggestName(s"hbwif_config_port_$id")
             registerIn.suggestName(s"hbwif_register_port_$id")
+            val laneClk = Wire(Clock()).suggestName(s"laneClk_$id")
+            laneClk := clock
             val pipelinedReset = withReset(resetAsync) {
                AsyncResetShiftReg(reset.toBool, depth = p(HbwifPipelineResetDepth), init = 1)
-            }
+            }.suggestName(s"pipelinedReset_$id")
             val lane = Module(genLane(clientEdge, managerEdge))
-            val regmap = withReset(pipelinedReset) { lane.regmap }
+            val regmap = withClockAndReset(laneClk, pipelinedReset) { lane.regmap }
+            configBuffers(id).module.clock := laneClk
+            configBuffers(id).module.reset := pipelinedReset
+            lane.clock := laneClk
+            lane.reset := pipelinedReset
             val addrmap = TLController.toAddrmap(regmap)
             registerNodes(id).regmap(regmap:_*)
             if(clientPort) {
@@ -136,8 +142,6 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
             lane.io.rx <> rx(id)
             lane.io.clockRef <> hbwifRefClocks(id/(lanes/banks))
             lane.io.asyncResetIn <> hbwifResets(id)
-            lane.reset := pipelinedReset
-            configBuffers(id).module.reset := pipelinedReset
             (lane, addrmap)
         }).unzip
     }
