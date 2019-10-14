@@ -1,0 +1,1 @@
+../../../test/scala/serial/Encoding8b10bTest.scala
