@@ -33,6 +33,17 @@ module DifferentialDelayLine #(
 
 endmodule
 
+module ClockToDifferential (
+    input clock,
+    inout out_p,
+    inout out_n
+);
+
+    assign out_p = !clock;
+    assign out_n = clock;
+
+endmodule
+
 module DifferentialToBool (
     input in_p,
     input in_n,

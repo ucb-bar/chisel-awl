@@ -100,6 +100,8 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
 
         val tx = IO(Vec(lanes, new Differential()))
         val rx = IO(Vec(lanes, Flipped(new Differential())))
+        val txClocks = IO(Output(Vec(lanes, Clock())))
+        val rxClocks = IO(Output(Vec(lanes, Clock())))
 
         val (laneModules, addrmaps) = (0 until lanes).map({ id =>
             val (clientOut, clientEdge) = if(clientPort) {
@@ -140,6 +142,8 @@ abstract class HbwifModule()(implicit p: Parameters) extends LazyModule {
             lane.io.data.manager <> managerIn
             tx(id) <> lane.io.tx
             lane.io.rx <> rx(id)
+            rxClocks(id) <> lane.io.rxClock
+            txClocks(id) <> lane.io.txClock
             lane.io.clockRef <> hbwifRefClocks(id/(lanes/banks))
             lane.io.asyncResetIn <> hbwifResets(id)
             (lane, addrmap)
