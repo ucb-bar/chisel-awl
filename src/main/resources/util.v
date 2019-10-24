@@ -58,6 +58,17 @@ module DifferentialToBool (
 
 endmodule
 
+module TieoffDifferential (
+    input in,
+    inout out_p,
+    inout out_n
+);
+
+    assign out_p = in;
+    assign out_n = !in;
+
+endmodule
+
 module ErrorInjector #(
     parameter per1k = 0
 ) (
