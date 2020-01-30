@@ -2,7 +2,6 @@ package hbwif
 
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.{withClockAndReset, MultiIOModule}
 import scala.math.max
 
 // TODO get rid of this rocketchip dependency
@@ -16,7 +15,7 @@ abstract class DecodedSymbol(val decodedWidth: Int, val encodedWidth: Int, val r
     // Comparison
     def ===(other: DecodedSymbol): Bool = {
         if (this.decodedWidth == other.decodedWidth) {
-            this.toBits === other.toBits
+            this.asUInt === other.asUInt
         } else {
             false.B
         }

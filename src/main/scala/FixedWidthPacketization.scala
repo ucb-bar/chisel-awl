@@ -27,7 +27,7 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
     enable := controlIO.get.enable
 
     val decodedWidth = symbolFactory().decodedWidth
-    val packetWidth = io.data.tx.bits.toBits.getWidth
+    val packetWidth = io.data.tx.bits.asUInt.getWidth
     val symbolsPerPacket = (packetWidth + decodedWidth*decodedSymbolsPerCycle - 1)/decodedWidth
     val cyclesPerPacket = (symbolsPerPacket + decodedSymbolsPerCycle - 1)/decodedSymbolsPerCycle
     val extendedWidth = symbolsPerPacket*decodedWidth
@@ -43,7 +43,7 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
 
     when (io.data.tx.fire()) {
         txCount := symbolsPerPacket.U
-        txBuffer := io.data.tx.bits.toBits
+        txBuffer := io.data.tx.bits.asUInt
     } .elsewhen(txCount > decodedSymbolsPerCycle.U) {
         when (io.symbolsTxReady) {
             txCount := txCount - decodedSymbolsPerCycle.U
@@ -65,7 +65,7 @@ class FixedWidthPacketizer[S <: DecodedSymbol, F <: Data](decodedSymbolsPerCycle
 
     assert(io.data.rx.ready || !io.data.rx.valid, "Something went wrong, we should never have a valid symbol and unready Queue- check your buffer depths")
 
-    io.data.rx.bits := io.data.rx.bits.fromBits(rxBuffer.reverse.take(symbolsPerPacket).reduce(Cat(_,_))(extendedWidth - 1, extendedWidth - packetWidth))
+    io.data.rx.bits := rxBuffer.reverse.take(symbolsPerPacket).reduce(Cat(_,_))(extendedWidth - 1, extendedWidth - packetWidth).asTypeOf(io.data.rx.bits)
     io.data.rx.valid := (rxSymCount >= symbolsPerPacket.U)
 
     rxSymCount := io.symbolsRx.foldRight(rxSymCount - Mux(io.data.rx.fire(), symbolsPerPacket.U, 0.U)) { (symbol, count) =>
