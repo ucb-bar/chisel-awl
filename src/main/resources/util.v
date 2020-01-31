@@ -58,7 +58,7 @@ module DifferentialToBool (
 
 endmodule
 
-module TieoffDifferential (
+module BoolToDifferential (
     input in,
     inout out_p,
     inout out_n

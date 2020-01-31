@@ -69,7 +69,7 @@ object ClockToDifferential {
 
 }
 
-class TieoffDifferential extends BlackBox {
+class BoolToDifferential extends BlackBox {
 
     val io = IO(new Bundle {
         val in = Input(Bool())
@@ -78,10 +78,10 @@ class TieoffDifferential extends BlackBox {
 
 }
 
-object TieoffDifferential {
+object BoolToDifferential {
 
     def apply(b: Bool): Differential = {
-        val x = Module(new TieoffDifferential)
+        val x = Module(new BoolToDifferential)
         x.io.in <> b
         x.io.out
     }
