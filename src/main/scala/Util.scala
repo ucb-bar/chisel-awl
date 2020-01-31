@@ -44,7 +44,7 @@ class Packer(entries: Int, width: Int = 8) extends Module {
     })
 
     io.out := (1 until entries).foldLeft(io.in)({ (prev, stage) =>
-        Vec((0 until entries).map({ i =>
+        VecInit((0 until entries).map({ i =>
             if (i >= entries - stage) {
                 prev(i)
             } else {
@@ -71,7 +71,7 @@ object Pack {
     def apply(bits: UInt, mask: UInt): (Vec[UInt], UInt) = {
         val w = bits.getWidth / mask.getWidth
         require(bits.getWidth % mask.getWidth == 0)
-        this.apply(Vec((0 until mask.getWidth).map({ i =>
+        this.apply(VecInit((0 until mask.getWidth).map({ i =>
             val v = Wire(Valid(UInt(w.W)))
             v.bits := bits(w * i + w - 1, w * i)
             v.valid := mask(i)

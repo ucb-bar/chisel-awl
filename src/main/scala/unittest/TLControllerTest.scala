@@ -20,9 +20,9 @@ class TLControllerPusher(edge: TLEdgeOut, pattern: Seq[Pattern])(implicit p: Par
 
     io.tl.b.ready := true.B
     io.tl.c.valid := false.B
-    io.tl.c.bits := io.tl.c.bits.fromBits(0.U)
+    io.tl.c.bits := 0.U.asTypeOf(io.tl.c.bits)
     io.tl.e.valid := false.B
-    io.tl.e.bits := io.tl.e.bits.fromBits(0.U)
+    io.tl.e.bits := 0.U.asTypeOf(io.tl.e.bits)
 
     val started = RegInit(false.B)
     started := io.start || started
@@ -37,8 +37,8 @@ class TLControllerPusher(edge: TLEdgeOut, pattern: Seq[Pattern])(implicit p: Par
     val a = io.tl.a
     val d = io.tl.d
 
-    val check = Vec(pattern.map(_.dataIn.isDefined.B))(step) holdUnless a.fire()
-    val expect = Vec(pattern.map(_.dataIn.getOrElse(BigInt(0)).U))(step) holdUnless a.fire()
+    val check = VecInit(pattern.map(_.dataIn.isDefined.B))(step) holdUnless a.fire()
+    val expect = VecInit(pattern.map(_.dataIn.getOrElse(BigInt(0)).U))(step) holdUnless a.fire()
     assert(!check || !d.fire() || expect === d.bits.data)
 
     when (a.fire()) {
@@ -50,10 +50,10 @@ class TLControllerPusher(edge: TLEdgeOut, pattern: Seq[Pattern])(implicit p: Par
     }
 
     val (plegal, pbits) = pattern.map(_.bits(edge)).unzip
-    assert(end || Vec(plegal)(step), "Illegal")
+    assert(end || VecInit(plegal)(step), "Illegal")
 
     a.valid := started && ready && !end && !flight
-    a.bits := Vec(pbits)(step)
+    a.bits := VecInit(pbits)(step)
     d.ready := true.B
 
 }

@@ -56,7 +56,7 @@ class Symbol8b10bGenerator(val decodedSymbolsPerCycle: Int, val symbols: Seq[(In
         val decodedReady = Input(Bool())
     })
 
-    val symbolVec = Vec(symbols map { case x => Decoded8b10bSymbol(x) })
+    val symbolVec = VecInit(symbols map { case x => Decoded8b10bSymbol(x) })
     val counter = Counter(symbols.length / decodedSymbolsPerCycle + 1)
     val initCounter = Counter(5)
     val finished = RegInit(false.B)
@@ -105,7 +105,7 @@ class Symbol8b10bChecker(val decodedSymbolsPerCycle: Int, val symbols: Seq[(Int,
     val finished = RegInit(false.B)
     io.finished := finished
 
-    val decodedRev = Vec(io.decoded.reverse)
+    val decodedRev = VecInit(io.decoded.reverse)
 
     val started = RegInit(false.B)
     val startIdx = Reg(UInt(log2Ceil(decodedSymbolsPerCycle).W))
@@ -114,7 +114,7 @@ class Symbol8b10bChecker(val decodedSymbolsPerCycle: Int, val symbols: Seq[(Int,
 
     val error = RegInit(false.B)
 
-    val symbolVec = Vec(symbols map { case x => Decoded8b10bSymbol(x) })
+    val symbolVec = VecInit(symbols map { case x => Decoded8b10bSymbol(x) })
     val idx = (counter.value * decodedSymbolsPerCycle.U) - startIdx
 
     when (started) {

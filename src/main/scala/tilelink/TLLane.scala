@@ -3,7 +3,7 @@ package hbwif.tilelink
 import hbwif._
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.{withReset, MultiIOModule, IO}
+import chisel3.experimental.IO
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config._
