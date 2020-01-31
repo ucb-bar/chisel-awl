@@ -31,9 +31,9 @@ case class TLControllerReadExpectPattern(name: String, data: BigInt) extends TLC
 }
 
 trait HasTLController {
-    this: Lane =>
+    this: MultiIOModule =>
 
-    private def allios = Seq(ssio, encoderio, decoderio, packetizerio) ++ debugio
+    def allios: Seq[Option[ControlBundle]]
     def regmap = allios.foldLeft((Seq[(Int, Seq[RegField])](), 0))({ case ((seq, base), cio) =>
         val mapped = ioToRegMap(cio, base)
         (seq ++ mapped._1, mapped._2)
@@ -60,11 +60,17 @@ trait HasTLController {
 
     private def inputCrossing(x: ControlInput): RegField = {
         val width = x.width
-        val (toClock, toReset) = x.clock match {
-            case OuterClock => (this.clock, this.reset.toBool)
-            case TxClock => (this.io.txClock, this.io.txReset)
-            case RxClock => (this.io.rxClock, this.io.rxReset)
-            case _ => ???
+        val (toClock, toReset) = this match {
+            case l: Lane => x.clock match {
+                case OuterClock => (l.clock, l.reset.toBool)
+                case TxClock => (l.io.txClock, l.io.txReset)
+                case RxClock => (l.io.rxClock, l.io.rxReset)
+                case _ => ???
+            }
+            case _ => x.clock match {
+                case OuterClock => (this.clock, this.reset.toBool)
+                case _ => ???
+            }
         }
         val reg = withClockAndReset(toClock, toReset) { if (x.default.isDefined) RegInit(x.default.get.U(width.W)) else Reg(UInt(width.W)) }
         x.signal := reg
@@ -101,11 +107,17 @@ trait HasTLController {
 
     private def outputCrossing(x: ControlOutput): RegField = {
         val width = x.width
-        val (fromClock, fromReset) = x.clock match {
-            case OuterClock => (this.clock, this.reset.toBool)
-            case TxClock => (this.io.txClock, this.io.txReset)
-            case RxClock => (this.io.rxClock, this.io.rxReset)
-            case _ => ???
+        val (fromClock, fromReset) = this match {
+            case l: Lane => x.clock match {
+                case OuterClock => (l.clock, l.reset.toBool)
+                case TxClock => (l.io.txClock, l.io.txReset)
+                case RxClock => (l.io.rxClock, l.io.rxReset)
+                case _ => ???
+            }
+            case _ => x.clock match {
+                case OuterClock => (this.clock, this.reset.toBool)
+                case _ => ???
+            }
         }
         val readfn = x.clock match {
             case OuterClock => {
