@@ -14,7 +14,9 @@ abstract class TLLane8b10b(val clientEdge: TLEdgeOut, val managerEdge: TLEdgeIn)
     (implicit val c: SerDesConfig, implicit val b: BertConfig, implicit val m: PatternMemConfig, implicit val p: Parameters) extends Lane
     with HasEncoding8b10b
     with HasTLBidirectionalPacketizer
-    with HasTLController
+    with HasTLController {
+        override def allios = Seq(ssio, encoderio, decoderio, packetizerio) ++ debugio
+    }
 
 class GenericTLLane8b10b(clientEdge: TLEdgeOut, managerEdge: TLEdgeIn)(implicit p: Parameters)
     extends TLLane8b10b(clientEdge, managerEdge)(p(HbwifSerDesKey), p(HbwifBertKey), p(HbwifPatternMemKey), p)
