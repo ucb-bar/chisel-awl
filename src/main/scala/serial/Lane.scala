@@ -2,7 +2,6 @@ package awl.serial
 
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.MultiIOModule
 
 final class LaneIO[T <: Data](val dataFactory: () => T)(implicit val c: SerDesConfig)
     extends Bundle with TransceiverOuterIF {

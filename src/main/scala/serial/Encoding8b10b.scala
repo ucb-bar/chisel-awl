@@ -227,7 +227,7 @@ class Decoder8b10b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbolsPe
 
     val prev = Reg(UInt(9.W))
     val extended = Cat(prev, io.encoded.bits)
-    val offsets = Vec( (0 to 9).map { i => extended(decodedSymbolsPerCycle*10+i-1, i) } )
+    val offsets = VecInit( (0 to 9).map { i => extended(decodedSymbolsPerCycle*10+i-1, i) } )
     // Check that bits cdeif (7,3) are the same (this defines a comma)
     val commas = offsets.map { x => (x(9,3) === "b0011111".U) || (x(9,3) === "b1100000".U) }
     val found = commas.reduce(_||_)

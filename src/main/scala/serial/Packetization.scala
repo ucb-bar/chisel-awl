@@ -2,7 +2,6 @@ package awl.serial
 
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.MultiIOModule
 
 class PacketizerIO[S <: DecodedSymbol, T <: Data](val decodedSymbolsPerCycle: Int, val symbolFactory: () => S, val dataFactory: () => T) extends Bundle {
     val symbolsTx = Vec(decodedSymbolsPerCycle, Valid(symbolFactory()))

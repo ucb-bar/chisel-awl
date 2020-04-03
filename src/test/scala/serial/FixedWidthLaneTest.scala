@@ -33,7 +33,7 @@ class FixedWidthLane8b10bTest[F <: Data](delay: Int, dataWidth: Int, fwDataFacto
 
     val rnd = new Random(5)
     val len = 500
-    val numBits = lane.io.data.tx.bits.toBits.getWidth
+    val numBits = lane.io.data.tx.bits.asUInt.getWidth
     val seq = Seq.fill(len) { BigInt(numBits, rnd) }
 
     val pusher = Module(new BigPusher(seq, fwDataFactory))
@@ -63,7 +63,7 @@ class BigPusher[F <: Data](seq: Seq[BigInt], fwDataFactory: () => F) extends Mod
         }
     }
 
-    io.out.bits := io.out.bits.fromBits(0.U)
+    io.out.bits := 0.U
 
     //seq.zipWithIndex.foreach { case (d, i) => println(f"Packet $i%d should be $d%x") }
 
@@ -73,7 +73,7 @@ class BigPusher[F <: Data](seq: Seq[BigInt], fwDataFactory: () => F) extends Mod
                 printf("Setting %x for packet %d\n", d.U, i.U)
                 printf("Set pusher.io.out.bits to %x", io.out.bits.asUInt)
             }
-            io.out.bits := io.out.bits.fromBits(d.U)
+            io.out.bits := d.U.asTypeOf(chiselTypeOf(io.out.bits))
         }
     }
 
@@ -104,7 +104,7 @@ class BigChecker[F <: Data](seq: Seq[BigInt], fwDataFactory: () => F) extends Mo
         when (count.value === i.U && io.in.fire()) {
             printf("Checking that we got %x for packet %d\n", d.U, i.U)
             printf("Got checker.io.in.bits %x\n", io.in.bits.asUInt)
-            assert(io.in.bits.asUInt === io.in.bits.fromBits(d.U).asUInt, "Got the wrong data")
+            assert(io.in.bits.asUInt === d.U, "Got the wrong data")
         }
     }
 

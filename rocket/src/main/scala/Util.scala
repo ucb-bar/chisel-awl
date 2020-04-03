@@ -168,27 +168,27 @@ trait TLPacketizerUtils {
         val ret = Wire(UInt())
         when (tlType === typeA) {
             val a = Wire(new TLBundleA(aceEdge.bundle))
-            a := a.fromBits(0.U)
+            a := 0.U.asTypeOf(chiselTypeOf(a))
             a.opcode := opcode
             ret := getNumSymbols(aceEdge, a, first)
         } .elsewhen (tlType === typeB) {
             val b = Wire(new TLBundleB(bdEdge.bundle))
-            b := b.fromBits(0.U)
+            b := 0.U.asTypeOf(chiselTypeOf(b))
             b.opcode := opcode
             ret := getNumSymbols(bdEdge, b, first)
         } .elsewhen (tlType === typeC) {
             val c = Wire(new TLBundleC(aceEdge.bundle))
-            c := c.fromBits(0.U)
+            c := 0.U.asTypeOf(chiselTypeOf(c))
             c.opcode := opcode
             ret := getNumSymbols(aceEdge, c, first)
         } .elsewhen (tlType === typeD) {
             val d = Wire(new TLBundleD(bdEdge.bundle))
-            d := d.fromBits(0.U)
+            d := 0.U.asTypeOf(chiselTypeOf(d))
             d.opcode := opcode
             ret := getNumSymbols(bdEdge, d, first)
         } .otherwise {
             val e = Wire(new TLBundleE(aceEdge.bundle))
-            e := e.fromBits(0.U)
+            e := 0.U.asTypeOf(chiselTypeOf(e))
             ret := getNumSymbols(aceEdge, e, first)
         }
         ret
