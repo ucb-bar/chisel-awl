@@ -241,8 +241,10 @@ class Decoder8b10b(decodedSymbolsPerCycle: Int) extends Decoder(decodedSymbolsPe
         prev := io.encoded.bits(8,0)
     }
 
+    val valid = (io.encoded.valid && lock)
     (0 until decodedSymbolsPerCycle).foreach { i =>
-        io.decoded(i) := Decoded8b10bSymbol.decode(offsets(idx)(i*10+9,i*10), rd, io.encoded.valid && lock)
+        val data = (offsets(idx)(i*10+9, i*10))
+        io.decoded(i) := Decoded8b10bSymbol.decode(data, rd, valid)
     }
 
     val error = RegInit(false.B)
